@@ -5,6 +5,7 @@ import type { AiSettings } from '../src/ai/types'
 const openAiSettings: AiSettings = {
   enabled: true,
   configured: true,
+  completionEnabled: true,
   provider: 'openai-compatible',
   model: 'test-model',
   baseUrl: 'https://example.com/v1',
@@ -37,6 +38,28 @@ describe('AI providers', () => {
 
     expect(result).toBe('明确后的文本')
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://example.com/v1/chat/completions')
+  })
+
+  it('uses a short low-temperature request for inline completion', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '并保持代码干净。' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      getAiProvider(openAiSettings).generate(openAiSettings, {
+        action: 'complete',
+        content: '只修改当前问题',
+      }),
+    ).resolves.toBe('并保持代码干净。')
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    const body = JSON.parse(String(init?.body)) as { max_tokens?: number; temperature?: number }
+    expect(body.max_tokens).toBe(120)
+    expect(body.temperature).toBe(0.1)
   })
 
   it('extracts Anthropic text responses', async () => {
@@ -88,7 +111,7 @@ describe('AI providers', () => {
     ).rejects.toThrow(/无法连接 AI Provider.*Base URL.*网络连接.*站点访问授权/)
   })
 
-  it('converts aborted provider requests into a visible timeout error', async () => {
+  it('converts provider timeouts into a visible timeout error', async () => {
     const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' })
     vi.stubGlobal(
       'fetch',
@@ -101,5 +124,26 @@ describe('AI providers', () => {
         content: '测试',
       }),
     ).rejects.toThrow(/请求超过 30 秒/)
+  })
+
+  it('allows a stale completion request to be cancelled without converting it into a timeout', async () => {
+    const controller = new AbortController()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))
+        }),
+      ),
+    )
+
+    const request = getAiProvider(openAiSettings).generate(
+      openAiSettings,
+      { action: 'complete', content: '继续输入' },
+      controller.signal,
+    )
+    controller.abort()
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
