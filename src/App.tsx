@@ -555,6 +555,7 @@ async function insertIntoActivePage(text: string): Promise<InsertPlacement> {
 async function sendInsertRequest(tabId: number, request: ContentRequest): Promise<InsertPlacement> {
   const response = (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse
   if (!response.ok) throw new Error(response.error)
+  if (!('placement' in response)) throw new Error('网页插入桥返回了无效响应。')
   return response.placement
 }
 
