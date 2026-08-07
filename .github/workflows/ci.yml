@@ -10,12 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Audit dependency licenses
+        run: npm run license:audit
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
