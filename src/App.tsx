@@ -7,7 +7,7 @@ import { ChromeAiSettingsRepository, defaultAiSettings } from './storage/aiSetti
 import { defaultBaseUrl, ensureAiHostPermission, getAiProvider } from './ai/provider'
 import { lintPrompt } from './ai/lint'
 import { makeAppendSuggestion, makeReplacementSuggestion } from './ai/suggestions'
-import type { AiAction, AiSettings, PromptSuggestion } from './ai/types'
+import type { AiSettings, PromptSuggestion } from './ai/types'
 import type { ComposerState, ContentRequest, ContentResponse, InsertMode } from './extension/messages'
 import {
   AiSheet,
