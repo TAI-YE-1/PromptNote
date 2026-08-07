@@ -61,4 +61,18 @@ describe('generic web input insertion', () => {
     expect(composer.innerText).toBe('AXB')
     expect(composer.dispatchEvent).toHaveBeenCalledOnce()
   })
+
+  it('falls back when execCommand reports success but does not change the editor DOM', () => {
+    const { composer, execCommand } = installChatGptContentEditableFixture({
+      text: 'AB',
+      start: 1,
+      execCommandSucceeds: true,
+      execCommandMutates: false,
+    })
+
+    expect(insertIntoEditable(composer as unknown as HTMLElement, 'X')).toBe('caret')
+    expect(execCommand).toHaveBeenCalledWith('insertText', false, 'X')
+    expect(composer.innerText).toBe('AXB')
+    expect(composer.dispatchEvent).toHaveBeenCalledOnce()
+  })
 })
