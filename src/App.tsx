@@ -388,6 +388,7 @@ export function App() {
       setAiPanel(null)
     } catch (aiRunError) {
       setAiError(messageOf(aiRunError))
+      setAiPanel('menu')
     } finally {
       setAiBusy(false)
     }
