@@ -1,4 +1,4 @@
-# PROTOTYPE — PromptNote P0.5 可交互原型规格
+# PROTOTYPE — PromptNote P0.5 单文件 HTML 可交互原型规格
 
 本文件定义 PromptNote 在正式进入 P1 代码实现前的 P0.5 原型验证范围。原型用于验证用户体验，不作为生产代码来源，不建立第二套产品或技术实现。
 
@@ -17,16 +17,47 @@ P0.5 不验证：真实 TipTap Schema、PromptDocument 持久化、Compiler 正�
 
 ## 2. 原型载体
 
-优先使用 Figma 可交互原型。
+P0.5 使用 **单文件 HTML 可交互原型**，文件建议放在：
 
-原因：
+`prototype/promptnote-prototype.html`
 
-- 可以快速比较布局而不产生临时代码债；
-- 适合模拟 Side Panel 的窄宽度；
-- Slash Menu、selection toolbar、suggestion、preview、dialog 都能用 overlay / component state 表达；
-- 原型确认后直接丢弃交互实现，只保留验证后的 UX 规则进入正式代码。
+该文件必须：
 
-原型基础画布以约 440px 宽的 Side Panel 为主视图，同时必须检查约 360px 与 520px 两个宽度状态。这里是设计验证尺寸，不是浏览器 API 的硬编码约束。
+- 单文件包含 HTML、CSS、JavaScript；
+- 可直接双击在 Chrome / Edge 打开；
+- 不依赖 Node、npm、Vite、React、CDN 或远程资源；
+- 不需要后端或登录；
+- 使用假数据和前端内存状态模拟交互；
+- 允许使用 `localStorage` 仅保存“原型演示状态”，但不得将其误认为正式 PromptDocument 存储设计；默认优先纯内存状态；
+- 原型结束后不复制进入正式 Extension 实现。
+
+### 2.1 为什么不用 Figma
+
+当前原型的目的不是交付视觉设计文件，而是低成本验证真实交互。单文件 HTML 可以直接模拟输入、点击、菜单、选择、抽屉、预览和状态切换，且无需 Figma 额度。
+
+### 2.2 为什么不用 React
+
+P0.5 不能提前演变为正式代码。若使用 React / TipTap / Extension API，会把“原型验证”提前变成 P1-P3 实现，导致 UX 未确认前就产生代码债。
+
+### 2.3 原型内部实现原则
+
+建议使用最简单的状态驱动模式：
+
+```text
+const state = { ... }
+
+用户事件
+   ↓
+更新 state
+   ↓
+render()
+   ↓
+刷新当前原型视图
+```
+
+允许拆少量纯函数，但仍保留在同一个 HTML 文件中。不要引入组件框架、路由库、状态库或构建系统。
+
+原型基础视口以约 440px 宽的 Side Panel 为主视图，同时必须检查约 360px 与 520px 两个宽度状态。这里是设计验证尺寸，不是浏览器 API 的硬编码约束。
 
 ## 3. 信息架构
 
@@ -103,7 +134,7 @@ PromptNote Side Panel
 
 语义标签使用较小、较弱的标题或左侧标记。正文仍像普通文档连续阅读。
 
-不推荐：每个 Section 都有明显边框、阴影、彩色大卡片。原因是长 Prompt 会变成表单堆叠，破坏“像写文档一样写 Prompt”。
+不推荐：每个 Section 都有明显边框、阴影、彩色大卡片。长 Prompt 不能变成表单堆叠。
 
 ## 5. Slash Menu
 
@@ -136,6 +167,8 @@ Prompt 结构
 - 不要求用户理解 Goal / Context 等英文术语；
 - 语义块可转换回普通段落且正文不丢失。
 
+P0.5 中不要求复刻 TipTap 的真实 selection / command 行为，只需要把交互感受模拟出来。
+
 ## 6. Prompt Section 视觉
 
 采用“文档式 section”，不是“表单字段”。
@@ -147,19 +180,19 @@ Prompt 结构
 先检查真实代码，不要先修改。
 ```
 
-Hover / Focus 时才显示弱操作：
+Hover / Focus 时显示弱操作：
 
 ```text
 ⋮ 约束        转换类型 / 移除结构标签
 ```
 
-结构标签只是语义元数据；正文的排版应保持连续。
+结构标签只是语义元数据；正文排版保持连续。
 
 原型至少演示：Goal、Context、Instruction、Constraint、Example、Acceptance。
 
 ## 7. Selection Toolbar
 
-用户选中一段文本后显示轻量浮动工具条：
+用户选中或点击原型中的演示文本后显示轻量浮动工具条：
 
 ```text
 [B] [I]  |  改清楚  缩短  拆成约束  ···
@@ -168,15 +201,15 @@ Hover / Focus 时才显示弱操作：
 原则：
 
 - 常规格式和 AI 动作共处，但视觉分组；
-- AI 不在未选中文本时主动弹出；
+- AI 不在未选择文本时主动弹出；
 - 不用一个常驻“AI Chat”占据 Side Panel；
-- `检查歧义`、`生成验收条件` 可放入 `···` 或 Check 流程，避免工具条过宽。
+- `检查歧义`、`生成验收条件` 可放入 `···` 或 Check 流程。
 
 ## 8. AI Suggestion 设计
 
 AI 结果不直接写入正文。
 
-推荐使用“贴近原文的 suggestion card / inline drawer”：
+推荐使用贴近原文的 suggestion card / inline drawer：
 
 ```text
 AI 建议
@@ -193,22 +226,23 @@ AI 建议
 要求：
 
 - 原文与建议始终同时可见；
-- `接受` 才产生正文变化；
+- `接受` 才让原型正文状态变化；
 - `忽略` 直接关闭；
-- 原文在 suggestion 期间继续可编辑时，原型要表现“内容已变化，建议可能过期”的状态；
-- 不做复杂 Track Changes，也不做对话式 AI 面板。
+- 原型要能演示“正文已经变化，因此旧建议已过期”；
+- 不做复杂 Track Changes，也不做对话式 AI 面板；
+- P0.5 的建议内容是预置假数据，不调用真实 AI API。
 
 ## 9. Check / Prompt Lint
 
-底部 `Check` 是结构检查入口，不是“Prompt 评分”。
+底部 `Check` 是结构检查入口，不是 Prompt 评分。
 
-点击后优先在编辑器内出现 findings，必要时用底部抽屉汇总：
+点击后出现 findings，例如：
 
 ```text
 检查到 3 个可能问题
 
 ⚠ “尽量”表达比较模糊
-  定位到原文  [查看]
+  [查看]
 
 ⚠ 当前没有明确验收标准
   [添加验收标准]
@@ -221,16 +255,12 @@ AI 建议
 
 - 不给 72/100 之类分数；
 - 不阻断 Copy / Insert；
-- 能定位原文；
-- 可执行动作优先是确定性结构动作，AI 语义修正仍走 suggestion。
+- 能模拟定位原文；
+- P0.5 findings 使用本地预置规则/假数据，不实现正式 lint 引擎。
 
 ## 10. Preview 设计
 
 `Preview` 打开覆盖当前 Side Panel 的二级视图，而不是永久左右分栏。
-
-原因：Side Panel 宽度有限，左右分栏会同时损害编辑和预览。
-
-结构：
 
 ```text
 ← 返回       Prompt Preview
@@ -247,15 +277,14 @@ AI 建议
 要求：
 
 - Preview 只读；
-- 切换格式不修改文档；
+- 切换格式不修改原型编辑内容；
 - Markdown 可显示源码，不把它变成第二编辑器；
-- 返回后保持原编辑位置。
+- 返回后保持原先编辑状态；
+- P0.5 可用预置转换函数模拟三种输出，不代表正式 Compiler 契约已经实现。
 
 ## 11. Bottom Action Bar
 
-默认固定在底部，核心操作始终可见。
-
-推荐：
+默认固定在底部：
 
 ```text
 [检查]        [预览]      [复制 ▾]   [插入]
@@ -263,14 +292,16 @@ AI 建议
 
 设计判断：
 
-- `Insert` 是场景内最高价值动作，视觉权重最高；
+- `Insert` 视觉权重最高；
 - `Copy` 必须始终存在，是 Adapter 失败的可靠降级路径；
-- `Copy ▾` 可选择输出格式，但默认记住最近格式；
-- 不把 Plain / Markdown / XML 三个按钮常驻底栏，避免拥挤。
+- `Copy ▾` 可模拟选择输出格式；
+- 不把 Plain / Markdown / XML 三个按钮常驻底栏。
+
+P0.5 的 Insert 只模拟结果，不操作真实 ChatGPT DOM。
 
 ## 12. 文档切换
 
-点击左上角文档入口，以 overlay / sheet 打开轻量列表：
+点击左上角文档入口，打开轻量 overlay / sheet：
 
 ```text
 Prompt
@@ -290,11 +321,7 @@ P0.5 不设计文件夹、标签系统、收藏、共享、团队空间等管理
 
 ## 13. Insert 冲突状态
 
-原型必须覆盖目标网页输入框已有文本时的情况。
-
-不能静默覆盖。
-
-弹出：
+原型必须覆盖目标网页输入框已有文本时的情况，不能静默覆盖。
 
 ```text
 当前输入框已有内容
@@ -308,7 +335,7 @@ P0.5 不设计文件夹、标签系统、收藏、共享、团队空间等管理
 
 默认不预选“替换”。
 
-Adapter 不可用时：
+Adapter 不可用时模拟：
 
 ```text
 无法插入到当前页面。
@@ -317,9 +344,9 @@ Adapter 不可用时：
 [复制到剪贴板]
 ```
 
-## 14. 原型 Frame / State 清单
+## 14. 原型 State 清单
 
-P0.5 至少包含以下可点击状态：
+P0.5 至少包含以下可操作状态：
 
 1. `A01 Empty` — 新 Prompt 空状态；
 2. `A02 Writing` — 自由文本编辑；
@@ -333,10 +360,10 @@ P0.5 至少包含以下可点击状态：
 10. `A10 Document Switcher`；
 11. `A11 Insert Existing Content`；
 12. `A12 Insert Failure → Copy`；
-13. `A13 Narrow 360` — 窄宽度检查；
-14. `A14 Wide 520` — 较宽状态检查。
+13. `A13 Narrow 360`；
+14. `A14 Wide 520`。
 
-不要求为每个状态建独立页面；优先使用 components / variants / overlays 表达。
+这些状态必须由同一个 HTML 文件里的统一状态模型切换，不为每个状态复制一份独立页面代码。
 
 ## 15. 原型交互主链
 
@@ -350,7 +377,7 @@ Writing
 Slash Menu
   ↓ 选择约束
 Structured
-  ↓ 选中文本
+  ↓ 选择文本
 Selection Toolbar
   ↓ 改清楚
 Suggestion
@@ -368,7 +395,19 @@ Structured
 Insert success / conflict / failure
 ```
 
-## 16. 视觉方向
+## 16. 原型辅助控制
+
+为了方便评审，单文件 HTML 可以提供一个不进入正式产品的“原型控制区”，例如：
+
+- 重置演示；
+- 快速跳到 Empty / Structured / Suggestion / Preview / Insert Failure；
+- 切换 360 / 440 / 520 宽度；
+- 模拟 Adapter 可用 / 不可用；
+- 模拟目标输入框已有内容。
+
+这些控件必须明确标记为 `Prototype Controls`，不应被误认为 V1 产品功能。
+
+## 17. 视觉方向
 
 关键词：轻、安静、文档感、低工具感。
 
@@ -378,12 +417,12 @@ Insert success / conflict / failure
 - 主要留白服务文字；
 - 结构标签使用弱强调；
 - AI 使用单一辅助标识，不让界面充满“魔法渐变”；
-- 关键操作层级明确，但不把整个产品做成开发者 IDE；
+- 关键操作层级明确，但不把产品做成开发者 IDE；
 - 图标只辅助识别，不替代文字。
 
 原型阶段不先做品牌视觉系统，避免 Logo、插画、渐变等工作干扰编辑体验判断。
 
-## 17. P0.5 验收问题
+## 18. P0.5 验收问题
 
 原型复核时必须逐条回答：
 
@@ -398,14 +437,27 @@ Insert success / conflict / failure
 
 只有这些问题被确认后，才能开始 P1。
 
-## 18. 原型关闭后的处理
+## 19. 原型验证方式
 
-P0.5 原型不是正式实现。
+完成 HTML 后至少执行：
+
+1. Chrome 打开本地文件；
+2. Edge 打开本地文件；
+3. 跑通第 15 节完整主链；
+4. 检查浏览器控制台无 JavaScript error；
+5. 检查 360 / 440 / 520 三种宽度；
+6. 检查重置演示后状态可恢复到初始态。
+
+如果可用浏览器自动化，可补充自动点击 smoke，但不能用自动化通过替代人工体验复核。
+
+## 20. 原型关闭后的处理
+
+P0.5 HTML 原型不是正式实现。
 
 确认后：
 
 1. 将最终交互结论同步到 `docs/UX.md`；
 2. 如产品边界变化，同步 `docs/PRODUCT.md` 与 `docs/DECISIONS.md`；
 3. 更新 `TASKS.md`，关闭 P0.5；
-4. 正式代码仍从 P1 新建，不复制临时原型实现；
-5. Figma 原型保留为 UX reference，不作为运行时权威状态或代码 Schema 权威来源。
+4. 正式代码仍从 P1 新建，不复制原型临时代码；
+5. HTML 原型保留为 UX reference，不作为运行时权威状态、PromptDocument Schema 或正式 Compiler 的来源。
