@@ -24,13 +24,12 @@ function paragraphState(text: string) {
   })
 }
 
-function runHistoryCommand(state: EditorState, command: HistoryCommand) {
-  let next: EditorState | null = null
-  expect(command(state, (transaction) => {
-    next = state.apply(transaction)
-  })).toBe(true)
-  if (!next) throw new Error('History command did not dispatch a transaction.')
-  return next
+function runHistoryCommand(state: EditorState, command: HistoryCommand): EditorState {
+  const dispatched: Transaction[] = []
+  expect(command(state, (transaction) => dispatched.push(transaction))).toBe(true)
+  const transaction = dispatched[0]
+  if (!transaction) throw new Error('History command did not dispatch a transaction.')
+  return state.apply(transaction)
 }
 
 describe('editor undo/redo', () => {
