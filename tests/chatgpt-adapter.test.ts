@@ -37,7 +37,7 @@ describe('chatGptAdapter', () => {
     expect(execCommand).toHaveBeenCalledWith('insertText', false, '\n新的 Prompt')
   })
 
-  it('falls back to textContent plus an input event when execCommand is unavailable', () => {
+  it('falls back to textContent plus an input event when execCommand rejects insertion', () => {
     const { composer, execCommand } = installChatGptContentEditableFixture({
       text: '原内容',
       execCommandSucceeds: false,
@@ -46,6 +46,19 @@ describe('chatGptAdapter', () => {
     chatGptAdapter.insert('替换后的 Prompt', 'replace')
 
     expect(execCommand).toHaveBeenCalledWith('insertText', false, '替换后的 Prompt')
+    expect(composer.innerText).toBe('替换后的 Prompt')
+    expect(composer.dispatchEvent).toHaveBeenCalledOnce()
+  })
+
+  it('uses the same fallback when execCommand is absent', () => {
+    const { composer, execCommand } = installChatGptContentEditableFixture({
+      text: '原内容',
+      execCommandAvailable: false,
+    })
+
+    chatGptAdapter.insert('替换后的 Prompt', 'replace')
+
+    expect(execCommand).not.toHaveBeenCalled()
     expect(composer.innerText).toBe('替换后的 Prompt')
     expect(composer.dispatchEvent).toHaveBeenCalledOnce()
   })
