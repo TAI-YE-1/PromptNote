@@ -284,6 +284,45 @@ AI 是可选助手，不是正文的一部分。把 Provider 或 credential 放�
 
 ---
 
+## D016 — Web Insert 使用通用 caret-first 语义，站点 Adapter 只做特殊兼容
+
+**状态：Accepted**
+
+### 决定
+
+V1 的网页插入不再以“已有内容 → 追加整框 / 替换整框”作为主交互，也不把 ChatGPT Adapter 当作唯一插入入口。
+
+统一语义改为：
+
+- 有网页文本选区 → 只替换该选区；
+- 有折叠 caret → 插入到 caret；
+- 空输入框 → 直接插入；
+- 无法恢复 caret 但目标输入框可靠 → 插入末尾并明确告知；
+- 无法确定目标输入框 → 失败并要求用户先点击目标输入框；
+- 永不自动发送。
+
+标准 `input / textarea / contenteditable` 由通用 Adapter + 共享插入引擎处理；ChatGPT 等站点 Adapter 只保留必要的 selector / 特殊 DOM 发现逻辑。
+
+### 原因
+
+“插入”应与用户熟悉的粘贴心智一致。强制 append/replace 对话框增加操作步骤、破坏 caret 上下文，并导致 Side Panel 与 Content Script 在一次正常插入中进行不必要的多次消息往返。
+
+同时，按站点复制完整插入算法会制造重复代码和持续 DOM 维护成本。
+
+### 权限与性能影响
+
+- Manifest 使用 `activeTab + scripting`，只在用户明确点击扩展图标时对当前标签页临时注入轻量 page bridge；
+- 不向全部网页静态常驻 PromptNote content script；
+- Side Panel 正常插入只发送一次原子 `PROMPTNOTE_INSERT_AT_CARET` 消息；Bridge 丢失时才尝试恢复注入；
+- 自动保存成功后不再为每次输入重新读取全部文档列表；
+- Preview/Lint 只在对应 UI 打开时计算，避免默认编辑热路径无意义重算。
+
+### 影响
+
+D010 的“网页差异集中在 Adapter”继续有效，但 Adapter 责任进一步收窄为目标编辑器发现/站点差异；通用 caret 写入算法只有一份。
+
+---
+
 ## 决策变更规则
 
 如果要推翻 Accepted 决策：
