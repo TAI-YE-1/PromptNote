@@ -194,6 +194,30 @@ Prompt Marketplace、团队协作、Agent Workflow、MCP 平台、模型 Playgro
 
 ---
 
+## D013 — P1 前先完成 P0.5 可交互 UX 原型验证
+
+**状态：Accepted**
+
+### 决定
+
+在正式初始化 React / Extension 代码之前，先完成一轮 Figma 可交互原型，验证 Side Panel 核心编辑体验。
+
+原型范围以 `docs/PROTOTYPE.md` 为准。
+
+### 原因
+
+PromptNote 的核心差异不是技术可行性，而是“自己写 Prompt 是否舒服”。如果先进入 Extension / TipTap / Storage 实现，再发现结构块、AI suggestion、Preview 或底部操作布局不自然，会把 UX 返工扩大为代码返工。
+
+### 影响
+
+- `TASKS.md` 增加 P0.5，P0.5 关闭前不得开始 P1；
+- 原型只验证交互，不实现真实 Schema、Storage、Compiler、Adapter 或 AI API；
+- 原型确认后将结论回写 `docs/UX.md`；
+- 正式代码仍从 P1 干净开始，不复制原型临时代码；
+- Figma 是 UX reference，不取代 PRODUCT、CONTRACT、ARCHITECTURE 等权威来源。
+
+---
+
 ## 决策变更规则
 
 如果要推翻 Accepted 决策：
