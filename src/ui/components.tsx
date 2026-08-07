@@ -159,6 +159,8 @@ export function DocumentSheet(props: {
   onSwitch(id: string): void
   onCreate(): void
   onDelete(): void
+  onExport(): void
+  onImport(file: File): void
 }) {
   const [query, setQuery] = useState('')
   const visible = props.documents.filter((document) =>
@@ -188,6 +190,21 @@ export function DocumentSheet(props: {
               <small>{new Date(document.updatedAt).toLocaleString()}</small>
             </button>
           ))}
+        </div>
+        <div className="backup-actions">
+          <button className="ghost-button" onClick={props.onExport}>导出当前 JSON</button>
+          <label className="ghost-button file-import">
+            导入 JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) props.onImport(file)
+                event.currentTarget.value = ''
+              }}
+            />
+          </label>
         </div>
         <div className="sheet-actions">
           <button className="ghost-button danger-text" onClick={props.onDelete}>删除当前</button>
