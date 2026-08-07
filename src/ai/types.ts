@@ -49,5 +49,5 @@ export interface PromptLintFinding {
 
 export interface AiProvider {
   testConnection(settings: AiSettings): Promise<void>
-  generate(settings: AiSettings, request: AiRequest): Promise<string>
+  generate(settings: AiSettings, request: AiRequest, signal?: AbortSignal): Promise<string>
 }
