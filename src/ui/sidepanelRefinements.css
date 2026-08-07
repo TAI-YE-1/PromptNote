@@ -1,26 +1,65 @@
+.selection-toolbar {
+  left: 12px !important;
+  right: 12px;
+  width: auto;
+  max-width: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px;
+  transform: translateY(-100%);
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 13px;
+}
+
+.selection-toolbar button {
+  min-width: 0;
+  padding: 7px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.selection-toolbar > span {
+  display: none;
+}
+
 .block-format-picker {
   position: absolute;
   z-index: 44;
-  transform: translate(-50%, 0);
-  display: inline-flex;
+  left: 12px !important;
+  right: 12px;
+  width: auto;
+  max-width: none;
+  transform: none;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: calc(100% - 24px);
-  padding: 4px 5px 4px 9px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 7px 6px 10px;
   border: 1px solid #d8dfd9;
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(252, 252, 250, .98);
-  color: #667068;
+  color: #707970;
   font-size: 9px;
-  box-shadow: 0 8px 22px rgba(35, 74, 58, .12);
+  box-shadow: 0 8px 22px rgba(35, 74, 58, .10);
+}
+
+.block-format-picker > span {
+  flex: 0 0 auto;
+  color: #7b847d;
+  font-weight: 650;
 }
 
 .block-format-picker select {
-  max-width: 118px;
-  height: 26px;
-  padding: 0 24px 0 8px;
+  min-width: 116px;
+  max-width: 170px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 28px 0 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   outline: none;
   background: #eef3ef;
   color: var(--forest-deep);
@@ -113,8 +152,26 @@
 }
 
 @media (max-width: 380px) {
+  .selection-toolbar {
+    left: 8px !important;
+    right: 8px;
+    gap: 2px;
+    padding: 5px;
+  }
+
+  .selection-toolbar button {
+    padding-inline: 2px;
+    font-size: 9px;
+  }
+
   .block-format-picker {
-    max-width: calc(100% - 16px);
+    left: 8px !important;
+    right: 8px;
+  }
+
+  .block-format-picker select {
+    min-width: 104px;
+    max-width: 148px;
   }
 
   .backup-actions .ghost-button {
