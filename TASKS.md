@@ -23,7 +23,7 @@
 - [x] P0-04 建立 `docs/PROMPT-DOCUMENT-CONTRACT.md`，固定唯一内容源与 Schema 边界。
 - [x] P0-05 建立 `docs/ARCHITECTURE.md`，固定模块职责、依赖方向和状态边界。
 - [x] P0-06 建立 `docs/DECISIONS.md`，记录初始关键决策。
-- [x] P0-07 建立 `TASKS.md` 唯一任务账本。
+- [x] P0-07 建立 `TASKS.md` 唯一开发任务账本。
 - [x] P0-08 建立 `AGENTS.md` AI 开发协作规则。
 
 ---
@@ -129,7 +129,7 @@
 ## P6 — Web Adapter 与真实网页插入
 
 - [x] P6-01 建立统一 `WebPromptAdapter` + 单一共享 caret insert engine；Adapter 只发现目标编辑器，不复制插入算法。
-- [ ] P6-02 完成第一个真实 AI 网页的**线上 DOM 验证**；旧 ChatGPT 插入链已真实跑通但性能差，当前已重构为通用 caret-first + ChatGPT selector 特殊兼容，需在最新构建重新 smoke。
+- [ ] P6-02 完成第一个真实 AI 网页的**线上 DOM 验证**；旧 ChatGPT 插入链曾真实跑通。caret-first 重构后的最新真机测试暴露扩展重载后 stale bridge 全局布尔 guard 会阻止新 runtime listener 注册，已改为 live ping 检测 + 旧 listener 清理 + 缺失 receiver 时重新注入，需在最新构建重新 smoke。
 - [x] P6-03 插入只由用户明确触发，不自动发送。
 - [x] P6-04 输入框已有内容时不再强制 append/replace 整框；有选区只替换选区，有 caret 插入 caret，无法确定目标时明确失败，避免静默覆盖。
 - [x] P6-05 Adapter / page bridge 失败时明确失败并可退化为 Copy。
@@ -145,12 +145,12 @@
 - [x] P7-02 完成最近文档恢复逻辑。
 - [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；旧构建用户已反馈正常，但当前 Manifest/Web Insert 架构变化后仍需最终一轮。
 - [ ] P7-04 检查键盘可达性和关键操作可发现性；Esc 已实现为关闭当前最上层临时 UI，仍需最终构建浏览器确认。
-- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态审查已修复保存误报、删除恢复、全局 AI 错误不可见、底层 Chrome receiver 错误直出等问题，仍待真实浏览器错误路径收口。
+- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态/真机审查已修复保存误报、删除恢复、全局 AI 错误不可见、Chrome receiver 原始错误和扩展重载后的 stale bridge 问题，仍待真实浏览器错误路径收口。
 - [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性；代码侧已把 Insert 收成一次原子消息、自动保存后的文档列表改为本地增量更新，仍待真实浏览器重复操作验证。
 - [ ] P7-07 做最终代码减法审查；当前已删除重复 selection 状态/CSS override、冗余 Repository guard、残留 `!important`、旧 append/replace 冲突 UI/状态/CSS 与 ChatGPT-only 插入实现，待线上最终 smoke 后再反查一次。
 - [x] P7-08 反向搜索 Non-goals：生产树无 backend/auth/team/marketplace/cloud-sync/model-playground 平台化模块，权限/bridge 边界仍符合 V1。
 - [ ] P7-09 README 已同步当前实现；全部权威文档最终实现态收口待真实浏览器验收后完成。
-- [ ] P7-10 完成真实浏览器性能收口：代码已消除默认编辑热路径的 Storage 全量重读、关闭状态下 Lint/Preview 重算、双消息 Insert 和全网页常驻 bridge；仍需验证实际插入延迟与 Side Panel 启动/输入流畅度。当前主 Side Panel chunk 约 611KB minified（gzip 约 192KB），不通过调高 Vite warningLimit 掩盖，只有真实启动性能需要时再做 code splitting。
+- [ ] P7-10 完成真实浏览器性能收口：代码已消除默认编辑热路径的 Storage 全量重读、关闭状态下 Lint/Preview 重算、双消息 Insert 和全网页常驻 bridge；bridge 现在用 live ping 避免无效重复注入并清理旧 DOM listener。仍需验证实际插入延迟与 Side Panel 启动/输入流畅度。当前主 Side Panel chunk 约 611KB minified（gzip 约 192KB），不通过调高 Vite warningLimit 掩盖，只有真实启动性能需要时再做 code splitting。
 
 ---
 
@@ -174,7 +174,7 @@
 
 ## 当前状态
 
-当前阶段：**真实 Extension 核心实现已经进入 `main`；Web Insert 已从 ChatGPT-only append/replace 重构为通用 caret-first 插入，使用 `activeTab + scripting` 按用户动作注入 page bridge；默认编辑热路径已减少 Storage/Lint/Compiler/消息重复工作。CI 使用 npm lockfile + `npm ci`，持续执行跨平台许可证审计、TypeScript、ESLint、14 个测试文件 / 55 项测试和 Extension build。当前最新代码门禁已通过，但重构后的真实浏览器最终验收尚未完成。**
+当前阶段：**真实 Extension 核心实现已经进入 `main`；Web Insert 已从 ChatGPT-only append/replace 重构为通用 caret-first 插入，使用 `activeTab + scripting` 按用户动作注入 page bridge；bridge 存活性改为 live ping，并能在扩展重载后替换旧 listener/重新注入；默认编辑热路径已减少 Storage/Lint/Compiler/消息重复工作。CI 使用 npm lockfile + `npm ci`，持续执行跨平台许可证审计、TypeScript、ESLint、14 个测试文件 / 55 项测试和 Extension build。当前最新代码门禁已通过，但重构后的真实浏览器最终验收尚未完成。**
 
 当前最优先剩余工作：
 
