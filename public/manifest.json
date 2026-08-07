@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "PromptNote / 提词笺",
+  "version": "0.1.0",
+  "description": "像写文档一样写 Prompt。",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "sidePanel"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "action": {
+    "default_title": "打开 PromptNote"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

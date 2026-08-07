@@ -1,0 +1,324 @@
+import { useState } from 'react'
+import type { PromptDocument } from '../prompt/schema'
+import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
+import type { CompileFormat } from '../prompt/compiler'
+import type { AiAction, AiSettings, PromptLintFinding, PromptSuggestion } from '../ai/types'
+import type { EditorSelectionSnapshot } from '../editor/PromptEditor'
+import type { InsertMode } from '../extension/messages'
+
+export function SlashMenu(props: { onClose(): void; onInsert(kind: SectionKind): void }) {
+  return (
+    <div className="slash-menu">
+      <div className="slash-menu__head">
+        <span>Prompt 结构</span>
+        <button onClick={props.onClose}>×</button>
+      </div>
+      {sectionKinds.map((kind) => {
+        const meta = sectionKindMeta[kind]
+        return (
+          <button key={kind} className="slash-item" onClick={() => props.onInsert(kind)}>
+            <span className="slash-item__icon">{meta.icon}</span>
+            <span>
+              <strong>{meta.label}</strong>
+              <small>{meta.description}</small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export function SelectionToolbar(props: {
+  selection: EditorSelectionSnapshot
+  onAction(action: 'clarify' | 'shorten' | 'split_constraints'): void
+  onMore(): void
+}) {
+  const left = props.selection.rect.left + props.selection.rect.width / 2
+  const top = Math.max(42, props.selection.rect.top - 8)
+  return (
+    <div className="selection-toolbar" style={{ left, top }}>
+      <button onClick={() => props.onAction('clarify')}>改清楚</button>
+      <button onClick={() => props.onAction('shorten')}>缩短</button>
+      <button onClick={() => props.onAction('split_constraints')}>拆成约束</button>
+      <span />
+      <button onClick={props.onMore}>AI…</button>
+    </div>
+  )
+}
+
+export function SuggestionCard(props: {
+  suggestion: PromptSuggestion
+  stale: boolean
+  onAccept(): void
+  onIgnore(): void
+}) {
+  const advisory = props.suggestion.target === 'advisory'
+  return (
+    <section className={`suggestion-card ${props.stale ? 'suggestion-card--stale' : ''}`}>
+      <div className="suggestion-card__head">
+        <span>AI 建议 · {props.suggestion.label}</span>
+        {props.stale && <span>正文已变化 · 建议已过期</span>}
+      </div>
+      {props.suggestion.sourceText && (
+        <>
+          <div className="field-label">原文</div>
+          <div className="suggestion-text">{props.suggestion.sourceText}</div>
+        </>
+      )}
+      <div className="field-label">建议</div>
+      <div className="suggestion-text suggestion-text--result">
+        {props.suggestion.replacementText}
+      </div>
+      <div className="card-actions">
+        <button className="ghost-button" onClick={props.onIgnore}>
+          {advisory ? '关闭' : '忽略'}
+        </button>
+        {!advisory && (
+          <button className="primary-button" disabled={props.stale} onClick={props.onAccept}>
+            接受
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function LintCard(props: {
+  findings: PromptLintFinding[]
+  aiReady: boolean
+  onDeepCheck(): void
+}) {
+  return (
+    <section className="lint-card">
+      <div className="lint-card__head">本地 Prompt 检查</div>
+      {props.findings.length === 0 ? (
+        <div className="lint-empty">没有发现明显的结构问题；这里不提供 Prompt 分数。</div>
+      ) : (
+        props.findings.map((finding) => (
+          <div className="finding" key={finding.id}>
+            <span>{finding.severity === 'warning' ? '⚠' : '○'}</span>
+            <div>
+              <strong>{finding.message}</strong>
+              {finding.detail && <small>{finding.detail}</small>}
+            </div>
+          </div>
+        ))
+      )}
+      <div className="deep-check">
+        <span>{props.aiReady ? '需要语义判断时，可进一步调用 AI。' : '未配置 AI 也不影响以上检查。'}</span>
+        <button className="ghost-button" onClick={props.onDeepCheck}>
+          {props.aiReady ? 'AI 深度检查' : '配置 AI'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+export function Preview(props: {
+  text: string
+  format: CompileFormat
+  onFormat(format: CompileFormat): void
+  onBack(): void
+  onCopy(): void
+  onInsert(): void
+}) {
+  return (
+    <div className="preview-view">
+      <header className="preview-head">
+        <button className="icon-button" onClick={props.onBack} aria-label="返回编辑">←</button>
+        <strong>Prompt Preview</strong>
+        <span />
+      </header>
+      <div className="preview-body">
+        <div className="format-tabs">
+          {(['plain', 'markdown', 'xml'] as const).map((format) => (
+            <button
+              key={format}
+              className={props.format === format ? 'format-tab format-tab--active' : 'format-tab'}
+              onClick={() => props.onFormat(format)}
+            >
+              {format === 'plain' ? 'Plain' : format === 'markdown' ? 'Markdown' : 'XML'}
+            </button>
+          ))}
+        </div>
+        <pre>{props.text}</pre>
+      </div>
+      <footer className="preview-actions">
+        <button className="ghost-button" onClick={props.onCopy}>复制</button>
+        <button className="primary-button" onClick={props.onInsert}>插入</button>
+      </footer>
+    </div>
+  )
+}
+
+export function DocumentSheet(props: {
+  documents: PromptDocument[]
+  currentId: string
+  onClose(): void
+  onSwitch(id: string): void
+  onCreate(): void
+  onDelete(): void
+}) {
+  const [query, setQuery] = useState('')
+  const visible = props.documents.filter((document) =>
+    document.title.toLowerCase().includes(query.trim().toLowerCase()),
+  )
+  return (
+    <div className="overlay" onMouseDown={props.onClose}>
+      <section className="sheet" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sheet-head">
+          <div><strong>Prompt</strong><small>最近使用的本地文档</small></div>
+          <button className="icon-button" onClick={props.onClose}>×</button>
+        </div>
+        <input
+          className="sheet-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索…"
+        />
+        <div className="document-list">
+          {visible.map((document) => (
+            <button
+              key={document.id}
+              className={document.id === props.currentId ? 'document-item document-item--active' : 'document-item'}
+              onClick={() => props.onSwitch(document.id)}
+            >
+              <strong>{document.title || '未命名 Prompt'}</strong>
+              <small>{new Date(document.updatedAt).toLocaleString()}</small>
+            </button>
+          ))}
+        </div>
+        <div className="sheet-actions">
+          <button className="ghost-button danger-text" onClick={props.onDelete}>删除当前</button>
+          <button className="primary-button" onClick={props.onCreate}>＋ 新建 Prompt</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+const providerNames: Record<AiSettings['provider'], string> = {
+  'openai-compatible': 'OpenAI-compatible',
+  anthropic: 'Anthropic',
+}
+
+export function AiSheet(props: {
+  mode: 'menu' | 'settings'
+  settings: AiSettings
+  busy: boolean
+  testState: 'idle' | 'ok' | 'error'
+  error: string | null
+  onSettings(settings: AiSettings): void
+  onProvider(provider: AiSettings['provider']): void
+  onClose(): void
+  onOpenSettings(): void
+  onSave(): void
+  onTest(): void
+  onAction(action: 'draft_acceptance' | 'ambiguity' | 'structure'): void
+}) {
+  if (props.mode === 'menu') {
+    return (
+      <div className="overlay" onMouseDown={props.onClose}>
+        <section className="sheet" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="sheet-head">
+            <div><strong>AI 辅助</strong><small>{providerNames[props.settings.provider]} · {props.settings.model}</small></div>
+            <button className="icon-button" onClick={props.onClose}>×</button>
+          </div>
+          <div className="ai-status-card">
+            <span className={props.settings.enabled ? 'status-dot status-dot--ready' : 'status-dot'} />
+            <div><strong>{props.settings.enabled ? 'AI 已就绪' : 'AI 已关闭'}</strong><small>只在你主动触发后调用，不自动改写。</small></div>
+          </div>
+          <div className="ai-menu">
+            <AiMenuButton title="检查当前 Prompt 的歧义" detail="发送当前 Prompt；结果只作为建议" disabled={!props.settings.enabled || props.busy} onClick={() => props.onAction('ambiguity')} />
+            <AiMenuButton title="补充验收标准" detail="生成可接受/忽略的验收标准建议" disabled={!props.settings.enabled || props.busy} onClick={() => props.onAction('draft_acceptance')} />
+            <AiMenuButton title="给出结构整理建议" detail="只建议结构，不整篇重写" disabled={!props.settings.enabled || props.busy} onClick={() => props.onAction('structure')} />
+          </div>
+          {props.error && <div className="form-error">{props.error}</div>}
+          <div className="sheet-actions"><span /><button className="ghost-button" onClick={props.onOpenSettings}>设置</button></div>
+        </section>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overlay" onMouseDown={props.onClose}>
+      <section className="sheet" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sheet-head">
+          <div><strong>AI 辅助设置</strong><small>配置属于扩展偏好，不进入 PromptDocument</small></div>
+          <button className="icon-button" onClick={props.onClose}>×</button>
+        </div>
+        <div className="ai-status-card">
+          <span className={props.settings.configured ? 'status-dot status-dot--ready' : 'status-dot'} />
+          <div><strong>{props.settings.configured ? '已配置' : '尚未配置 AI'}</strong><small>编辑、Compiler、Copy 和本地检查不依赖 AI。</small></div>
+        </div>
+        <div className="settings-form">
+          <label className="toggle-row">
+            <span><strong>启用 AI 辅助</strong><small>关闭后不会调用 Provider</small></span>
+            <input type="checkbox" checked={props.settings.enabled} onChange={(event) => props.onSettings({ ...props.settings, enabled: event.target.checked })} />
+          </label>
+          <label><span>Provider</span>
+            <select value={props.settings.provider} onChange={(event) => props.onProvider(event.target.value as AiSettings['provider'])}>
+              <option value="openai-compatible">OpenAI-compatible</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </label>
+          <label><span>Model</span><input value={props.settings.model} onChange={(event) => props.onSettings({ ...props.settings, model: event.target.value })} placeholder="填写实际模型 ID" /></label>
+          <label><span>API Base URL</span><input value={props.settings.baseUrl} onChange={(event) => props.onSettings({ ...props.settings, baseUrl: event.target.value })} /></label>
+          <label><span>API Key</span><input type="password" value={props.settings.apiKey} onChange={(event) => props.onSettings({ ...props.settings, apiKey: event.target.value })} placeholder="保存在 chrome.storage.local" /></label>
+          <label><span>默认发送范围</span>
+            <select value={props.settings.scope} onChange={(event) => props.onSettings({ ...props.settings, scope: event.target.value as AiSettings['scope'] })}>
+              <option value="selection">仅选中文字</option>
+              <option value="context">选区 + 当前 Prompt 上下文</option>
+            </select>
+          </label>
+        </div>
+        <div className="privacy-note">API Key 与 PromptDocument 分离保存在本地扩展存储中；Chrome 本地存储并非加密保险库。只有你主动触发 AI 时才发送所需内容。</div>
+        {props.testState === 'ok' && <div className="form-success">连接测试成功。</div>}
+        {props.testState === 'error' && props.error && <div className="form-error">{props.error}</div>}
+        <div className="sheet-actions">
+          <button className="ghost-button" disabled={props.busy} onClick={props.onTest}>{props.busy ? '测试中…' : '测试连接'}</button>
+          <button className="primary-button" disabled={props.busy} onClick={props.onSave}>保存配置</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function AiMenuButton(props: { title: string; detail: string; disabled: boolean; onClick(): void }) {
+  return (
+    <button className="ai-menu-item" disabled={props.disabled} onClick={props.onClick}>
+      <span className="ai-menu-item__icon">◇</span>
+      <span><strong>{props.title}</strong><small>{props.detail}</small></span>
+      <span>›</span>
+    </button>
+  )
+}
+
+export function InsertConflictDialog(props: {
+  mode: InsertMode
+  onMode(mode: InsertMode): void
+  onClose(): void
+  onConfirm(): void
+}) {
+  return (
+    <div className="modal-overlay">
+      <section className="dialog">
+        <h3>当前输入框已有内容</h3>
+        <p>PromptNote 不会静默覆盖。请选择这次如何处理。</p>
+        <label><input type="radio" checked={props.mode === 'append'} onChange={() => props.onMode('append')} /> 追加到现有内容后</label>
+        <label><input type="radio" checked={props.mode === 'replace'} onChange={() => props.onMode('replace')} /> 替换现有内容</label>
+        <div className="card-actions"><button className="ghost-button" onClick={props.onClose}>取消</button><button className="primary-button" onClick={props.onConfirm}>继续</button></div>
+      </section>
+    </div>
+  )
+}
+
+export const aiActionLabels: Record<AiAction, string> = {
+  clarify: '改清楚',
+  shorten: '缩短',
+  split_constraints: '拆成约束',
+  draft_acceptance: '补充验收标准',
+  ambiguity: '检查歧义',
+  structure: '结构建议',
+}
