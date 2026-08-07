@@ -122,7 +122,7 @@
 - [x] P5-09 UI 明确展示原文与建议，必须接受后才修改；结构建议保持 advisory。
 - [x] P5-10 实现共享 source revision guard，拒绝应用过期 suggestion。
 - [ ] P5-11 完整验证未配置 AI、禁用 AI、Provider HTTP 失败、30 秒超时情况下的**真实浏览器主链**仍可编辑/保存/lint/Compiler/Copy。
-- [ ] P5-12 补齐 suggestion 接受/忽略 UI 行为测试；当前已有 settings 隔离、provider success/failure/timeout、revision guard 聚焦测试。
+- [x] P5-12 补齐 suggestion UI 行为测试：可编辑 suggestion 显式 Accept / Ignore、过期 suggestion 禁止 Accept、advisory 只允许关闭且不得修改正文。
 
 ---
 
@@ -133,7 +133,7 @@
 - [x] P6-03 插入只由用户明确触发，不自动发送。
 - [x] P6-04 输入框已有内容时明确选择 append / replace，避免静默覆盖。
 - [x] P6-05 Adapter 失败时明确失败并可退化为 Copy。
-- [ ] P6-06 建立更接近真实 ChatGPT DOM 的 fixture；当前已有 textarea 探测、追加、替换、无输入框聚焦 mock 测试。
+- [x] P6-06 建立更接近真实 ChatGPT DOM 的 fixture：覆盖 `#prompt-textarea` contenteditable/ProseMirror 风格、Range/Selection 插入、execCommand fallback、legacy textarea 与无输入框失败路径。
 - [ ] P6-07 第一个 Adapter 稳定后再增加第二、第三站点。
 - [x] P6-08 content script 只做 Adapter/消息职责，未复制 Compiler/Storage/Editor 逻辑。
 
@@ -180,5 +180,5 @@
 1. Edge 真实加载与 Chrome/Edge 完整 Side Panel 主链；
 2. ChatGPT 当前线上 DOM 的真实 Adapter 验证；
 3. 浏览器重启恢复与无 AI 降级；
-4. suggestion 接受/忽略 UI 行为测试与更真实的 ChatGPT DOM fixture；
-5. V1 体验、许可证、release notes 最终收口。
+4. V1 体验错误路径、状态一致性与代码减法审查；
+5. 许可证、release notes 和最终文档收口。
