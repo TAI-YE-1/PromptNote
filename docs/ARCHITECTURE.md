@@ -42,6 +42,9 @@
                          │
                          ▼
                     Web Adapter
+                         │
+                         ▼
+              Shared Caret Insert Engine
 ```
 
 另有一类与正文分离的 Extension Preferences：
@@ -81,6 +84,8 @@ src/
 │  └─ lint.ts
 ├─ adapters/
 │  ├─ types.ts
+│  ├─ editable.ts
+│  ├─ generic.ts
 │  └─ ...
 ├─ extension/
 │  ├─ background.ts
@@ -119,7 +124,7 @@ src/
 - 选区；
 - 把用户接受的 suggestion 应用到当前文档。
 
-Editor 不直接读写 `chrome.storage.local`，不直接操作 ChatGPT DOM，也不得因为出现选区就直接调用 AI。
+Editor 不直接读写 `chrome.storage.local`，不直接操作目标网页 DOM，也不得因为出现选区就直接调用 AI。
 
 ### 4.3 Storage 层
 
@@ -189,28 +194,53 @@ Prompt lint 分两层：
 
 禁止把基础 lint 强制绑定到 AI Provider。
 
-### 4.7 Web Adapter 层
+### 4.7 Web Adapter 与共享插入引擎
 
-各网站 DOM 差异只允许存在于 `adapters/`。
+网页插入分成两层职责：
 
-统一概念接口：
+1. `WebPromptAdapter` 只负责“这个页面由谁识别目标编辑器”；
+2. `adapters/editable.ts` 作为共享插入引擎，统一处理 caret / selection / fallback-end 的 DOM 写入。
+
+统一接口：
 
 ```ts
 interface WebPromptAdapter {
   id: string;
   canHandle(url: URL): boolean;
   findComposer(): HTMLElement | null;
-  insert(text: string): Promise<InsertResult>;
 }
 ```
 
+选择顺序：
+
+```text
+站点特殊 Adapter（仅必要 selector / DOM 差异）
+        ↓ 找不到则
+通用 Web Input Adapter
+        ↓
+共享 Caret Insert Engine
+```
+
+通用 Adapter 优先覆盖标准：
+
+- `textarea`；
+- 常用文本 `input`；
+- `contenteditable`。
+
+共享插入规则：
+
+- 有网页选区 → 只替换该选区；
+- 有折叠 caret → 插入 caret；
+- 无法恢复 caret 但目标唯一可靠 → 插入末尾并返回明确 placement；
+- 多个候选且无法确定目标 → 失败，不猜测；
+- 永不自动 submit/send。
+
 要求：
 
-- Adapter 只接收已经编译的字符串；
-- Adapter 不理解 PromptDocument Schema；
-- Adapter 不决定输出格式；
-- Adapter 不自动提交/发送；
-- DOM 变化只能影响对应 Adapter，不得破坏编辑器或 Storage。
+- Adapter 只接收/定位 DOM，不理解 PromptDocument Schema；
+- Compiler 决定输出字符串，Adapter 不决定格式；
+- 站点 Adapter 不复制通用输入写入算法；
+- 网站 DOM 变化只能影响目标网页桥，不得破坏 Editor/Storage。
 
 ## 5. 状态源
 
@@ -247,7 +277,7 @@ V1 状态分类：
 
 派生状态不得反向成为正文权威来源。
 
-## 6. 自动保存
+## 6. 自动保存与热路径
 
 自动保存以 PromptDocument 变化为输入，通过单一保存调度入口调用 Repository。
 
@@ -260,25 +290,41 @@ V1 状态分类：
 
 AI 配置的保存与正文自动保存是两个不同语义，不得共用一份对象或 revision。
 
-禁止靠重复刷新或多处 `save()` 调用掩盖状态同步问题。
+默认编辑热路径必须避免无意义工作：
+
+- 自动保存成功后，本地文档列表用已知 PromptDocument 增量更新，不为每次输入重新读取全部 Storage；
+- Preview 未打开时不预先编译 Preview 文本；
+- Lint 未打开时不在每次键入后重跑本地 Lint；
+- Insert 点击时只编译一次并使用单次原子网页插入消息；
+- 不用重复刷新、重复保存、重复 DOM 扫描来掩盖状态问题。
 
 ## 7. Extension 边界
 
 ### Background
 
-只处理必须在 Extension service worker 完成的生命周期或消息路由职责。
+Background 只处理 Extension 生命周期和用户动作入口：
 
-不得逐渐演变成业务逻辑大仓库。
+- 用户点击扩展图标时打开 Side Panel；
+- 利用 `activeTab + scripting` 对当前标签页进行一次轻量 page bridge 预热。
 
-### Content Script
+不常驻监听页面正文，不保存 Prompt 内容，不演变成消息业务中枢。
 
-只负责：
+### Content Script / Page Bridge
 
-- 当前页面能力探测；
-- Adapter 所需 DOM 交互；
-- Side Panel 与网页之间的受控消息桥接。
+V1 不向所有网页静态常驻注入 PromptNote content script。
+
+Page Bridge 只在明确用户动作下对当前标签页注入，并负责：
+
+- 记录/恢复最近的可编辑目标与 contenteditable 选区；
+- 选择站点特殊 Adapter 或通用 Adapter；
+- 执行共享 caret insert；
+- Side Panel 与网页之间的单次受控消息桥接。
+
+Bridge 必须有重复注入 guard，避免重复注册 message listener。
 
 不得在 Content Script 复制 Compiler、Storage、Editor 或 AI Provider 业务逻辑。
+
+Manifest 的 `activeTab` 提供用户动作触发的临时页面访问；`scripting` 只用于按需注入 page bridge。AI Provider 的任意 Base URL 继续通过 optional host permission 单独请求，两类权限语义不得混用。
 
 ## 8. 错误处理
 
@@ -289,7 +335,7 @@ AI 配置的保存与正文自动保存是两个不同语义，不得共用一�
 - AI 未配置 → AI 动作进入设置，但核心功能继续可用；
 - AI 连接测试失败 → 显示真实 Provider 错误，不伪装已连接；
 - AI 调用失败 → 保留编辑能力并显示失败；
-- Adapter 失败 → 提供 Copy，不伪造“已插入”；
+- Adapter/Bridge 失败 → 提示用户点击目标输入框/重新授权当前标签页，并提供 Copy，不伪造“已插入”；
 - Storage 保存失败 → 明确未保存；
 - 未知 PromptDocument schemaVersion → 拒绝静默加载并给出可恢复提示。
 
@@ -304,7 +350,8 @@ V1 优先：
 - Repository 与 preferences 聚焦测试；
 - AI Provider adapter / connection test 的错误归一化测试；
 - AI suggestion 接受、拒绝、过期 revision 测试；
-- Adapter 的 DOM fixture 测试；
+- 通用 textarea / selection / contenteditable caret fixture；
+- 站点特殊 Adapter 的 DOM 发现 fixture；
 - 一个真实浏览器端到端主链测试。
 
 普通改动优先跑静态检查和直接相关测试；不因小改动重复执行高成本全量验证。
