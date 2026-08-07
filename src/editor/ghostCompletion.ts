@@ -12,7 +12,8 @@ export interface GhostCompletionState {
 export const ghostCompletionKey = new PluginKey<GhostCompletionState>('promptnoteGhostCompletion')
 
 function stateFor(text: string | null, position: number | null): GhostCompletionState {
-  return { text: text?.trim() || null, position }
+  if (!text || !text.trim()) return { text: null, position: null }
+  return { text: text.trimEnd(), position }
 }
 
 export function createGhostCompletionPlugin(): Plugin<GhostCompletionState> {
