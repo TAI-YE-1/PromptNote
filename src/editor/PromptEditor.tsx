@@ -1,10 +1,15 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { PromptSection } from './promptSection'
 import type { PromptNodeJSON } from '../prompt/schema'
-import type { SectionKind } from '../prompt/sectionKinds'
+import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
+import {
+  createBlockConversionTransaction,
+  getActiveBlockFormat,
+  type EditableBlockFormat,
+} from './blockConversion'
 
 export interface EditorSelectionSnapshot {
   text: string
@@ -28,11 +33,18 @@ interface PromptEditorProps {
   onSlashRequest(): void
 }
 
+interface BlockFormatPickerState {
+  format: EditableBlockFormat
+  left: number
+  top: number
+}
+
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
   props,
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const [blockFormatPicker, setBlockFormatPicker] = useState<BlockFormatPickerState | null>(null)
   const editor = useEditor({
     extensions: [StarterKit, PromptSection],
     content: props.content as JSONContent,
@@ -57,6 +69,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       errorOnInvalidContent: true,
     })
     props.onSelectionChange(null)
+    setBlockFormatPicker(null)
   }, [editor, props.documentId])
 
   useImperativeHandle(
@@ -93,25 +106,51 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   function captureSelection() {
     if (!editor || editor.state.selection.empty) {
       props.onSelectionChange(null)
+      setBlockFormatPicker(null)
       return
     }
+
     const text = editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n')
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
     const rect = selection.getRangeAt(0).getBoundingClientRect()
     const rootRect = rootRef.current?.getBoundingClientRect()
     if (!rootRect) return
+
+    const relativeRect = {
+      left: rect.left - rootRect.left,
+      top: rect.top - rootRect.top,
+      width: rect.width,
+      height: rect.height,
+    }
+
     props.onSelectionChange({
       text,
       from: editor.state.selection.from,
       to: editor.state.selection.to,
-      rect: {
-        left: rect.left - rootRect.left,
-        top: rect.top - rootRect.top,
-        width: rect.width,
-        height: rect.height,
-      },
+      rect: relativeRect,
     })
+
+    const activeBlock = getActiveBlockFormat(editor.state)
+    setBlockFormatPicker(
+      activeBlock
+        ? {
+            format: activeBlock.format,
+            left: relativeRect.left + relativeRect.width / 2,
+            top: relativeRect.top + relativeRect.height + 8,
+          }
+        : null,
+    )
+  }
+
+  function convertSelectedBlock(format: EditableBlockFormat) {
+    if (!editor) return
+    const transaction = createBlockConversionTransaction(editor.state, format)
+    if (!transaction) return
+    editor.view.dispatch(transaction.scrollIntoView())
+    editor.commands.focus()
+    props.onSelectionChange(null)
+    setBlockFormatPicker(null)
   }
 
   return (
@@ -124,6 +163,25 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       }}
     >
       <EditorContent editor={editor} />
+      {blockFormatPicker && (
+        <label
+          className="block-format-picker"
+          style={{ left: blockFormatPicker.left, top: blockFormatPicker.top }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <span>转为</span>
+          <select
+            value={blockFormatPicker.format}
+            aria-label="转换当前文本块类型"
+            onChange={(event) => convertSelectedBlock(event.target.value as EditableBlockFormat)}
+          >
+            <option value="paragraph">普通段落</option>
+            {sectionKinds.map((kind) => (
+              <option key={kind} value={kind}>{sectionKindMeta[kind].label}</option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   )
 })
