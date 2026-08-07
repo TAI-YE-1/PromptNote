@@ -74,21 +74,39 @@ function insertIntoContentEditable(element: HTMLElement, text: string): InsertPl
   const selection = window.getSelection()
   const resolved = resolveContentRange(element, selection)
   const range = resolved.range
+  const fallbackRange = range.cloneRange()
+  const beforeText = element.textContent ?? ''
+  const selectedText = range.toString()
 
   selection?.removeAllRanges()
   selection?.addRange(range)
 
-  const inserted =
+  const commandReportedSuccess =
     typeof document.execCommand === 'function' && document.execCommand('insertText', false, text)
-  if (!inserted) {
-    range.deleteContents()
+  const afterCommandText = element.textContent ?? ''
+  const commandProducedExpectedChange =
+    text.length === 0 ||
+    afterCommandText !== beforeText ||
+    (resolved.placement === 'selection' && selectedText === text)
+
+  if (!commandReportedSuccess || !commandProducedExpectedChange) {
+    fallbackRange.deleteContents()
     const textNode = document.createTextNode(text)
-    range.insertNode(textNode)
-    range.setStartAfter(textNode)
-    range.collapse(true)
+    fallbackRange.insertNode(textNode)
+    fallbackRange.setStartAfter(textNode)
+    fallbackRange.collapse(true)
     selection?.removeAllRanges()
-    selection?.addRange(range)
+    selection?.addRange(fallbackRange)
     dispatchInput(element, text, resolved.placement === 'selection')
+  }
+
+  const afterText = element.textContent ?? ''
+  if (
+    text.length > 0 &&
+    afterText === beforeText &&
+    !(resolved.placement === 'selection' && selectedText === text)
+  ) {
+    throw new Error('网页编辑器没有接受插入内容，请先复制后手动粘贴。')
   }
 
   lastEditable = element
