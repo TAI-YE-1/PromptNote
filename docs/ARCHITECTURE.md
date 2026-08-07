@@ -1,6 +1,6 @@
 # ARCHITECTURE — PromptNote
 
-本文件定义 V1 的技术边界、模块职责和依赖方向。目标是保持项目轻量、单向数据流、单一状态源，并避免浏览器集成、编辑器、AI 与持久化互相耦合。
+本文件定义 V1 的技术边界、模块职责和依赖方向。目标是保持项目轻量、单向数据流、单一状态源，并避免编辑器、AI 与持久化互相耦合。
 
 ## 1. V1 形态
 
@@ -11,367 +11,276 @@
 - TipTap / ProseMirror 编辑器
 - `chrome.storage.local` 本地持久化
 - 无后端、无账号系统、无云数据库
+- 不注入第三方网页 DOM，不维护 Web Adapter / Content Script 插入链
 
 ## 2. 逻辑架构
 
 ```text
-┌──────────────────────────────┐
-│         Side Panel UI        │
-│                              │
-│ PromptEditor  Preview/Lint   │
-│ AI Status / AI Settings      │
-└──────────────┬───────────────┘
-               │
-               ▼
-        PromptDocument
-        （唯一正文源）
-          │          │
-          │          ├──────────────┐
-          ▼          ▼              ▼
-      Repository   Compiler    AI Assistance
-          │          │              │
- chrome.storage   string       Suggestion/Lint
-          │                         │
-          │                  AI Provider Adapter
-          │                         │
-          │                  Provider API（可选）
-          │
-          └──────────────┬──────────┘
-                         ▼
-                    UI actions
-                         │
-                         ▼
-                    Web Adapter
-                         │
-                         ▼
-              Shared Caret Insert Engine
+┌─────────────────────────────────┐
+│          Side Panel UI          │
+│ PromptEditor / Preview / Lint   │
+│ AI Status / Settings            │
+└───────────────┬─────────────────┘
+                │
+                ▼
+         PromptDocument
+         （唯一正文源）
+        ┌───────┼──────────┐
+        ▼       ▼          ▼
+ Repository  Compiler  AI Assistance
+        │       │          │
+ chrome.storage string     ├─ Suggestion / Lint
+                           └─ Inline Completion
+                                  │
+                                  ▼
+                         AI Provider Adapter
 ```
 
-另有一类与正文分离的 Extension Preferences：
+内联补全只以 ProseMirror decoration / ghost text 存在。它不是 PromptDocument，也不触发保存；只有 `Tab` 接受后才通过 Editor transaction 成为正文。
+
+另有与正文分离的 Extension Preferences：
 
 ```text
 Extension Preferences
 ├─ AI enabled
+├─ completionEnabled
 ├─ Provider
 ├─ Model
 ├─ API Base URL
-├─ API credential reference / local secret
+├─ API credential
 └─ default AI content scope
 ```
 
-这些设置不得进入 PromptDocument。
+这些设置不得进入 PromptDocument、导出的 Prompt JSON 或 Compiler 输出。
 
-## 3. 模块建议
-
-初始目录保持小而明确：
+## 3. 目录职责
 
 ```text
 src/
+├─ app/
+│  ├─ PromptNoteApp.tsx
+│  └─ useInlineCompletion.ts
 ├─ editor/
 │  ├─ PromptEditor.tsx
 │  ├─ promptSection.ts
-│  └─ slashMenu.ts
+│  ├─ ghostCompletion.ts
+│  └─ blockConversion.ts
 ├─ prompt/
 │  ├─ schema.ts
 │  ├─ sectionKinds.ts
-│  └─ compiler.ts
+│  ├─ compiler.ts
+│  └─ text.ts
 ├─ storage/
 │  ├─ promptRepository.ts
-│  └─ preferencesRepository.ts
+│  └─ aiSettingsRepository.ts
 ├─ ai/
 │  ├─ provider.ts
-│  ├─ suggestion.ts
-│  └─ lint.ts
-├─ adapters/
-│  ├─ types.ts
-│  ├─ editable.ts
-│  ├─ generic.ts
-│  └─ ...
+│  ├─ suggestions.ts
+│  ├─ lint.ts
+│  └─ types.ts
 ├─ extension/
-│  ├─ background.ts
-│  └─ content.ts
-├─ App.tsx
+│  └─ background.ts
+├─ ui/
+│  └─ components.tsx
 └─ main.tsx
 ```
 
-这只是职责边界，不要求机械拆成大量碎片文件。若一个模块很小，可合并相邻文件；禁止为“架构看起来漂亮”制造无价值包装层。
+文件拆分按真实职责，不为“架构感”制造空 wrapper。
 
 ## 4. 依赖方向
 
 ### 4.1 Prompt 核心层
 
-`prompt/` 定义：
+`prompt/` 定义 PromptDocument Schema、section kind、Compiler 与纯文本派生逻辑。
 
-- PromptDocument Schema；
-- section kind 权威定义；
-- Compiler；
-- 与 UI 无关的纯逻辑。
-
-它不得依赖：
-
-- React；
-- Chrome API；
-- 页面 DOM；
-- AI Provider SDK。
+不得依赖 React、Chrome API、页面 DOM 或 AI Provider。
 
 ### 4.2 Editor 层
 
-`editor/` 负责：
+`editor/` 负责 TipTap Extension、Slash Menu、编辑命令、选区、语义块转换和 ghost completion decoration。
 
-- TipTap Extension；
-- Slash Menu；
-- 编辑命令；
-- 选区；
-- 把用户接受的 suggestion 应用到当前文档。
+Editor 不直接读写 Storage，也不直接调用 Provider。ghost completion 只接收外部给出的短字符串并负责显示、失效、`Tab` 接受、`Esc` 忽略。
 
-Editor 不直接读写 `chrome.storage.local`，不直接操作目标网页 DOM，也不得因为出现选区就直接调用 AI。
+### 4.3 App 层
 
-### 4.3 Storage 层
+`app/PromptNoteApp.tsx` 负责组合 UI 与应用状态；`useInlineCompletion.ts` 只负责补全请求调度。
+
+补全调度必须同时检查：
+
+```text
+settings.configured
+&& settings.enabled
+&& settings.completionEnabled
+```
+
+否则不得发自动请求。
+
+### 4.4 Storage 层
 
 `storage/` 是本地持久化唯一入口。
 
-正文持久化使用 `PromptRepository`；扩展偏好使用独立 preferences repository / namespace。
+- `PromptRepository`：PromptDocument；
+- AI settings repository：Provider、credential、AI 总开关、补全开关等扩展偏好。
 
-V1 可以都基于 `chrome.storage.local` 实现，但必须逻辑隔离：
+禁止正文同时写 localStorage / IndexedDB / Chrome Storage 多份副本；禁止保存 Markdown/XML 派生副本。
 
-- PromptDocument 是正文权威状态；
-- AI 设置是扩展偏好；
-- API credential 不得写入 PromptDocument、导出的 PromptDocument JSON 或 Compiler 输出。
+### 4.5 Compiler 层
 
-禁止：
-
-- 组件中散落 `chrome.storage.local.get/set`；
-- 同时用 localStorage、IndexedDB、Chrome Storage 保存正文；
-- 保存 Markdown/XML 副本作为另一份内容状态；
-- 把 Provider/Model/API Key 复制进每个 PromptDocument。
-
-### 4.4 Compiler 层
-
-Compiler 是纯函数式转换：
+Compiler 只做：
 
 `PromptDocument → Plain / Markdown / XML`
 
-Compiler 不允许：
+不得修改 Editor、读取 Storage、调用 AI 或读取网页 DOM。
 
-- 修改 Editor state；
-- 读取 DOM；
-- 存储数据；
-- 调用 AI；
-- 根据当前网站偷偷改变正文。
+### 4.6 AI Assistance 层
 
-### 4.5 AI Assistance 层
+Provider Adapter 统一处理 Provider 差异、Base URL、Model、credential、请求、超时与错误归一化。
 
-AI 层只接受当前内容/选区与操作意图，返回 suggestion 或 lint finding。
+AI 有两类调用：
 
-统一 Provider Adapter 负责：
+1. **显式动作**：selection/global suggestion、AI lint；
+2. **内联补全**：唯一允许自动调用的能力，但必须由独立补全开关显式 opt-in。
 
-- Provider 差异；
-- Base URL / Model / credential 配置；
-- 请求与错误归一化；
-- 测试连接。
+Suggestion 必须带来源 revision；过期 suggestion 不得应用。
 
-UI、Editor 和 Prompt 核心层不得直接散落多个 Provider SDK 调用。
+内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。
 
-AI Assistance 不能直接：
+### 4.7 Prompt Lint
 
-- 写 PromptRepository；
-- 替换 TipTap state；
-- 自动发送消息；
-- 在 Provider 间维护不同 Prompt 正文副本。
+本地 deterministic lint 不依赖 AI。AI semantic lint 只有用户显式触发时调用。
 
-只有用户明确触发 AI 动作后才允许调用 Provider。
+## 5. 内联补全架构
 
-选区动作默认只发送选区；如果某个全局动作需要完整 Prompt，该动作的 UI 必须明确表达发送范围，不能依赖隐式扩大上下文。
+### 5.1 请求条件
 
-AI suggestion 必须带来源 revision；正文发生变化后，过期 suggestion 不得直接应用。
-
-### 4.6 Prompt Lint
-
-Prompt lint 分两层：
-
-1. 本地 deterministic lint：无需 AI，可在离线/未配置 AI 时运行；
-2. AI semantic lint：只在用户显式触发时调用，用于更复杂的歧义、冲突和完整性判断。
-
-禁止把基础 lint 强制绑定到 AI Provider。
-
-### 4.7 Web Adapter 与共享插入引擎
-
-网页插入分成两层职责：
-
-1. `WebPromptAdapter` 只负责“这个页面由谁识别目标编辑器”；
-2. `adapters/editable.ts` 作为共享插入引擎，统一处理 caret / selection / fallback-end 的 DOM 写入。
-
-统一接口：
-
-```ts
-interface WebPromptAdapter {
-  id: string;
-  canHandle(url: URL): boolean;
-  findComposer(): HTMLElement | null;
-}
-```
-
-选择顺序：
+只有以下三个条件同时成立才允许调度：
 
 ```text
-站点特殊 Adapter（仅必要 selector / DOM 差异）
-        ↓ 找不到则
-通用 Web Input Adapter
-        ↓
-共享 Caret Insert Engine
+AI 已配置成功
+AND AI 总开关开启
+AND completionEnabled = true
 ```
 
-通用 Adapter 优先覆盖标准：
+默认 `completionEnabled=false`。修改 Provider / Model / Base URL / API Key 后，连接状态和补全开关必须失效，避免对未经重新确认的端点自动发请求。
 
-- `textarea`；
-- 常用文本 `input`；
-- `contenteditable`。
+### 5.2 热路径
 
-共享插入规则：
+当前实现原则：
 
-- 有网页选区 → 只替换该选区；
-- 有折叠 caret → 插入 caret；
-- 无法恢复 caret 但目标唯一可靠 → 插入末尾并返回明确 placement；
-- 多个候选且无法确定目标 → 失败，不猜测；
-- 永不自动 submit/send。
+- caret 前最多取有限上下文，不发送无限增长全文；
+- 编辑停顿约 750ms 后才请求；
+- 继续输入/移动 caret 时取消旧请求；
+- Provider 请求使用短输出上限；
+- 失败后短暂退避，避免连续失败造成请求风暴；
+- 过期结果不得显示；
+- ghost text 不触发 autosave / Compiler / revision。
 
-对 `contenteditable` / 富编辑器，浏览器旧式 `execCommand('insertText')` 只能作为第一尝试，不能把返回 `true` 当作成功证据。共享引擎必须验证编辑器 DOM 是否真实发生预期变化；未变化则走 Range + `input` fallback，最终仍无变化则返回明确失败，禁止 UI 假报“已插入”。
+### 5.3 Editor 状态
 
-要求：
+Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 
-- Adapter 只接收/定位 DOM，不理解 PromptDocument Schema；
-- Compiler 决定输出字符串，Adapter 不决定格式；
-- 站点 Adapter 不复制通用输入写入算法；
-- 网站 DOM 变化只能影响目标网页桥，不得破坏 Editor/Storage。
+- `Tab` → 把 ghost 插入当前 transaction，随后清除；
+- `Esc` → 只清除 decoration；
+- docChanged / selectionSet → 自动清除 stale ghost；
+- 保留有意义的前导空格，避免英文/代码续写拼接错误。
 
-## 5. 状态源
-
-V1 状态分类：
+## 6. 状态源
 
 ### 持久正文状态
 
-`PromptDocument`
-
-它是唯一正文权威源。
+`PromptDocument` 是唯一权威正文源。
 
 ### 持久扩展偏好
 
-例如：
-
 - AI enabled；
+- completionEnabled；
 - Provider；
 - Model；
-- API Base URL；
+- Base URL；
 - credential；
-- 默认 AI 内容范围；
-- UI preferences。
+- AI 内容范围。
 
-扩展偏好不是 Prompt 内容，不得进入 Compiler 或 PromptDocument 导入导出。
+### 临时派生状态
 
-### 可派生临时状态
-
-- 当前编译预览；
+- Preview；
 - lint findings；
 - AI suggestions；
-- 当前选区；
-- 当前网页 Adapter 状态；
-- UI 展开/收起等展示状态。
+- 当前 selection；
+- ghost completion；
+- UI 打开/关闭状态。
 
-派生状态不得反向成为正文权威来源。
+临时状态不得反向成为正文源。
 
-## 6. 自动保存与热路径
+## 7. 自动保存与默认热路径
 
-自动保存以 PromptDocument 变化为输入，通过单一保存调度入口调用 Repository。
+自动保存以 PromptDocument 变化为输入，通过单一 Repository 调度入口保存。
 
-必须考虑：
+必须避免：
 
-- 高频输入防抖；
-- Side Panel 关闭前已有保存请求的完成状态；
-- 保存失败可见；
-- 并发保存顺序，避免旧版本覆盖新版本。
+- 每次键入后重新读取全部 Storage；
+- Preview 关闭时仍编译 Preview；
+- Lint 关闭时仍重跑 Lint；
+- ghost decoration 变化触发正文保存；
+- 每次键入立即发补全请求；
+- 多个过期补全请求并发堆积。
 
-AI 配置的保存与正文自动保存是两个不同语义，不得共用一份对象或 revision。
+AI 配置保存和正文 autosave 是不同语义，不得共享 revision 或对象。
 
-默认编辑热路径必须避免无意义工作：
+## 8. Extension 边界与权限
 
-- 自动保存成功后，本地文档列表用已知 PromptDocument 增量更新，不为每次输入重新读取全部 Storage；
-- Preview 未打开时不预先编译 Preview 文本；
-- Lint 未打开时不在每次键入后重跑本地 Lint；
-- Insert 点击时只编译一次并使用单次原子网页插入消息；
-- 不用重复刷新、重复保存、重复 DOM 扫描来掩盖状态问题。
+Background 只负责：
 
-## 7. Extension 边界
+- 用户点击扩展图标时打开 Side Panel。
 
-### Background
+不注入网页、不监听页面正文、不传递 Prompt 内容。
 
-Background 只处理 Extension 生命周期和用户动作入口：
+Manifest 固定权限只允许：
 
-- 用户点击扩展图标时打开 Side Panel；
-- 针对当前网页 origin 请求 optional host permission；
-- 允许后为该站点持久获得插入所需 host access；
-- 若用户拒绝持久站点授权，则当前 action 仍可使用 `activeTab + scripting` 做一次性 bridge 预热。
+```text
+storage
+sidePanel
+```
 
-不得直接申请全网永久 host permission，不常驻监听页面正文，不保存 Prompt 内容，不演变成消息业务中枢。
+`optional_host_permissions` 仅用于用户配置的 AI Provider Base URL 网络请求。不得重新引入 `activeTab`、`scripting`、Content Script 或网页 host 权限来做 Prompt DOM 写入，除非未来 PRODUCT/DECISIONS 明确重新改变范围。
 
-### Content Script / Page Bridge
-
-V1 不向所有网页静态常驻注入 PromptNote content script。
-
-Page Bridge 只在明确用户动作下对当前标签页注入，并负责：
-
-- 记录/恢复最近的可编辑目标与 contenteditable 选区；
-- 选择站点特殊 Adapter 或通用 Adapter；
-- 执行共享 caret insert；
-- Side Panel 与网页之间的单次受控消息桥接。
-
-Bridge 存活性以真实 ping 为准，不允许仅用页面全局布尔值推断旧 runtime listener 仍然有效。重复/版本更新注入时，当前 bridge 必须先清理上一版 message listener 与 DOM tracking listener，再安装当前实现，避免 stale receiver 和 listener 累积。
-
-不得在 Content Script 复制 Compiler、Storage、Editor 或 AI Provider 业务逻辑。
-
-Manifest 的 `activeTab` 负责当前 action 的一次性临时访问，`scripting` 只用于按需注入 page bridge；当前网页长期插入授权和 AI Provider 网络授权都使用 optional host permission，但必须按各自实际 origin 单独请求，不得混成全网权限。
-
-## 8. 错误处理
+## 9. 错误处理
 
 原则：真实失败、明确降级。
 
-例如：
+- AI 未配置 → 显式 AI 动作进入设置；核心编辑继续可用；
+- AI Provider 失败 → 显示真实错误；
+- 补全失败 → 清除 ghost、短暂退避、编辑继续可用；
+- Storage 保存失败 → 明确显示未保存；
+- 未知 PromptDocument schemaVersion → fail-closed；
+- Copy 失败 → 明确提示从 Preview 手动复制。
 
-- AI 未配置 → AI 动作进入设置，但核心功能继续可用；
-- AI 连接测试失败 → 显示真实 Provider 错误，不伪装已连接；
-- AI 调用失败 → 保留编辑能力并显示失败；
-- Adapter/Bridge 失败 → 提示用户点击目标输入框/重新授权当前站点，并提供 Copy，不伪造“已插入”；
-- Storage 保存失败 → 明确未保存；
-- 未知 PromptDocument schemaVersion → 拒绝静默加载并给出可恢复提示。
+禁止静默异常和假成功。
 
-禁止静默异常、假成功、无边界默认值。
+## 10. 测试边界
 
-## 9. 测试边界
+V1 优先覆盖：
 
-V1 优先：
+- Schema / Compiler；
+- PromptSection / Slash Menu / block conversion；
+- Repository 与 AI preferences；
+- Provider HTTP / transport / timeout / cancellation；
+- Suggestion 接受/忽略/revision guard；
+- Ghost completion：默认偏好关闭、Tab 接受、Esc 忽略、doc change 失效、前导空格；
+- Chrome / Edge 真实 Side Panel 主链。
 
-- Schema / Compiler 单元测试；
-- PromptSection TipTap 行为测试；
-- Repository 与 preferences 聚焦测试；
-- AI Provider adapter / connection test 的错误归一化测试；
-- AI suggestion 接受、拒绝、过期 revision 测试；
-- 通用 textarea / selection / contenteditable caret fixture；
-- contenteditable “API 报成功但 DOM 未变化”假成功 fixture；
-- 站点特殊 Adapter 的 DOM 发现 fixture；
-- 一个真实浏览器端到端主链测试。
+Web Adapter、ChatGPT DOM fixture、contenteditable 插入 fixture 已随 Web Insert 退役删除，不保留测试旧链。
 
-普通改动优先跑静态检查和直接相关测试；不因小改动重复执行高成本全量验证。
+## 11. 架构变更规则
 
-## 10. 架构变更规则
-
-出现以下情况必须先更新架构/决策文档，再改代码：
+出现以下情况必须先更新权威文档和 DECISIONS：
 
 - 新增后端；
-- 新增第二种正文持久化；
+- 新增第二正文持久化；
 - 修改 PromptDocument 权威源；
-- 新增模型专用 Prompt 状态；
-- 改变 AI Provider 或 credential 的存储边界；
-- 改变 Web Adapter 责任；
+- 改变 AI credential / Provider 存储边界；
+- 改变内联补全自动调用条件；
+- 重新引入第三方网页 DOM 注入；
 - 引入新的框架级依赖；
 - 跨模块职责迁移。
 
-替代旧实现时必须迁移全部真实调用方并删除旧链，不保留无明确外部兼容需求的新旧双轨。
+替代旧实现时必须迁移真实调用方并删除旧链，不保留无外部兼容需求的新旧双轨。
