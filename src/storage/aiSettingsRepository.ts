@@ -5,6 +5,7 @@ const AI_SETTINGS_KEY = 'promptnote.aiSettings.v1'
 export const defaultAiSettings: AiSettings = {
   enabled: true,
   configured: false,
+  completionEnabled: false,
   provider: 'openai-compatible',
   model: '',
   baseUrl: 'https://api.openai.com',
