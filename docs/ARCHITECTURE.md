@@ -18,29 +18,45 @@
 ┌──────────────────────────────┐
 │         Side Panel UI        │
 │                              │
-│  PromptEditor   Preview/Lint │
+│ PromptEditor  Preview/Lint   │
+│ AI Status / AI Settings      │
 └──────────────┬───────────────┘
                │
                ▼
         PromptDocument
-        （唯一内容源）
+        （唯一正文源）
           │          │
           │          ├──────────────┐
           ▼          ▼              ▼
       Repository   Compiler    AI Assistance
           │          │              │
  chrome.storage   string       Suggestion/Lint
-          │          │              │
-          └──────────┴──────┬───────┘
-                            ▼
-                       UI actions
-                            │
-                            ▼
-                       Web Adapter
-                            │
-                  ChatGPT / Claude /
-                       Gemini ...
+          │                         │
+          │                  AI Provider Adapter
+          │                         │
+          │                  Provider API（可选）
+          │
+          └──────────────┬──────────┘
+                         ▼
+                    UI actions
+                         │
+                         ▼
+                    Web Adapter
 ```
+
+另有一类与正文分离的 Extension Preferences：
+
+```text
+Extension Preferences
+├─ AI enabled
+├─ Provider
+├─ Model
+├─ API Base URL
+├─ API credential reference / local secret
+└─ default AI content scope
+```
+
+这些设置不得进入 PromptDocument。
 
 ## 3. 模块建议
 
@@ -57,8 +73,10 @@ src/
 │  ├─ sectionKinds.ts
 │  └─ compiler.ts
 ├─ storage/
-│  └─ promptRepository.ts
+│  ├─ promptRepository.ts
+│  └─ preferencesRepository.ts
 ├─ ai/
+│  ├─ provider.ts
 │  ├─ suggestion.ts
 │  └─ lint.ts
 ├─ adapters/
@@ -98,21 +116,29 @@ src/
 - TipTap Extension；
 - Slash Menu；
 - 编辑命令；
+- 选区；
 - 把用户接受的 suggestion 应用到当前文档。
 
-Editor 不直接读写 `chrome.storage.local`，不直接操作 ChatGPT DOM。
+Editor 不直接读写 `chrome.storage.local`，不直接操作 ChatGPT DOM，也不得因为出现选区就直接调用 AI。
 
 ### 4.3 Storage 层
 
 `storage/` 是本地持久化唯一入口。
 
-V1 实现使用 `chrome.storage.local`，但调用方只依赖 `PromptRepository`。
+正文持久化使用 `PromptRepository`；扩展偏好使用独立 preferences repository / namespace。
+
+V1 可以都基于 `chrome.storage.local` 实现，但必须逻辑隔离：
+
+- PromptDocument 是正文权威状态；
+- AI 设置是扩展偏好；
+- API credential 不得写入 PromptDocument、导出的 PromptDocument JSON 或 Compiler 输出。
 
 禁止：
 
 - 组件中散落 `chrome.storage.local.get/set`；
 - 同时用 localStorage、IndexedDB、Chrome Storage 保存正文；
-- 保存 Markdown/XML 副本作为另一份内容状态。
+- 保存 Markdown/XML 副本作为另一份内容状态；
+- 把 Provider/Model/API Key 复制进每个 PromptDocument。
 
 ### 4.4 Compiler 层
 
@@ -132,16 +158,38 @@ Compiler 不允许：
 
 AI 层只接受当前内容/选区与操作意图，返回 suggestion 或 lint finding。
 
-它不能直接：
+统一 Provider Adapter 负责：
+
+- Provider 差异；
+- Base URL / Model / credential 配置；
+- 请求与错误归一化；
+- 测试连接。
+
+UI、Editor 和 Prompt 核心层不得直接散落多个 Provider SDK 调用。
+
+AI Assistance 不能直接：
 
 - 写 PromptRepository；
 - 替换 TipTap state；
 - 自动发送消息；
 - 在 Provider 间维护不同 Prompt 正文副本。
 
-Provider 接入后续通过单一适配接口处理，避免业务代码直接散落多个 SDK 调用。
+只有用户明确触发 AI 动作后才允许调用 Provider。
 
-### 4.6 Web Adapter 层
+选区动作默认只发送选区；如果某个全局动作需要完整 Prompt，该动作的 UI 必须明确表达发送范围，不能依赖隐式扩大上下文。
+
+AI suggestion 必须带来源 revision；正文发生变化后，过期 suggestion 不得直接应用。
+
+### 4.6 Prompt Lint
+
+Prompt lint 分两层：
+
+1. 本地 deterministic lint：无需 AI，可在离线/未配置 AI 时运行；
+2. AI semantic lint：只在用户显式触发时调用，用于更复杂的歧义、冲突和完整性判断。
+
+禁止把基础 lint 强制绑定到 AI Provider。
+
+### 4.7 Web Adapter 层
 
 各网站 DOM 差异只允许存在于 `adapters/`。
 
@@ -166,17 +214,34 @@ interface WebPromptAdapter {
 
 ## 5. 状态源
 
-V1 只允许：
+V1 状态分类：
 
-### 持久内容状态
+### 持久正文状态
 
 `PromptDocument`
+
+它是唯一正文权威源。
+
+### 持久扩展偏好
+
+例如：
+
+- AI enabled；
+- Provider；
+- Model；
+- API Base URL；
+- credential；
+- 默认 AI 内容范围；
+- UI preferences。
+
+扩展偏好不是 Prompt 内容，不得进入 Compiler 或 PromptDocument 导入导出。
 
 ### 可派生临时状态
 
 - 当前编译预览；
 - lint findings；
 - AI suggestions；
+- 当前选区；
 - 当前网页 Adapter 状态；
 - UI 展开/收起等展示状态。
 
@@ -192,6 +257,8 @@ V1 只允许：
 - Side Panel 关闭前已有保存请求的完成状态；
 - 保存失败可见；
 - 并发保存顺序，避免旧版本覆盖新版本。
+
+AI 配置的保存与正文自动保存是两个不同语义，不得共用一份对象或 revision。
 
 禁止靠重复刷新或多处 `save()` 调用掩盖状态同步问题。
 
@@ -211,7 +278,7 @@ V1 只允许：
 - Adapter 所需 DOM 交互；
 - Side Panel 与网页之间的受控消息桥接。
 
-不得在 Content Script 复制 Compiler、Storage 或 Editor 逻辑。
+不得在 Content Script 复制 Compiler、Storage、Editor 或 AI Provider 业务逻辑。
 
 ## 8. 错误处理
 
@@ -219,6 +286,8 @@ V1 只允许：
 
 例如：
 
+- AI 未配置 → AI 动作进入设置，但核心功能继续可用；
+- AI 连接测试失败 → 显示真实 Provider 错误，不伪装已连接；
 - AI 调用失败 → 保留编辑能力并显示失败；
 - Adapter 失败 → 提供 Copy，不伪造“已插入”；
 - Storage 保存失败 → 明确未保存；
@@ -232,8 +301,9 @@ V1 优先：
 
 - Schema / Compiler 单元测试；
 - PromptSection TipTap 行为测试；
-- Repository 聚焦测试；
-- AI suggestion 应用与过期 revision 测试；
+- Repository 与 preferences 聚焦测试；
+- AI Provider adapter / connection test 的错误归一化测试；
+- AI suggestion 接受、拒绝、过期 revision 测试；
 - Adapter 的 DOM fixture 测试；
 - 一个真实浏览器端到端主链测试。
 
@@ -247,6 +317,7 @@ V1 优先：
 - 新增第二种正文持久化；
 - 修改 PromptDocument 权威源；
 - 新增模型专用 Prompt 状态；
+- 改变 AI Provider 或 credential 的存储边界；
 - 改变 Web Adapter 责任；
 - 引入新的框架级依赖；
 - 跨模块职责迁移。
