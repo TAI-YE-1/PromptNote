@@ -1,15 +1,10 @@
-export interface ComposerState {
-  supported: boolean
-  hasContent: boolean
+export type InsertPlacement = 'selection' | 'caret' | 'end'
+
+export type ContentRequest = {
+  type: 'PROMPTNOTE_INSERT_AT_CARET'
   text: string
 }
 
-export type InsertMode = 'append' | 'replace'
-
-export type ContentRequest =
-  | { type: 'PROMPTNOTE_GET_COMPOSER_STATE' }
-  | { type: 'PROMPTNOTE_INSERT'; text: string; mode: InsertMode }
-
 export type ContentResponse =
-  | { ok: true; state?: ComposerState }
+  | { ok: true; placement: InsertPlacement }
   | { ok: false; error: string }
