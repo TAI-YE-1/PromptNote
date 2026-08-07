@@ -19,11 +19,10 @@ import {
   makeReplacementSuggestion,
 } from './ai/suggestions'
 import type { AiSettings, PromptSuggestion } from './ai/types'
-import type { ComposerState, ContentRequest, ContentResponse, InsertMode } from './extension/messages'
+import type { ContentRequest, ContentResponse, InsertPlacement } from './extension/messages'
 import {
   AiSheet,
   DocumentSheet,
-  InsertConflictDialog,
   LintCard,
   Preview,
   SelectionContextMenu,
@@ -58,8 +57,6 @@ export function App() {
   const [aiBusy, setAiBusy] = useState(false)
   const [aiTestState, setAiTestState] = useState<'idle' | 'ok' | 'error'>('idle')
   const [aiError, setAiError] = useState<string | null>(null)
-  const [insertConflict, setInsertConflict] = useState<ComposerState | null>(null)
-  const [insertMode, setInsertMode] = useState<InsertMode>('append')
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -114,8 +111,7 @@ export function App() {
     const dismissTopmost = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
 
-      if (insertConflict) setInsertConflict(null)
-      else if (aiPanel) setAiPanel(null)
+      if (aiPanel) setAiPanel(null)
       else if (documentSheetOpen) setDocumentSheetOpen(false)
       else if (previewOpen) setPreviewOpen(false)
       else if (slashOpen) setSlashOpen(false)
@@ -127,37 +123,30 @@ export function App() {
 
     window.addEventListener('keydown', dismissTopmost)
     return () => window.removeEventListener('keydown', dismissTopmost)
-  }, [aiPanel, documentSheetOpen, insertConflict, previewOpen, selection, slashOpen])
+  }, [aiPanel, documentSheetOpen, previewOpen, selection, slashOpen])
 
-  const compiled = useMemo(
-    () => (current ? compilePrompt(current, previewFormat) : ''),
-    [current, previewFormat],
+  const previewText = useMemo(
+    () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
+    [current, previewFormat, previewOpen],
   )
-  const localFindings = useMemo(() => (current ? lintPrompt(current) : []), [current])
+  const localFindings = useMemo(
+    () => (lintOpen && current ? lintPrompt(current) : []),
+    [current, lintOpen],
+  )
   const suggestionIsStale = Boolean(
     suggestion && current && !isSuggestionCurrent(suggestion, current.revision),
   )
-
-  async function refreshDocumentList(failureMessage: string) {
-    try {
-      setDocuments(await promptRepository.list())
-    } catch (listError) {
-      setError(`${failureMessage}：${messageOf(listError)}`)
-    }
-  }
 
   async function persistDocument(document: PromptDocument) {
     if (deletedDocumentIds.current.has(document.id)) return
     try {
       await promptRepository.save(document)
       setSaveState('saved')
+      setDocuments((previous) => upsertDocument(previous, document))
     } catch (saveError) {
       setSaveState('error')
       setError(`保存失败：${messageOf(saveError)}`)
-      return
     }
-
-    await refreshDocumentList('文档已保存，但刷新列表失败')
   }
 
   function updateCurrentContent(content: PromptNodeJSON) {
@@ -197,10 +186,10 @@ export function App() {
       const created = createPromptDocument()
       await promptRepository.save(created)
       await promptRepository.setCurrentId(created.id)
+      setDocuments((previous) => upsertDocument(previous, created))
       setCurrent(created)
       setDocumentSheetOpen(false)
       window.setTimeout(() => editorRef.current?.focus(), 0)
-      await refreshDocumentList('Prompt 已创建，但刷新列表失败')
     } catch (createError) {
       setError(`创建失败：${messageOf(createError)}`)
     }
@@ -288,12 +277,12 @@ export function App() {
 
       await promptRepository.save(imported)
       await promptRepository.setCurrentId(imported.id)
+      setDocuments((previous) => upsertDocument(previous, imported))
       setCurrent(imported)
       setSuggestion(null)
       setSelection(null)
       setDocumentSheetOpen(false)
-      setToast('已导入 PromptDocument JSON')
-      await refreshDocumentList('备份已恢复，但刷新列表失败')
+      setToast('已恢复 Prompt 备份')
     } catch (importError) {
       setError(`导入失败：${messageOf(importError)}`)
     }
@@ -437,39 +426,12 @@ export function App() {
     }
   }
 
-  async function queryComposer(): Promise<ComposerState> {
-    const tabId = await activeTabId()
-    const request: ContentRequest = { type: 'PROMPTNOTE_GET_COMPOSER_STATE' }
-    const response = (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse
-    if (!response.ok || !response.state) {
-      throw new Error(response.ok ? '未返回输入框状态。' : response.error)
-    }
-    return response.state
-  }
-
-  async function requestInsert(mode: InsertMode) {
-    if (!current) return
-    const tabId = await activeTabId()
-    const request: ContentRequest = {
-      type: 'PROMPTNOTE_INSERT',
-      text: compilePrompt(current, previewFormat),
-      mode,
-    }
-    const response = (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse
-    if (!response.ok) throw new Error(response.error)
-    setToast('已插入当前网页；不会自动发送')
-  }
-
   async function insertIntoPage() {
+    if (!current) return
+    setError(null)
     try {
-      const composer = await queryComposer()
-      if (!composer.supported) throw new Error('当前网页没有可用的 Prompt 输入框。')
-      if (composer.hasContent) {
-        setInsertConflict(composer)
-        setInsertMode('append')
-        return
-      }
-      await requestInsert('replace')
+      const placement = await insertIntoActivePage(compilePrompt(current, previewFormat))
+      setToast(insertToast(placement))
     } catch (insertError) {
       setError(`无法插入：${messageOf(insertError)} 可继续使用“复制”。`)
     }
@@ -496,7 +458,7 @@ export function App() {
 
       <main className="workspace">
         {previewOpen ? (
-          <Preview text={compiled} format={previewFormat} onFormat={setPreviewFormat} onBack={() => setPreviewOpen(false)} onCopy={() => void copyCompiled()} onInsert={() => void insertIntoPage()} />
+          <Preview text={previewText} format={previewFormat} onFormat={setPreviewFormat} onBack={() => setPreviewOpen(false)} onCopy={() => void copyCompiled()} onInsert={() => void insertIntoPage()} />
         ) : (
           <>
             <div className="editor-scroll">
@@ -562,17 +524,50 @@ export function App() {
           onAction={(action) => void runGlobalAi(action)}
         />
       )}
-      {insertConflict && <InsertConflictDialog mode={insertMode} onMode={setInsertMode} onClose={() => setInsertConflict(null)} onConfirm={() => { const mode = insertMode; setInsertConflict(null); void requestInsert(mode).catch((insertError: unknown) => setError(`插入失败：${messageOf(insertError)}`)) }} />}
       {error && <div className="error-banner"><span>{error}</span><button onClick={() => setError(null)}>×</button></div>}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
 }
 
+async function insertIntoActivePage(text: string): Promise<InsertPlacement> {
+  const tabId = await activeTabId()
+  const request: ContentRequest = { type: 'PROMPTNOTE_INSERT_AT_CARET', text }
+
+  try {
+    return await sendInsertRequest(tabId, request)
+  } catch (error) {
+    if (!isMissingReceiverError(error)) throw error
+  }
+
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
+  } catch (injectionError) {
+    throw new Error(
+      'PromptNote 尚未获得当前网页的临时插入权限。请在目标网页点击一次 PromptNote 扩展图标，再重试。',
+      { cause: injectionError },
+    )
+  }
+
+  return sendInsertRequest(tabId, request)
+}
+
+async function sendInsertRequest(tabId: number, request: ContentRequest): Promise<InsertPlacement> {
+  const response = (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse
+  if (!response.ok) throw new Error(response.error)
+  return response.placement
+}
+
 async function activeTabId(): Promise<number> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab?.id) throw new Error('无法确定当前标签页。')
   return tab.id
+}
+
+function upsertDocument(documents: PromptDocument[], document: PromptDocument): PromptDocument[] {
+  return [...documents.filter((item) => item.id !== document.id), document].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  )
 }
 
 function validateAiSettings(settings: AiSettings) {
@@ -589,12 +584,23 @@ function safeFileName(value: string) {
   return trimmed.slice(0, 80) || 'prompt'
 }
 
+function isMissingReceiverError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Could not establish connection|Receiving end does not exist/i.test(message)
+}
+
 function messageOf(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
-  if (/Could not establish connection|Receiving end does not exist/i.test(message)) {
-    return 'PromptNote 尚未连接到当前网页。若刚重新加载或更新了扩展，请刷新 ChatGPT 标签页后重试。'
+  if (isMissingReceiverError(error)) {
+    return 'PromptNote 尚未连接到当前网页。请在目标网页点击一次 PromptNote 扩展图标后重试。'
   }
   return message
+}
+
+function insertToast(placement: InsertPlacement): string {
+  if (placement === 'selection') return '已替换网页当前选区；不会自动发送'
+  if (placement === 'end') return '未恢复到光标，已插入输入框末尾；不会自动发送'
+  return '已插入网页光标处；不会自动发送'
 }
 
 function saveLabel(state: SaveState) {
