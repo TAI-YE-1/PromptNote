@@ -32,10 +32,14 @@ function userPayload(request: AiRequest): string {
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
 }
 
-async function fetchAi(url: string, init: RequestInit): Promise<Response> {
+async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+  const timeoutSignal = AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
+  const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
+
   try {
-    return await fetch(url, { ...init, signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) })
+    return await fetch(url, { ...init, signal: requestSignal })
   } catch (error) {
+    if (signal?.aborted) throw error
     if (error && typeof error === 'object' && 'name' in error) {
       const name = String((error as { name?: unknown }).name)
       if (name === 'TimeoutError' || name === 'AbortError') {
@@ -94,23 +98,27 @@ class OpenAICompatibleProvider implements AiProvider {
     await this.generate(settings, { action: 'shorten', content: '测试连接。' })
   }
 
-  async generate(settings: AiSettings, request: AiRequest): Promise<string> {
-    const response = await fetchAi(apiEndpoint(settings.baseUrl, '/v1/chat/completions'), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${settings.apiKey}`,
-        'Content-Type': 'application/json',
+  async generate(settings: AiSettings, request: AiRequest, signal?: AbortSignal): Promise<string> {
+    const response = await fetchAi(
+      apiEndpoint(settings.baseUrl, '/v1/chat/completions'),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${settings.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          temperature: request.action === 'complete' ? 0.1 : 0.2,
+          ...(request.action === 'complete' ? { max_tokens: 120 } : {}),
+          messages: [
+            { role: 'system', content: systemInstruction(request.action) },
+            { role: 'user', content: userPayload(request) },
+          ],
+        }),
       },
-      body: JSON.stringify({
-        model: settings.model,
-        temperature: request.action === 'complete' ? 0.1 : 0.2,
-        ...(request.action === 'complete' ? { max_tokens: 120 } : {}),
-        messages: [
-          { role: 'system', content: systemInstruction(request.action) },
-          { role: 'user', content: userPayload(request) },
-        ],
-      }),
-    })
+      signal,
+    )
     return extractOpenAIContent(await readJson(response))
   }
 }
@@ -120,22 +128,26 @@ class AnthropicProvider implements AiProvider {
     await this.generate(settings, { action: 'shorten', content: '测试连接。' })
   }
 
-  async generate(settings: AiSettings, request: AiRequest): Promise<string> {
-    const response = await fetchAi(apiEndpoint(settings.baseUrl, '/v1/messages'), {
-      method: 'POST',
-      headers: {
-        'x-api-key': settings.apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
+  async generate(settings: AiSettings, request: AiRequest, signal?: AbortSignal): Promise<string> {
+    const response = await fetchAi(
+      apiEndpoint(settings.baseUrl, '/v1/messages'),
+      {
+        method: 'POST',
+        headers: {
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          max_tokens: request.action === 'complete' ? 120 : 800,
+          temperature: request.action === 'complete' ? 0.1 : 0.2,
+          system: systemInstruction(request.action),
+          messages: [{ role: 'user', content: userPayload(request) }],
+        }),
       },
-      body: JSON.stringify({
-        model: settings.model,
-        max_tokens: request.action === 'complete' ? 120 : 800,
-        temperature: request.action === 'complete' ? 0.1 : 0.2,
-        system: systemInstruction(request.action),
-        messages: [{ role: 'user', content: userPayload(request) }],
-      }),
-    })
+      signal,
+    )
     return extractAnthropicContent(await readJson(response))
   }
 }
