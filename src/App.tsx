@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PromptEditor, type EditorSelectionSnapshot, type PromptEditorHandle } from './editor/PromptEditor'
 import { compilePrompt, type CompileFormat } from './prompt/compiler'
-import { cloneWithContent, createPromptDocument, type PromptDocument, type PromptNodeJSON } from './prompt/schema'
+import {
+  cloneWithContent,
+  createPromptDocument,
+  createPromptDocumentExport,
+  parsePromptDocumentExport,
+  type PromptDocument,
+  type PromptNodeJSON,
+} from './prompt/schema'
 import { ChromePromptRepository } from './storage/promptRepository'
 import { ChromeAiSettingsRepository, defaultAiSettings } from './storage/aiSettingsRepository'
 import { defaultBaseUrl, ensureAiHostPermission, getAiProvider } from './ai/provider'
@@ -181,6 +188,64 @@ export function App() {
       setDocumentSheetOpen(false)
     } catch (deleteError) {
       setError(messageOf(deleteError))
+    }
+  }
+
+  function exportCurrentDocument() {
+    if (!current) return
+    try {
+      const backup = createPromptDocumentExport(current)
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `promptnote-${safeFileName(current.title || 'prompt')}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setToast('已导出 PromptDocument JSON')
+    } catch (exportError) {
+      setError(`导出失败：${messageOf(exportError)}`)
+    }
+  }
+
+  async function importPromptDocumentBackup(file: File) {
+    try {
+      const raw = JSON.parse(await file.text()) as unknown
+      const backup = parsePromptDocumentExport(raw)
+      await flushCurrent()
+
+      let imported = backup.document
+      const existing = await promptRepository.get(imported.id)
+      if (existing) {
+        const overwrite = window.confirm(
+          `本地已存在同 ID 的“${existing.title || '未命名 Prompt'}”。确定覆盖它吗？\n\n取消则会作为一个新的导入副本保存。`,
+        )
+        if (!overwrite) {
+          const now = new Date().toISOString()
+          imported = {
+            ...imported,
+            id: crypto.randomUUID(),
+            title: `${imported.title || '未命名 Prompt'}（导入）`,
+            revision: imported.revision + 1,
+            updatedAt: now,
+          }
+        } else {
+          deletedDocumentIds.current.delete(imported.id)
+        }
+      }
+
+      await promptRepository.save(imported)
+      await promptRepository.setCurrentId(imported.id)
+      setCurrent(imported)
+      setDocuments(await promptRepository.list())
+      setSuggestion(null)
+      setSelection(null)
+      setDocumentSheetOpen(false)
+      setToast('已导入 PromptDocument JSON')
+    } catch (importError) {
+      setError(`导入失败：${messageOf(importError)}`)
     }
   }
 
@@ -401,7 +466,18 @@ export function App() {
         )}
       </main>
 
-      {documentSheetOpen && <DocumentSheet documents={documents} currentId={current.id} onClose={() => setDocumentSheetOpen(false)} onSwitch={(id) => void switchDocument(id)} onCreate={() => void createDocument()} onDelete={() => void deleteCurrentDocument()} />}
+      {documentSheetOpen && (
+        <DocumentSheet
+          documents={documents}
+          currentId={current.id}
+          onClose={() => setDocumentSheetOpen(false)}
+          onSwitch={(id) => void switchDocument(id)}
+          onCreate={() => void createDocument()}
+          onDelete={() => void deleteCurrentDocument()}
+          onExport={exportCurrentDocument}
+          onImport={(file) => void importPromptDocumentBackup(file)}
+        />
+      )}
       {aiPanel && (
         <AiSheet
           mode={aiPanel}
@@ -438,6 +514,11 @@ function validateAiSettings(settings: AiSettings) {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     throw new Error('API Base URL 必须是 HTTP(S) 地址。')
   }
+}
+
+function safeFileName(value: string) {
+  const trimmed = value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ')
+  return trimmed.slice(0, 80) || 'prompt'
 }
 
 function messageOf(error: unknown) {
