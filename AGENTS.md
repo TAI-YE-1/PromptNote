@@ -8,11 +8,12 @@
 
 1. `docs/PRODUCT.md`
 2. `docs/UX.md`
-3. `docs/PROMPT-DOCUMENT-CONTRACT.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/DECISIONS.md`
-6. `TASKS.md`
-7. 真实代码、配置、测试与当前调用链
+3. 当前阶段若为 P0.5，额外阅读 `docs/PROTOTYPE.md`
+4. `docs/PROMPT-DOCUMENT-CONTRACT.md`
+5. `docs/ARCHITECTURE.md`
+6. `docs/DECISIONS.md`
+7. `TASKS.md`
+8. 真实代码、配置、测试与当前调用链
 
 `README.md` 用于快速入口，但不能替代上述权威文档。
 
@@ -22,6 +23,8 @@
 PRODUCT
   ↓
 UX
+  ↓
+PROTOTYPE（仅 P0.5 UX 验证阶段）
   ↓
 PROMPT-DOCUMENT-CONTRACT
   ↓
@@ -33,6 +36,8 @@ TASKS
   ↓
 code
 ```
+
+`PROTOTYPE.md` 只约束 P0.5 原型验证，不得覆盖 PRODUCT / UX 已定义的产品原则，也不得成为运行时 Schema 或正式代码权威来源。
 
 当代码与文档冲突时，不得因为代码“已经这样写了”就反向认定代码正确。
 
@@ -237,7 +242,19 @@ Suggestion：
 
 确定性 Lint 优先本地实现，语义判断再考虑 AI。
 
-## 13. TASKS 是唯一账本
+## 13. P0.5 原型特别规则
+
+P0.5 只用于 UX 验证：
+
+- 使用 Figma 可交互原型；
+- 不为原型初始化正式 React / Extension 代码；
+- 不实现真实 PromptDocument、Storage、Compiler、Adapter 或 AI API；
+- 不因为原型方便而引入 PRODUCT Non-goals；
+- 原型完成后将确认结论回写 `docs/UX.md`；
+- 正式实现从 P1 干净开始，不复制临时代码；
+- Figma 只作为 UX reference，不作为运行时状态、Schema 或架构权威来源。
+
+## 14. TASKS 是唯一账本
 
 开发只能沿 `TASKS.md` 的当前实施包推进。
 
@@ -254,12 +271,13 @@ Suggestion：
 
 新发现工作属于 V1 时写回 `TASKS.md`，不要另建平行 TODO 文档。
 
-## 14. 文档必须跟代码一起更新
+## 15. 文档必须跟代码一起更新
 
 每个任务包结束前检查：
 
 - 产品边界是否变化 → `PRODUCT.md`；
 - 体验是否变化 → `UX.md`；
+- P0.5 原型范围或结论变化 → `PROTOTYPE.md`；
 - Schema 是否变化 → `PROMPT-DOCUMENT-CONTRACT.md`；
 - 模块职责/数据流是否变化 → `ARCHITECTURE.md`；
 - 重大技术或产品选择是否变化 → `DECISIONS.md`；
@@ -268,7 +286,7 @@ Suggestion：
 
 不要创建新的文档来逃避更新现有权威来源。
 
-## 15. 完成汇报要求
+## 16. 完成汇报要求
 
 每个开发任务停止时明确说明：
 
