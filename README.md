@@ -26,17 +26,19 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - 选区 AI：改清楚、缩短、拆成约束；
 - 全局 AI：歧义检查、验收标准建议、结构建议；
 - source revision 过期建议保护；
-- 第一个 ChatGPT Web Adapter：探测输入框、追加/替换、冲突提示、失败退化为 Copy；
-- GitHub Actions：TypeScript、ESLint、单测、Extension build。
+- 通用网页插入：标准 `input / textarea / contenteditable` 按当前选区或光标位置插入；
+- ChatGPT 特殊 Adapter 只保留必要的输入框 selector 兼容；
+- 用户点击扩展图标时使用 `activeTab + scripting` 按需注入轻量网页 bridge，不向所有网页常驻 Content Script；
+- GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
-尚未把 V1 标记为完成。真实 Chrome / Edge 手工加载、浏览器重启恢复、ChatGPT 当前线上 DOM 端到端、窄宽度/键盘可达性等仍需真实浏览器验收。以 `TASKS.md` 为唯一完成度账本。
+尚未把 V1 标记为完成。新的 caret-first 通用插入链、浏览器重启恢复、AI 全异常降级、最终 Chrome / Edge 主链与键盘可达性仍需真实浏览器收口。以 `TASKS.md` 为唯一完成度账本。
 
 ## 本地开发
 
 要求：Node.js 22。
 
 ```bash
-npm install
+npm ci
 npm run typecheck
 npm run lint
 npm test
@@ -51,14 +53,15 @@ npm run build
 2. 开启“开发者模式”；
 3. 选择“加载已解压的扩展程序”；
 4. 选择本项目构建后的 `dist/` 目录；
-5. 点击 PromptNote 扩展图标打开 Side Panel。
+5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel；该明确用户动作同时为当前标签页授予临时 `activeTab` 访问并预热网页插入 bridge。
 
 ### Edge 本地加载
 
 1. 打开 `edge://extensions`；
 2. 开启“开发人员模式”；
 3. 选择“加载解压缩的扩展”；
-4. 选择构建后的 `dist/` 目录。
+4. 选择构建后的 `dist/` 目录；
+5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel。
 
 ## V1 主链
 
@@ -68,7 +71,7 @@ npm run build
 4. 可选使用 AI 做局部改写或全局建议；结果先显示 suggestion，由用户接受后才改正文。
 5. 使用本地 Prompt Check，必要时再显式触发 AI 深度检查。
 6. 将同一份 PromptDocument 编译为 Plain Text、Markdown 或 XML。
-7. 复制结果，或在支持的网站中显式插入；不会自动发送消息。
+7. 复制结果，或把结果插入当前网页的文本输入位置；不会自动发送消息。
 
 ## AI 与隐私边界
 
@@ -79,16 +82,32 @@ npm run build
 - 自定义 AI Base URL 使用 Chrome optional host permission，按实际配置的 origin 请求权限；
 - AI 请求设置可见超时与错误，不伪造成功。
 
-## 当前网页支持
+## 网页插入
 
-第一个 Adapter 为 ChatGPT：
+PromptNote 的默认插入心智与普通“粘贴”一致，而不是按网站维护一套“追加/替换整个输入框”的流程：
 
-- `chatgpt.com`
-- `chat.openai.com`
+- 输入框存在选中文字 → 只替换当前选区；
+- 输入框存在光标 → 插入到当前光标；
+- 空输入框 → 直接插入；
+- 能确定目标但无法恢复光标 → 退化到输入框末尾并明确提示；
+- 无法确定目标输入框 → 提示先点击目标输入框，不猜测、不覆盖；
+- 永远不会自动点击发送/提交。
 
-当前代码不会自动点击发送；输入框已有内容时，用户必须明确选择追加或替换。
+通用能力覆盖标准 `input / textarea / contenteditable`。站点 Adapter 只负责确有必要的特殊 DOM 发现，例如 ChatGPT 当前优先识别 `#prompt-textarea`；插入算法只有共享的一份。
 
-Claude / Gemini 等站点只有在 ChatGPT Adapter 真实浏览器验证稳定后才进入后续实现，避免复制脆弱 DOM 逻辑。
+PromptNote 不向所有网页常驻 Content Script。用户点击扩展图标后，Extension 使用 `activeTab + scripting` 对当前标签页临时注入轻量 bridge；这和 AI Provider 使用的 optional host permission 是两个不同权限边界。
+
+## 性能策略
+
+默认编辑热路径避免无意义工作：
+
+- 450ms 自动保存后直接用已知 PromptDocument 增量更新文档列表，不再每次重新读取整个 Storage；
+- “检查”未打开时不在每次键入后运行本地 lint；
+- “预览”未打开时不在每次键入后编译预览字符串；
+- 正常 Web Insert 使用一次原子消息完成定位与插入，不先查询再第二次写入；
+- 网页 bridge 按用户动作注入，不在所有页面长期运行。
+
+当前 TipTap / React Side Panel 生产 bundle 仍有约 600KB 级别的 minified 主 chunk；这是已知的构建体积优化空间，不通过提高 Vite warning limit 掩盖。是否进一步 code splitting 应以真实 Side Panel 启动性能为依据。
 
 ## V1 明确不做
 
