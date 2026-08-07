@@ -31,7 +31,9 @@ function insertContentEditable(element: HTMLElement, text: string, mode: InsertM
   selection?.removeAllRanges()
   selection?.addRange(range)
   const value = mode === 'append' && readText(element).trim() ? `\n${text}` : text
-  const inserted = document.execCommand('insertText', false, value)
+  const inserted = typeof document.execCommand === 'function'
+    ? document.execCommand('insertText', false, value)
+    : false
   if (!inserted) {
     element.textContent = mode === 'append' ? `${readText(element)}${value}` : text
     element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }))
