@@ -1,66 +1,114 @@
 .selection-toolbar {
-  left: 12px !important;
-  right: 12px;
+  left: 50% !important;
+  right: auto;
   width: auto;
-  max-width: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  margin-top: 24px;
-  padding: 6px;
-  transform: translateY(-100%);
+  max-width: calc(100% - 36px);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 12px;
+  padding: 0;
+  transform: translate(-50%, -100%);
   overflow: visible;
-  border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  transition: background .14s ease, box-shadow .14s ease, padding .14s ease;
 }
 
 .selection-toolbar button {
+  display: none;
   min-width: 0;
-  padding: 7px 4px;
+  padding: 7px 8px;
+  border-radius: 999px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+}
+
+.selection-toolbar > button:last-of-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  padding: 7px 12px;
+  background: var(--forest-deep);
+  color: #fff;
+  font-size: 0;
+  box-shadow: 0 7px 18px rgba(24, 56, 44, .20);
+}
+
+.selection-toolbar > button:last-of-type::after {
+  content: 'AI 辅助';
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .01em;
 }
 
 .selection-toolbar > span {
   display: none;
 }
 
+.selection-toolbar:hover,
+.selection-toolbar:focus-within {
+  gap: 2px;
+  padding: 4px;
+  background: var(--forest-deep);
+  box-shadow: 0 9px 22px rgba(24, 56, 44, .24);
+}
+
+.selection-toolbar:hover button,
+.selection-toolbar:focus-within button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.selection-toolbar:hover > button:last-of-type,
+.selection-toolbar:focus-within > button:last-of-type {
+  min-width: auto;
+  padding-inline: 8px;
+  box-shadow: none;
+}
+
+.selection-toolbar:hover > button:last-of-type::after,
+.selection-toolbar:focus-within > button:last-of-type::after {
+  font-size: 10px;
+}
+
 .block-format-picker {
   position: absolute;
   z-index: 44;
-  left: 12px !important;
-  right: 12px;
+  left: 50% !important;
+  right: auto;
   width: auto;
-  max-width: none;
-  transform: none;
-  display: flex;
+  max-width: calc(100% - 36px);
+  transform: translateX(-50%);
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 7px 6px 10px;
+  padding: 3px;
   border: 1px solid #d8dfd9;
-  border-radius: 12px;
+  border-radius: 999px;
   background: rgba(252, 252, 250, .98);
   color: #707970;
-  font-size: 9px;
-  box-shadow: 0 8px 22px rgba(35, 74, 58, .10);
+  box-shadow: 0 7px 18px rgba(35, 74, 58, .10);
 }
 
 .block-format-picker > span {
-  flex: 0 0 auto;
-  color: #7b847d;
-  font-weight: 650;
+  display: none;
 }
 
 .block-format-picker select {
-  min-width: 116px;
-  max-width: 170px;
-  height: 28px;
-  margin-left: auto;
-  padding: 0 28px 0 10px;
+  min-width: 108px;
+  max-width: 148px;
+  height: 30px;
+  margin: 0;
+  padding: 0 28px 0 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 999px;
   outline: none;
   background: #eef3ef;
   color: var(--forest-deep);
@@ -154,25 +202,26 @@
 
 @media (max-width: 380px) {
   .selection-toolbar {
-    left: 8px !important;
-    right: 8px;
-    gap: 2px;
-    padding: 5px;
+    max-width: calc(100% - 20px);
   }
 
-  .selection-toolbar button {
-    padding-inline: 2px;
+  .selection-toolbar:hover button,
+  .selection-toolbar:focus-within button {
+    padding-inline: 6px;
     font-size: 9px;
   }
 
+  .selection-toolbar > button:last-of-type {
+    min-width: 76px;
+  }
+
   .block-format-picker {
-    left: 8px !important;
-    right: 8px;
+    max-width: calc(100% - 20px);
   }
 
   .block-format-picker select {
-    min-width: 104px;
-    max-width: 148px;
+    min-width: 100px;
+    max-width: 132px;
   }
 
   .backup-actions .ghost-button {
