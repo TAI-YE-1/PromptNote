@@ -26,7 +26,7 @@ import {
   InsertConflictDialog,
   LintCard,
   Preview,
-  SelectionToolbar,
+  SelectionContextMenu,
   SlashMenu,
   SuggestionCard,
 } from './ui/components'
@@ -462,7 +462,17 @@ export function App() {
                 onSlashRequest={() => { setSlashOpen(true); setSelection(null) }}
               />
               {slashOpen && <SlashMenu onClose={() => setSlashOpen(false)} onInsert={(kind) => { editorRef.current?.insertSection(kind); setSlashOpen(false) }} />}
-              {selection && !aiBusy && <SelectionToolbar selection={selection} onAction={(action) => void runSelectionAi(action)} onMore={() => openAi(false)} />}
+              {selection && !aiBusy && (
+                <SelectionContextMenu
+                  selection={selection}
+                  onAction={(action) => void runSelectionAi(action)}
+                  onMore={() => openAi(false)}
+                  onConvert={(format) => {
+                    editorRef.current?.convertSelectedBlock(format)
+                    setSelection(null)
+                  }}
+                />
+              )}
               {aiBusy && <div className="inline-status">AI 正在生成建议…</div>}
               {suggestion && <SuggestionCard suggestion={suggestion} stale={suggestionIsStale} onAccept={acceptSuggestion} onIgnore={() => setSuggestion(null)} />}
               {lintOpen && <LintCard findings={localFindings} aiReady={aiSettings.enabled && aiSettings.configured} onDeepCheck={() => { if (aiSettings.enabled && aiSettings.configured) void runGlobalAi('ambiguity'); else openAi() }} />}
