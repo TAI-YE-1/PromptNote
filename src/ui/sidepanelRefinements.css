@@ -6,6 +6,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
+  margin-top: 24px;
   padding: 6px;
   transform: translateY(-100%);
   overflow: visible;
