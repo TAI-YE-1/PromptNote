@@ -46,3 +46,7 @@ export function makeAppendSuggestion(input: {
     sectionKind: input.sectionKind === 'acceptance' ? 'acceptance' : undefined,
   }
 }
+
+export function isSuggestionCurrent(suggestion: PromptSuggestion, currentRevision: number): boolean {
+  return suggestion.sourceRevision === currentRevision
+}
