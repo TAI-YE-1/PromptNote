@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App } from './App'
+import { PromptNoteApp } from './app/PromptNoteApp'
 import './styles.css'
 import './ui/components.css'
 
@@ -9,6 +9,6 @@ if (!root) throw new Error('PromptNote root element missing.')
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <PromptNoteApp />
   </StrictMode>,
 )
