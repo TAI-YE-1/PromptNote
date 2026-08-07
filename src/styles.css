@@ -131,7 +131,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .settings-form { display: grid; gap: 11px; margin-top: 12px; }
 .settings-form label > span { display: block; margin-bottom: 5px; color: #6c736d; font-size: 10px; font-weight: 700; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.toggle-row > span { margin: 0 !important; }
+.settings-form .toggle-row > span { margin: 0; }
 .toggle-row strong, .toggle-row small { display: block; }
 .toggle-row small { margin-top: 3px; color: var(--muted); font-size: 9px; font-weight: 400; }
 .privacy-note { margin-top: 12px; padding: 10px; border-radius: 10px; background: #f4f5f1; color: #687069; font-size: 9px; line-height: 1.55; }
