@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "license:audit": "node scripts/audit-licenses.mjs"
   },
   "dependencies": {
     "@tiptap/core": "3.29.2",
