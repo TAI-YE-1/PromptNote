@@ -1,19 +1,8 @@
 import type { PromptDocument, PromptNodeJSON } from './schema'
 import { isSectionKind, sectionKindMeta } from './sectionKinds'
+import { textOfPromptNode } from './text'
 
 export type CompileFormat = 'plain' | 'markdown' | 'xml'
-
-function textOf(node: PromptNodeJSON): string {
-  if (node.text) return node.text
-  const children = node.content ?? []
-  const parts = children.map(textOf).filter(Boolean)
-  if (node.type === 'hardBreak') return '\n'
-  if (node.type === 'paragraph' || node.type === 'heading') return parts.join('')
-  if (node.type === 'bulletList') return parts.join('\n')
-  if (node.type === 'listItem') return `- ${parts.join(' ')}`
-  if (node.type === 'codeBlock') return parts.join('')
-  return parts.join('')
-}
 
 function blocksOf(document: PromptDocument): PromptNodeJSON[] {
   return document.content.content ?? []
@@ -43,7 +32,7 @@ export function compilePrompt(document: PromptDocument, format: CompileFormat): 
     return blocks
       .map((block) => {
         const kind = sectionKind(block)
-        const text = textOf(block).trim()
+        const text = textOfPromptNode(block).trim()
         if (!text) return ''
         return kind ? `${sectionKindMeta[kind].label}\n${text}` : text
       })
@@ -55,7 +44,7 @@ export function compilePrompt(document: PromptDocument, format: CompileFormat): 
     return blocks
       .map((block) => {
         const kind = sectionKind(block)
-        const text = textOf(block).trim()
+        const text = textOfPromptNode(block).trim()
         if (!text) return ''
         if (kind) return `## ${sectionKindMeta[kind].label}\n\n${text}`
         if (block.type === 'codeBlock') return `\`\`\`\n${text}\n\`\`\``
@@ -68,7 +57,7 @@ export function compilePrompt(document: PromptDocument, format: CompileFormat): 
   const xmlBlocks = blocks
     .map((block) => {
       const kind = sectionKind(block)
-      const text = textOf(block).trim()
+      const text = textOfPromptNode(block).trim()
       if (!text) return ''
       const tag = kind ? tagName(kind) : 'paragraph'
       return `  <${tag}>${escapeXml(text)}</${tag}>`
