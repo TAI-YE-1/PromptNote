@@ -21,6 +21,8 @@ function systemInstruction(action: AiRequest['action']): string {
     draft_acceptance: '根据给定 Prompt 生成简洁、可验证的验收标准。',
     ambiguity: '指出并改写最重要的一处歧义；只返回建议文本。',
     structure: '只给出结构整理建议，不整篇重写。',
+    complete:
+      '从用户当前光标前的 Prompt 上下文自然续写一小段。最多约 60 个中文字符或两句；不要重复已有文本，不加解释、标题、引号或 Markdown 围栏，只返回应直接接在光标后的文字。',
   }
   return `${common}\n${actions[action]}`
 }
@@ -101,7 +103,8 @@ class OpenAICompatibleProvider implements AiProvider {
       },
       body: JSON.stringify({
         model: settings.model,
-        temperature: 0.2,
+        temperature: request.action === 'complete' ? 0.1 : 0.2,
+        ...(request.action === 'complete' ? { max_tokens: 120 } : {}),
         messages: [
           { role: 'system', content: systemInstruction(request.action) },
           { role: 'user', content: userPayload(request) },
@@ -127,8 +130,8 @@ class AnthropicProvider implements AiProvider {
       },
       body: JSON.stringify({
         model: settings.model,
-        max_tokens: 800,
-        temperature: 0.2,
+        max_tokens: request.action === 'complete' ? 120 : 800,
+        temperature: request.action === 'complete' ? 0.1 : 0.2,
         system: systemInstruction(request.action),
         messages: [{ role: 'user', content: userPayload(request) }],
       }),
