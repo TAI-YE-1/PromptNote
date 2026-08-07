@@ -33,15 +33,15 @@
 ## P0.5 — 单文件 HTML 可交互 UX 原型验证
 
 - [x] P0.5-01 建立 `docs/PROTOTYPE.md`，固定原型目标、范围、状态与验收标准。
-- [ ] P0.5-02 建立 `prototype/promptnote-prototype.html` 单文件原型；HTML/CSS/JS 全部内嵌，无 Node、React、CDN、后端依赖。
-- [ ] P0.5-03 完成约 440px 基准 Side Panel 主界面及 Empty / Writing / Slash Menu / Structured 四个核心编辑状态。
-- [ ] P0.5-04 完成 Selection Toolbar 与 AI Suggestion 接受/忽略/过期状态，AI 使用预置假数据。
-- [ ] P0.5-05 完成 Prompt Check / Lint finding 状态，不引入 Prompt 分数，不实现正式 lint 引擎。
-- [ ] P0.5-06 完成 Plain / Markdown / XML Preview，只读且不形成第二编辑入口。
-- [ ] P0.5-07 完成轻量 Document Switcher，不引入文件夹/团队/市场等平台化能力。
-- [ ] P0.5-08 完成 Insert 正常、目标输入已有内容、Adapter 失败→Copy 三种模拟状态；不得操作真实 ChatGPT DOM。
-- [ ] P0.5-09 使用统一 `state + render()` 或等价单状态模型跑通“自然书写 → Slash 结构化 → AI 建议 → Check → Preview → Insert”的可点击主链，不为各状态复制独立页面实现。
-- [ ] P0.5-10 增加仅用于评审的 Prototype Controls：重置、快速状态跳转、360/440/520 宽度、Adapter 可用性和输入冲突模拟。
+- [x] P0.5-02 建立 `prototype/promptnote-prototype.html` 单文件原型；HTML/CSS/JS 全部内嵌，无 Node、React、CDN、后端依赖。
+- [x] P0.5-03 完成约 440px 基准 Side Panel 主界面及 Empty / Writing / Slash Menu / Structured 四个核心编辑状态。
+- [x] P0.5-04 完成 Selection Toolbar 与 AI Suggestion 接受/忽略/过期状态，AI 使用预置假数据。
+- [x] P0.5-05 完成 Prompt Check / Lint finding 状态，不引入 Prompt 分数，不实现正式 lint 引擎。
+- [x] P0.5-06 完成 Plain / Markdown / XML Preview，只读且不形成第二编辑入口。
+- [x] P0.5-07 完成轻量 Document Switcher，不引入文件夹/团队/市场等平台化能力。
+- [x] P0.5-08 完成 Insert 正常、目标输入已有内容、Adapter 失败→Copy 三种模拟状态；不得操作真实 ChatGPT DOM。
+- [x] P0.5-09 使用统一 `state + render()` 或等价单状态模型跑通“自然书写 → Slash 结构化 → AI 建议 → Check → Preview → Insert”的可点击主链，不为各状态复制独立页面实现。
+- [x] P0.5-10 增加仅用于评审的 Prototype Controls：重置、快速状态跳转、360/440/520 宽度、Adapter 可用性和输入冲突模拟。
 - [ ] P0.5-11 在 Chrome 与 Edge 本地打开原型，检查完整主链、360/440/520 宽度及浏览器控制台无 JavaScript error。
 - [ ] P0.5-12 按 `docs/PROTOTYPE.md` 8 条验收问题进行人工体验复核并记录结论。
 - [ ] P0.5-13 将确认后的交互结论同步回 `docs/UX.md`；如产品边界变化，同步 PRODUCT / DECISIONS。
@@ -181,6 +181,6 @@
 
 ## 当前状态
 
-当前阶段：**P0 文档基线完成，P0.5 原型规格已切换为单文件 HTML，尚未开始正式业务代码。**
+当前阶段：**P0 文档基线完成；P0.5 单文件 HTML 原型已实现，等待 Chrome/Edge 人工体验复核。**
 
-下一实施包：**P0.5 — `prototype/promptnote-prototype.html` 可交互 UX 原型。**
+下一实施包：**P0.5-11～P0.5-13 — 实际浏览器验收、UX 复核与权威文档回写。**
