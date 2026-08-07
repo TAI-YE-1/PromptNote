@@ -23,7 +23,15 @@ export class ChromeAiSettingsRepository implements AiSettingsRepository {
     const result = await chrome.storage.local.get(AI_SETTINGS_KEY)
     const value = result[AI_SETTINGS_KEY]
     if (!value || typeof value !== 'object') return defaultAiSettings
-    return { ...defaultAiSettings, ...(value as Partial<AiSettings>) }
+
+    const stored = value as Partial<AiSettings>
+    const legacyUnverified = !Object.hasOwn(stored, 'completionEnabled')
+    return {
+      ...defaultAiSettings,
+      ...stored,
+      configured: legacyUnverified ? false : Boolean(stored.configured),
+      completionEnabled: legacyUnverified ? false : Boolean(stored.completionEnabled),
+    }
   }
 
   async save(settings: AiSettings): Promise<void> {
