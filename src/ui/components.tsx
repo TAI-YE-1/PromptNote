@@ -166,7 +166,6 @@ export function Preview(props: {
   onFormat(format: CompileFormat): void
   onBack(): void
   onCopy(): void
-  onInsert(): void
 }) {
   return (
     <div className="preview-view">
@@ -189,9 +188,8 @@ export function Preview(props: {
         </div>
         <pre>{props.text}</pre>
       </div>
-      <footer className="preview-actions">
-        <button className="ghost-button" onClick={props.onCopy}>复制</button>
-        <button className="primary-button" onClick={props.onInsert}>插入</button>
+      <footer className="preview-actions preview-actions--single">
+        <button className="primary-button" onClick={props.onCopy}>复制当前格式</button>
       </footer>
     </div>
   )
@@ -306,7 +304,14 @@ export function AiSheet(props: {
           </div>
           <div className="ai-status-card">
             <span className={props.settings.enabled ? 'status-dot status-dot--ready' : 'status-dot'} />
-            <div><strong>{props.settings.enabled ? 'AI 已就绪' : 'AI 已关闭'}</strong><small>只在你主动触发后调用，不自动改写。</small></div>
+            <div>
+              <strong>{props.settings.enabled ? 'AI 已就绪' : 'AI 已关闭'}</strong>
+              <small>
+                {props.settings.completionEnabled
+                  ? '内联补全已开启；其他 AI 动作仍需主动触发。'
+                  : '内联补全未开启；AI 动作只在你主动触发后调用。'}
+              </small>
+            </div>
           </div>
           <div className="ai-menu">
             <AiMenuButton title="检查当前 Prompt 的歧义" detail="发送当前 Prompt；结果只作为建议" disabled={!props.settings.enabled || props.busy} onClick={() => props.onAction('ambiguity')} />
@@ -336,6 +341,18 @@ export function AiSheet(props: {
             <span><strong>启用 AI 辅助</strong><small>关闭后不会调用 Provider</small></span>
             <input type="checkbox" checked={props.settings.enabled} onChange={(event) => props.onSettings({ ...props.settings, enabled: event.target.checked })} />
           </label>
+          <label className="toggle-row">
+            <span>
+              <strong>编辑器内联补全</strong>
+              <small>默认关闭。开启后光标停顿会出现灰色续写；Tab 接受，Esc 忽略。</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={props.settings.completionEnabled}
+              disabled={!props.settings.enabled || !props.settings.configured}
+              onChange={(event) => props.onSettings({ ...props.settings, completionEnabled: event.target.checked })}
+            />
+          </label>
           <label><span>Provider</span>
             <select value={props.settings.provider} onChange={(event) => props.onProvider(event.target.value as AiSettings['provider'])}>
               <option value="openai-compatible">OpenAI-compatible</option>
@@ -352,7 +369,9 @@ export function AiSheet(props: {
             </select>
           </label>
         </div>
-        <div className="privacy-note">API Key 与 PromptDocument 分离保存在本地扩展存储中；Chrome 本地存储并非加密保险库。只有你主动触发 AI 时才发送所需内容。</div>
+        <div className="privacy-note">
+          API Key 与 PromptDocument 分离保存在本地扩展存储中；Chrome 本地存储并非加密保险库。普通 AI 动作只在你主动触发时发送内容；只有你另外开启“编辑器内联补全”后，编辑停顿才会自动请求短补全。
+        </div>
         {props.testState === 'ok' && <div className="form-success">连接测试成功。</div>}
         {props.testState === 'error' && props.error && <div className="form-error">{props.error}</div>}
         <div className="sheet-actions">
@@ -381,4 +400,5 @@ export const aiActionLabels: Record<AiAction, string> = {
   draft_acceptance: '补充验收标准',
   ambiguity: '检查歧义',
   structure: '结构建议',
+  complete: '内联补全',
 }
