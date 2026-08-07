@@ -1,0 +1,123 @@
+.block-format-picker {
+  position: absolute;
+  z-index: 44;
+  transform: translate(-50%, 0);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 4px 5px 4px 9px;
+  border: 1px solid #d8dfd9;
+  border-radius: 999px;
+  background: rgba(252, 252, 250, .98);
+  color: #667068;
+  font-size: 9px;
+  box-shadow: 0 8px 22px rgba(35, 74, 58, .12);
+}
+
+.block-format-picker select {
+  max-width: 118px;
+  height: 26px;
+  padding: 0 24px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  outline: none;
+  background: #eef3ef;
+  color: var(--forest-deep);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheet-search {
+  margin-top: 14px;
+}
+
+.document-list {
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.document-item {
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.document-item--active {
+  border-color: #dbe5de;
+}
+
+.backup-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #ebece7;
+}
+
+.backup-actions .ghost-button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fff;
+  color: #405047;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.backup-actions .ghost-button:hover {
+  border-color: #d7e0d9;
+  background: #f5f8f5;
+}
+
+.file-import {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-import input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
+
+.backup-actions + .privacy-note {
+  margin-top: 8px;
+  padding: 0 2px;
+  background: transparent;
+  color: #8a908a;
+  line-height: 1.5;
+}
+
+.backup-actions ~ .sheet-actions {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #ebece7;
+}
+
+.backup-actions ~ .sheet-actions .primary-button {
+  min-width: 118px;
+}
+
+@media (max-width: 380px) {
+  .block-format-picker {
+    max-width: calc(100% - 16px);
+  }
+
+  .backup-actions .ghost-button {
+    min-height: 40px;
+  }
+}
