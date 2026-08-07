@@ -1,7 +1,14 @@
 import type { AiProvider, AiRequest, AiSettings } from './types'
 
+export const AI_REQUEST_TIMEOUT_MS = 30_000
+
 function trimBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
+}
+
+function apiEndpoint(baseUrl: string, path: `/v1/${string}`): string {
+  const base = trimBaseUrl(baseUrl)
+  return base.endsWith('/v1') ? `${base}${path.slice(3)}` : `${base}${path}`
 }
 
 function systemInstruction(action: AiRequest['action']): string {
@@ -21,6 +28,20 @@ function systemInstruction(action: AiRequest['action']): string {
 function userPayload(request: AiRequest): string {
   if (!request.surroundingContext) return request.content
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
+}
+
+async function fetchAi(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) })
+  } catch (error) {
+    if (error && typeof error === 'object' && 'name' in error) {
+      const name = String((error as { name?: unknown }).name)
+      if (name === 'TimeoutError' || name === 'AbortError') {
+        throw new Error(`AI 请求超过 ${AI_REQUEST_TIMEOUT_MS / 1000} 秒，已停止等待。`)
+      }
+    }
+    throw error
+  }
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -70,7 +91,7 @@ class OpenAICompatibleProvider implements AiProvider {
   }
 
   async generate(settings: AiSettings, request: AiRequest): Promise<string> {
-    const response = await fetch(`${trimBaseUrl(settings.baseUrl)}/v1/chat/completions`, {
+    const response = await fetchAi(apiEndpoint(settings.baseUrl, '/v1/chat/completions'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${settings.apiKey}`,
@@ -95,7 +116,7 @@ class AnthropicProvider implements AiProvider {
   }
 
   async generate(settings: AiSettings, request: AiRequest): Promise<string> {
-    const response = await fetch(`${trimBaseUrl(settings.baseUrl)}/v1/messages`, {
+    const response = await fetchAi(apiEndpoint(settings.baseUrl, '/v1/messages'), {
       method: 'POST',
       headers: {
         'x-api-key': settings.apiKey,
