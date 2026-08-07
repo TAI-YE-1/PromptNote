@@ -63,6 +63,8 @@ V1 Prompt 语义块：
 
 不得要求所有 Prompt 必须包含固定字段。
 
+语义块在视觉上必须能和普通段落、相邻语义块明确区分，但仍保持“文档块”而不是重型表单/卡片墙：常态应有可见的块边界、语义标签和适度块间距；hover / focus 只做增强，不能依赖 hover 才能看出模块分界。
+
 ## 3. AI 辅助体验
 
 ### 3.1 默认不主动改文
@@ -244,7 +246,9 @@ AI 状态入口必须可发现，但视觉权重低于正文和 Insert 主操作
 
 通用网页输入能力优先覆盖标准 `input / textarea / contenteditable`。ChatGPT、Claude、Gemini 等站点 Adapter 只用于特殊 DOM / 富编辑器兼容，不得成为“能否插入”的唯一入口。
 
-为降低网页常驻开销和站点访问范围，PromptNote 不向所有网页永久注入 content script。用户点击扩展图标时，只对当前标签页使用临时 `activeTab` 权限预热轻量网页 bridge；Bridge 丢失时可在明确用户操作下重新注入。
+为降低网页常驻开销和站点访问范围，PromptNote 不向所有网页永久注入 content script。用户点击扩展图标时，只针对**当前网站 origin**请求 optional host permission；允许后，该站点后续插入不再依赖短暂的 `activeTab`。若用户拒绝持久站点授权，则当前 action 仍可利用 `activeTab` 完成一次性 bridge 注入；Bridge 丢失时可在明确用户操作下重新注入。不得为了省事直接申请全网永久 host permission。
+
+contenteditable 插入不能仅相信浏览器旧 API 的返回值；必须确认编辑器 DOM 确实发生预期变化，未变化时走受控 fallback，最终仍无变化则明确失败，不能显示假成功。
 
 Adapter / bridge 失败时必须：
 
