@@ -90,9 +90,9 @@
 - [x] P3-05 支持 Goal / Context / Instruction / Constraint / Example / Output Format / Acceptance。
 - [x] P3-06 支持自由文本与语义块混写。
 - [x] P3-07 支持普通段落与语义块之间的显式转换，转换不得丢正文。
-- [ ] P3-08 验证 undo/redo 对语义块、转换和 AI suggestion 应用的行为。
+- [x] P3-08 验证 undo/redo 对语义块转换、选区 suggestion 替换和 AI 追加验收块的行为。
 - [x] P3-09 实现选区与编辑命令基础，AI suggestion 只通过 Editor command 应用。
-- [ ] P3-10 增加 PromptSection、Slash Menu、转换、undo/redo 聚焦测试；当前已有 PromptSection DOM 标签与段落↔语义块无损转换测试，Slash Menu / undo / redo 仍待补齐。
+- [x] P3-10 增加 PromptSection、Slash Menu、转换、undo/redo 聚焦测试；菜单项直接从权威 `sectionKinds` 派生。
 
 ---
 
@@ -105,14 +105,14 @@
 - [x] P4-05 section 标签/标题映射从同一权威 kind 定义派生。
 - [x] P4-06 实现只读 Preview，不形成第二编辑源。
 - [x] P4-07 实现 Copy。
-- [ ] P4-08 补齐空块、嵌套普通 block、更多 Markdown/Plain 特殊字符等 Compiler 边界测试。
+- [x] P4-08 补齐空块、嵌套列表与 hard break、代码块、Markdown/Plain 特殊字符和完整 XML 转义边界测试。
 
 ---
 
 ## P5 — Prompt Lint、AI Settings 与 Suggestion
 
 - [x] P5-01 实现无需 AI 的本地 deterministic lint 框架。
-- [ ] P5-02 补齐首批本地规则；当前已有模糊词、缺验收标准、长文本无结构，明显重复等规则仍未实现。
+- [x] P5-02 补齐首批本地规则：模糊词、较长任务缺目标/验收、明显重复、可能未定义的上下文引用、长文本无结构；规则只提示不阻断主链。
 - [x] P5-03 定义 AI Provider 最小适配接口，UI 不直接依赖具体 SDK。
 - [x] P5-04 实现 AI preferences：enabled、Provider、Model、Base URL、credential、默认发送范围；不进入 PromptDocument。
 - [x] P5-05 实现 AI 设置 UI、连接测试、按 origin 请求 optional host permission 和真实错误展示。
@@ -180,5 +180,5 @@
 1. Edge 真实加载与 Chrome/Edge 完整 Side Panel 主链；
 2. ChatGPT 当前线上 DOM 的真实 Adapter 验证；
 3. 浏览器重启恢复与无 AI 降级；
-4. undo/redo、Slash Menu 与编辑器专项测试闭环；
+4. suggestion 接受/忽略 UI 行为测试与更真实的 ChatGPT DOM fixture；
 5. V1 体验、许可证、release notes 最终收口。
