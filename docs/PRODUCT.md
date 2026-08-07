@@ -27,7 +27,15 @@ V1 不为企业 PromptOps 团队、模型评测平台或 Agent 编排平台设�
 
 ### P1. 用户是作者，AI 是助手
 
-AI 能提出建议，但不得默认接管全文。AI 的局部改写、结构建议、歧义检查必须由用户主动触发，并且先展示 suggestion / diff，再由用户接受。
+AI 的局部改写、结构建议、歧义检查必须由用户主动触发，并且先展示 suggestion / diff，再由用户接受。
+
+编辑器内联补全是唯一允许自动请求 AI 的例外，但必须同时满足：
+
+- AI 已配置成功；
+- AI 辅助总开关已启用；
+- 用户另行打开“编辑器内联补全”开关。
+
+补全只以灰色 ghost text 展示，不进入正文；只有用户按 `Tab` 接受后才成为 PromptDocument 内容，`Esc` 可忽略。补全开关默认关闭。
 
 ### P2. 编辑格式与输出格式分离
 
@@ -49,11 +57,11 @@ V1 不依赖注册、服务器或云端数据库。Chrome / Edge Extension 的 S
 
 ### P6. 模型中立
 
-PromptDocument 不与单一模型绑定。模型差异仅允许出现在 Compiler preset 或 Web Adapter 层。
+PromptDocument 不与单一模型绑定。AI Provider 差异只存在于 AI assistance 层，不得产生模型专用正文副本。
 
 ### P7. 主链优先
 
-任何新功能都必须能明确增强以下至少一个环节：写、整理、检查、编译、复制/插入。
+任何新功能都必须能明确增强以下至少一个环节：写、整理、检查、编译、复制。
 
 ## 4. V1 核心场景
 
@@ -78,6 +86,8 @@ PromptDocument 不与单一模型绑定。模型差异仅允许出现在 Compile
 
 结果先作为建议呈现，不直接覆盖原文。
 
+如果用户主动开启“编辑器内联补全”，光标停顿后可出现 IDE 风格灰色续写；`Tab` 接受，`Esc` 忽略。关闭补全后不得后台调用 Provider。
+
 ### 场景 D：输出标准 Prompt
 
 同一 PromptDocument 可编译为：
@@ -86,11 +96,7 @@ PromptDocument 不与单一模型绑定。模型差异仅允许出现在 Compile
 - Markdown；
 - XML。
 
-第一版不为每个模型建立独立文档副本。
-
-### 场景 E：送入当前 AI 网页
-
-用户可复制编译结果，或通过 Web Adapter 将结果插入当前支持的网站输入框。
+用户通过 Copy 将结果带到目标 AI 工具；V1 不再维护网页 DOM 注入/写入链路。
 
 ## 5. V1 必须具备
 
@@ -103,8 +109,8 @@ PromptDocument 不与单一模型绑定。模型差异仅允许出现在 Compile
 - PromptDocument 唯一内容源；
 - Plain Text / Markdown / XML Compiler；
 - Copy；
-- 至少一个真实网页 Adapter 端到端可用；
 - AI assistance 接口边界和无 AI 降级路径；
+- 可独立启停的 IDE 风格编辑器内联补全；
 - 最基本的 Prompt lint；
 - 导入/导出可恢复的 PromptDocument 数据。
 
@@ -126,6 +132,8 @@ PromptDocument 不与单一模型绑定。模型差异仅允许出现在 Compile
 - 自动整篇重写并覆盖用户原文；
 - 每个模型维护一份独立 Prompt 内容；
 - 复杂云同步；
+- 网页 DOM 注入、Web Adapter、自动写入第三方网页输入框；
+- 自动提交/发送 Prompt；
 - 移动端原生 App；
 - Electron 桌面端。
 
@@ -135,11 +143,12 @@ V1 不是以“功能数量”验收，而以主链验收：
 
 1. 用户不懂 Markdown，也能完成一份结构清晰的 Prompt；
 2. 用户可以从自由文本逐步增加结构，而不是先填表；
-3. 用户可以清楚区分“自己的原文”和“AI 建议”；
+3. 用户可以清楚区分“自己的原文”“AI 建议”和“尚未接受的灰色补全”；
 4. Plain Text / Markdown / XML 均由同一 PromptDocument 稳定编译；
 5. 刷新或关闭 Side Panel 后，内容不会丢失；
-6. 可以把最终 Prompt 可靠地复制或插入真实 AI 网页；
-7. 禁用 AI 能力时，核心编辑、结构化、编译和插入仍完整可用。
+6. 最终 Prompt 可以稳定复制到任意目标工具，不依赖目标网站 DOM；
+7. 禁用 AI 或关闭补全时，核心编辑、结构化、编译和 Copy 仍完整可用；
+8. 补全只有在 AI 已配置、AI 已启用且补全开关开启时才允许自动请求 Provider。
 
 ## 8. 范围变更规则
 
