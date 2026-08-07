@@ -35,18 +35,19 @@
 - [x] P0.5-01 建立 `docs/PROTOTYPE.md`，固定原型目标、范围、状态与验收标准。
 - [x] P0.5-02 建立 `prototype/promptnote-prototype.html` 单文件原型；HTML/CSS/JS 全部内嵌，无 Node、React、CDN、后端依赖。
 - [x] P0.5-03 完成约 440px 基准 Side Panel 主界面及 Empty / Writing / Slash Menu / Structured 四个核心编辑状态。
-- [x] P0.5-04 完成 Selection Toolbar 与 AI Suggestion 接受/忽略/过期状态，AI 使用预置假数据。
-- [x] P0.5-05 完成 Prompt Check / Lint finding 状态，不引入 Prompt 分数，不实现正式 lint 引擎。
-- [x] P0.5-06 完成 Plain / Markdown / XML Preview，只读且不形成第二编辑入口。
-- [x] P0.5-07 完成轻量 Document Switcher，不引入文件夹/团队/市场等平台化能力。
-- [x] P0.5-08 完成 Insert 正常、目标输入已有内容、Adapter 失败→Copy 三种模拟状态；不得操作真实 ChatGPT DOM。
-- [x] P0.5-09 使用统一 `state + render()` 或等价单状态模型跑通“自然书写 → Slash 结构化 → AI 建议 → Check → Preview → Insert”的可点击主链，不为各状态复制独立页面实现。
-- [x] P0.5-10 增加仅用于评审的 Prototype Controls：重置、快速状态跳转、360/440/520 宽度、Adapter 可用性和输入冲突模拟。
-- [ ] P0.5-11 在 Chrome 与 Edge 本地打开原型，检查完整主链、360/440/520 宽度及浏览器控制台无 JavaScript error。
-- [ ] P0.5-12 按 `docs/PROTOTYPE.md` 8 条验收问题进行人工体验复核并记录结论。
-- [ ] P0.5-13 将确认后的交互结论同步回 `docs/UX.md`；如产品边界变化，同步 PRODUCT / DECISIONS。
+- [x] P0.5-04 完成 Selection Toolbar 与 AI Suggestion 接受/忽略/过期状态；AI 只能显式触发，选中文字不得直接调用 AI。
+- [x] P0.5-05 完成 AI 未配置 / 已连接 / 已关闭状态，以及 Provider / Model / Base URL / API Key / 发送范围 / 测试连接 / 保存配置的轻量 AI Settings；全部为原型模拟，不发真实网络请求。
+- [x] P0.5-06 完成 Prompt Check / Lint finding 状态；本地检查不依赖 AI，并提供可选 AI 深度检查入口，不引入 Prompt 分数。
+- [x] P0.5-07 完成 Plain / Markdown / XML Preview，只读且不形成第二编辑入口。
+- [x] P0.5-08 完成轻量 Document Switcher，不引入文件夹/团队/市场等平台化能力。
+- [x] P0.5-09 完成 Insert 正常、目标输入已有内容、Adapter 失败→Copy 三种模拟状态；不得操作真实 ChatGPT DOM。
+- [x] P0.5-10 使用统一 `state + render()` 或等价单状态模型跑通“自然书写 → Slash 结构化 → 选区 AI / 全局 AI → Check → Preview → Insert”的可点击主链，不为各状态复制独立页面实现。
+- [x] P0.5-11 增加仅用于评审的 Prototype Controls：重置、快速状态跳转、360/440/520 宽度、AI 配置状态、Adapter 可用性和输入冲突模拟。
+- [ ] P0.5-12 在 Chrome 与 Edge 本地打开原型，检查完整主链、360/440/520 宽度及浏览器控制台无 JavaScript error。
+- [ ] P0.5-13 按 `docs/PROTOTYPE.md` 验收问题进行人工体验复核并记录结论。
+- [ ] P0.5-14 用户确认原型交互后，将最终结论同步回权威文档；若发现新边界继续修正 UX / ARCHITECTURE / DECISIONS。
 
-**关闭标准：** 单个 HTML 文件可直接打开并完整点击验证；用户原文与 AI 建议边界清楚；结构块仍具有文档感；360px 窄宽度主链可用；Chrome/Edge 控制台无 JavaScript error；没有引入 PRODUCT Non-goals。P0.5 关闭后才开始 P1 正式代码，原型代码不得直接复制进生产实现。
+**关闭标准：** 单个 HTML 文件可直接打开并完整点击验证；AI 配置与辅助链可发现、可关闭、可降级；用户原文与 AI 建议边界清楚；结构块仍具有文档感；360px 窄宽度主链可用；Chrome/Edge 控制台无 JavaScript error；没有引入 PRODUCT Non-goals。P0.5 关闭后才开始 P1 正式代码，原型代码不得直接复制进生产实现。
 
 ---
 
@@ -114,21 +115,22 @@
 
 ---
 
-## P5 — Prompt Lint 与 AI Suggestion
+## P5 — Prompt Lint、AI Settings 与 Suggestion
 
 - [ ] P5-01 先实现无需 AI 的本地 deterministic lint 框架。
 - [ ] P5-02 实现首批本地规则：模糊词、无结构长文本、明显重复等。
 - [ ] P5-03 定义 AI Provider 最小适配接口，不让 UI 直接依赖具体 SDK。
-- [ ] P5-04 实现 `PromptSuggestion` / `PromptLintFinding` 权威类型。
-- [ ] P5-05 实现选区动作：clarify / shorten。
-- [ ] P5-06 实现 split constraints / draft acceptance。
-- [ ] P5-07 实现 AI ambiguity/lint 补充能力。
-- [ ] P5-08 UI 明确展示原文与建议，并要求用户接受后才应用。
-- [ ] P5-09 实现 source revision 校验，拒绝应用过期 suggestion。
-- [ ] P5-10 验证无 AI 配置、调用失败、超时情况下核心主链不受影响。
-- [ ] P5-11 增加 suggestion 接受/拒绝/过期和 AI failure 聚焦测试。
+- [ ] P5-04 实现 AI preferences：enabled、Provider、Model、Base URL、credential、默认发送范围；不得进入 PromptDocument。
+- [ ] P5-05 实现 AI 设置 UI、连接测试和真实错误展示。
+- [ ] P5-06 实现 `PromptSuggestion` / `PromptLintFinding` 权威类型。
+- [ ] P5-07 实现选区动作：clarify / shorten / split constraints。
+- [ ] P5-08 实现全局动作：ambiguity check / draft acceptance / structure suggestion。
+- [ ] P5-09 UI 明确展示原文与建议，并要求用户接受后才应用。
+- [ ] P5-10 实现 source revision 校验，拒绝应用过期 suggestion。
+- [ ] P5-11 验证未配置 AI、用户禁用 AI、调用失败、超时情况下核心主链不受影响。
+- [ ] P5-12 增加 settings、provider failure、suggestion 接受/拒绝/过期的聚焦测试。
 
-**关闭标准：** AI 永远不是正文权威源；AI 完全不可用时编辑、保存、Compiler、Copy 仍完整可用。
+**关闭标准：** AI 配置与正文状态隔离；AI 永远不是正文权威源；AI 完全不可用时编辑、保存、本地 lint、Compiler、Copy 仍完整可用。
 
 ---
 
@@ -181,6 +183,6 @@
 
 ## 当前状态
 
-当前阶段：**P0 文档基线完成；P0.5 单文件 HTML 原型已实现，等待 Chrome/Edge 人工体验复核。**
+当前阶段：**P0 文档基线完成；P0.5 单文件 HTML 原型已经覆盖编辑、结构、AI 配置/辅助、Lint、Preview、Copy/Insert，等待用户体验复核与真实 Chrome/Edge 人工验证。**
 
-下一实施包：**P0.5-11～P0.5-13 — 实际浏览器验收、UX 复核与权威文档回写。**
+下一实施包仍是：**P0.5 原型复核，不进入 P1。**
