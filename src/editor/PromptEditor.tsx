@@ -3,6 +3,7 @@ import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { PromptSection } from './promptSection'
+import { GhostCompletion, setGhostCompletion } from './ghostCompletion'
 import type { PromptNodeJSON } from '../prompt/schema'
 import type { SectionKind } from '../prompt/sectionKinds'
 import {
@@ -10,6 +11,8 @@ import {
   getActiveBlockFormat,
   type EditableBlockFormat,
 } from './blockConversion'
+
+const COMPLETION_CONTEXT_LIMIT = 2_000
 
 export interface EditorSelectionSnapshot {
   text: string
@@ -25,6 +28,11 @@ export interface EditorSelectionSnapshot {
   }
 }
 
+export interface EditorCompletionContext {
+  position: number
+  beforeText: string
+}
+
 export interface PromptEditorHandle {
   insertSection(kind: SectionKind, text?: string): void
   replaceRange(from: number, to: number, text: string): void
@@ -36,8 +44,10 @@ export interface PromptEditorHandle {
 interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
+  completionText: string | null
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
+  onCompletionContext(context: EditorCompletionContext | null): void
   onSlashRequest(): void
 }
 
@@ -47,7 +57,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const editor = useEditor({
-    extensions: [StarterKit, PromptSection],
+    extensions: [StarterKit, PromptSection, GhostCompletion],
     content: props.content as JSONContent,
     editorProps: {
       attributes: { class: 'prompt-editor__content', spellcheck: 'false' },
@@ -60,7 +70,11 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         return false
       },
     },
-    onUpdate: ({ editor: current }) => props.onChange(current.getJSON()),
+    onUpdate: ({ editor: current }) => {
+      props.onChange(current.getJSON())
+      emitCompletionContext(current)
+    },
+    onSelectionUpdate: ({ editor: current }) => emitCompletionContext(current),
   })
 
   useEffect(() => {
@@ -69,8 +83,32 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       emitUpdate: false,
       errorOnInvalidContent: true,
     })
+    setGhostCompletion(editor.view, null)
     props.onSelectionChange(null)
+    props.onCompletionContext(null)
   }, [editor, props.documentId])
+
+  useEffect(() => {
+    if (!editor) return
+    setGhostCompletion(editor.view, props.completionText)
+  }, [editor, props.completionText])
+
+  function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
+    const { selection, doc } = currentEditor.state
+    if (!selection.empty || !currentEditor.view.hasFocus()) {
+      props.onCompletionContext(null)
+      return
+    }
+
+    const from = Math.max(0, selection.from - COMPLETION_CONTEXT_LIMIT)
+    const beforeText = doc.textBetween(from, selection.from, '\n', '\n').trimEnd()
+    if (!beforeText.trim()) {
+      props.onCompletionContext(null)
+      return
+    }
+
+    props.onCompletionContext({ position: selection.from, beforeText })
+  }
 
   function convertSelectedBlock(format: EditableBlockFormat) {
     if (!editor) return
