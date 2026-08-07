@@ -124,10 +124,16 @@ export function App() {
     try {
       await promptRepository.save(document)
       setSaveState('saved')
-      setDocuments(await promptRepository.list())
     } catch (saveError) {
       setSaveState('error')
       setError(`保存失败：${messageOf(saveError)}`)
+      return
+    }
+
+    try {
+      setDocuments(await promptRepository.list())
+    } catch (listError) {
+      setError(`文档已保存，但刷新列表失败：${messageOf(listError)}`)
     }
   }
 
@@ -179,9 +185,10 @@ export function App() {
 
   async function deleteCurrentDocument() {
     if (!current || !window.confirm(`删除“${current.title || '未命名 Prompt'}”？此操作只删除本地副本。`)) return
+    const deletingId = current.id
     try {
-      deletedDocumentIds.current.add(current.id)
-      await promptRepository.remove(current.id)
+      deletedDocumentIds.current.add(deletingId)
+      await promptRepository.remove(deletingId)
       const remaining = await promptRepository.list()
       const next = remaining[0] ?? createPromptDocument()
       if (remaining.length === 0) await promptRepository.save(next)
@@ -191,7 +198,8 @@ export function App() {
       setSuggestion(null)
       setDocumentSheetOpen(false)
     } catch (deleteError) {
-      setError(messageOf(deleteError))
+      deletedDocumentIds.current.delete(deletingId)
+      setError(`删除失败：${messageOf(deleteError)}`)
     }
   }
 
