@@ -138,12 +138,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .form-error, .form-success { margin-top: 9px; padding: 8px 9px; border-radius: 9px; font-size: 10px; }
 .form-error { background: #fff2f0; color: var(--danger); }
 .form-success { background: var(--forest-soft); color: #365c49; }
-
-.modal-overlay { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(24,37,31,.34); }
-.dialog { width: min(330px, calc(100% - 24px)); padding: 17px; border-radius: 16px; background: var(--paper); box-shadow: 0 18px 56px rgba(35,55,43,.2); }
-.dialog h3 { margin: 0 0 7px; font-size: 14px; }
-.dialog p { margin: 0 0 12px; color: var(--muted); font-size: 11px; line-height: 1.55; }
-.dialog label { display: block; padding: 7px 0; font-size: 12px; }
 .error-banner { position: fixed; z-index: 100; left: 10px; right: 10px; bottom: 68px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 11px; border: 1px solid #efcbc7; border-radius: 10px; background: #fff5f4; color: #8d332b; font-size: 10px; box-shadow: 0 8px 24px rgba(120,40,30,.12); }
 .error-banner button { border: 0; background: transparent; color: inherit; }
 .toast { position: fixed; z-index: 110; left: 50%; bottom: 74px; transform: translateX(-50%); padding: 8px 11px; border-radius: 9px; background: var(--forest-deep); color: #fff; font-size: 11px; white-space: nowrap; box-shadow: 0 8px 24px rgba(24,56,44,.22); }
