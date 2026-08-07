@@ -74,6 +74,20 @@ describe('AI providers', () => {
     ).rejects.toThrow(/invalid api key/)
   })
 
+  it('turns transport failures into actionable provider guidance', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Promise.reject(new TypeError('Failed to fetch'))),
+    )
+
+    await expect(
+      getAiProvider(openAiSettings).generate(openAiSettings, {
+        action: 'shorten',
+        content: '测试',
+      }),
+    ).rejects.toThrow(/无法连接 AI Provider.*Base URL.*网络连接.*站点访问授权/)
+  })
+
   it('converts aborted provider requests into a visible timeout error', async () => {
     const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' })
     vi.stubGlobal(
