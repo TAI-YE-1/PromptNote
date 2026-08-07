@@ -18,6 +18,15 @@ export function startEditableTracking(): void {
   captureContentSelection()
 }
 
+export function stopEditableTracking(): void {
+  if (!trackingStarted) return
+  trackingStarted = false
+  document.removeEventListener('focusin', captureFocusedEditable, true)
+  document.removeEventListener('selectionchange', captureContentSelection)
+  lastEditable = null
+  lastContentRange = null
+}
+
 export function findGenericEditable(): HTMLElement | null {
   const focused = asEditable(document.activeElement)
   if (focused) return focused
