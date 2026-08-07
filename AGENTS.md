@@ -180,15 +180,17 @@ UI 不得散落 Chrome Storage API 调用。
 
 ### `adapters/`
 
-只处理目标网站 DOM 差异和插入。
+处理目标网页编辑器发现、站点特殊 DOM 差异与共享插入引擎。
+
+标准 `input / textarea / contenteditable` 的 caret / selection 写入只允许有一套共享实现；站点 Adapter 只补特殊 selector / DOM 差异，不得复制整套插入算法。
 
 不得复制 Compiler、Storage、Editor 逻辑，不得自动发送。
 
 ### `extension/`
 
-只放浏览器扩展生命周期、消息桥和必要 Content Script 入口，不得演变成业务逻辑仓库。
+只放浏览器扩展生命周期、按用户动作注入的 page bridge 和受控消息边界，不得演变成业务逻辑仓库。
 
-## 9. 依赖与文件控制
+## 9. 依赖、文件与性能控制
 
 保持项目小。
 
@@ -208,6 +210,17 @@ UI 不得散落 Chrome Storage API 调用。
 - 与当前目标无关的基础设施。
 
 文件拆分以职责边界为准，不以“文件越多越架构化”为目标；同样也不得把多个独立职责塞进一个巨型组件。
+
+性能要求同样属于代码质量，不允许等到“以后再优化”作为重复工作的借口。修改默认编辑热路径、Storage、Compiler/Lint、Web Insert 或 Content Script 时必须主动检查：
+
+- 是否在每次键入后执行当前 UI 根本不需要的派生计算；
+- 是否重复读取/刷新整个 Storage 或列表，而已知状态足以增量更新；
+- 是否为一次用户动作产生可合并的多次跨 Extension 消息往返；
+- 是否把本可按用户动作加载的脚本常驻到所有网页；
+- 是否重复扫描 DOM、重复注册 listener 或重复注入 bridge；
+- 是否用提高 bundle warning threshold、隐藏日志或延长 loading 来掩盖真实性能问题。
+
+优化必须以真实热路径和可验证收益为依据。不要为了“性能”引入复杂缓存、第二状态源或大规模抽象；如果 bundle 警告存在但未证明影响真实启动性能，应记录并测量，而不是机械拆包。
 
 完成任务包后做代码减法审查。
 
@@ -236,14 +249,19 @@ UI 不得散落 Chrome Storage API 调用。
 
 网页 DOM 必须基于真实当前页面或可靠 fixture 实现，不猜 selector。
 
-每个 Adapter 的站点特有逻辑只留在 Adapter 内。
+通用标准输入能力优先；只有真实站点 DOM 确实存在差异时才增加站点 Adapter。每个 Adapter 的站点特有逻辑只留在 Adapter 内，不得以“支持一个新网站”为理由复制共享 caret insertion。
 
-插入：
+插入默认使用粘贴式心智：
 
+- 有选区只替换选区；
+- 有 caret 插入 caret；
+- 无法可靠恢复目标时宁可明确失败，也不猜测多个输入框；
 - 必须用户主动触发；
 - 不自动发送；
-- 不静默覆盖现有输入；
+- 不静默覆盖整框现有输入；
 - 失败时明确报告并允许 Copy 降级。
+
+网页 bridge 优先按明确用户动作使用 `activeTab + scripting` 临时注入，不向所有网页常驻 PromptNote 脚本；重复注入必须有 guard。
 
 ## 12. AI Assistance 特别规则
 
