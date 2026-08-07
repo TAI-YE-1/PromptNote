@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { makeAppendSuggestion, makeReplacementSuggestion } from '../src/ai/suggestions'
+import {
+  isSuggestionCurrent,
+  makeAppendSuggestion,
+  makeReplacementSuggestion,
+} from '../src/ai/suggestions'
 
 describe('AI suggestion contract', () => {
   it('keeps the source revision on replacement suggestions', () => {
@@ -12,6 +16,8 @@ describe('AI suggestion contract', () => {
     })
     expect(suggestion.sourceRevision).toBe(7)
     expect(suggestion.target).toBe('selection')
+    expect(isSuggestionCurrent(suggestion, 7)).toBe(true)
+    expect(isSuggestionCurrent(suggestion, 8)).toBe(false)
   })
 
   it('models acceptance criteria as an append-only section suggestion', () => {
