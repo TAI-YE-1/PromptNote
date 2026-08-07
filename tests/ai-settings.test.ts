@@ -35,7 +35,7 @@ describe('ChromeAiSettingsRepository', () => {
     expect(defaultAiSettings.completionEnabled).toBe(false)
   })
 
-  it('backfills completionEnabled=false for settings saved before completion existed', async () => {
+  it('requires re-verification for settings saved before completion existed', async () => {
     store.set('promptnote.aiSettings.v1', {
       enabled: true,
       configured: true,
@@ -49,10 +49,11 @@ describe('ChromeAiSettingsRepository', () => {
     const repository = new ChromeAiSettingsRepository()
     const loaded = await repository.load()
 
+    expect(loaded.configured).toBe(false)
     expect(loaded.completionEnabled).toBe(false)
   })
 
-  it('stores AI preferences separately from PromptDocument content', async () => {
+  it('stores verified AI preferences separately from PromptDocument content', async () => {
     const repository = new ChromeAiSettingsRepository()
     const settings: AiSettings = {
       enabled: true,
