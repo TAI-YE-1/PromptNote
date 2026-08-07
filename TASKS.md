@@ -133,7 +133,7 @@
 - [x] P6-03 插入只由用户明确触发，不自动发送。
 - [x] P6-04 输入框已有内容时明确选择 append / replace，避免静默覆盖。
 - [x] P6-05 Adapter 失败时明确失败并可退化为 Copy。
-- [x] P6-06 建立更接近真实 ChatGPT DOM 的 fixture：覆盖 `#prompt-textarea` contenteditable/ProseMirror 风格、Range/Selection 插入、execCommand fallback、legacy textarea 与无输入框失败路径。
+- [x] P6-06 建立更接近真实 ChatGPT DOM 的 fixture：覆盖 `#prompt-textarea` contenteditable/ProseMirror 风格、Range/Selection 插入、execCommand 缺失/失败 fallback、legacy textarea 与无输入框失败路径。
 - [ ] P6-07 第一个 Adapter 稳定后再增加第二、第三站点。
 - [x] P6-08 content script 只做 Adapter/消息职责，未复制 Compiler/Storage/Editor 逻辑。
 
@@ -145,10 +145,10 @@
 - [x] P7-02 完成最近文档恢复逻辑。
 - [ ] P7-03 检查真实 Side Panel 360px 等窄宽度可用性。
 - [ ] P7-04 检查键盘可达性和关键操作可发现性。
-- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败。
-- [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性。
-- [ ] P7-07 做最终代码减法审查。
-- [ ] P7-08 反向搜索 Non-goals，确认未偷偷引入平台化能力。
+- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态审查已修复保存误报、删除恢复、全局 AI 错误不可见等问题，仍待真实浏览器错误路径收口。
+- [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性；代码侧已修复部分成功状态误报，仍待真实浏览器验证。
+- [ ] P7-07 做最终代码减法审查；当前已删除重复状态/CSS override、冗余 Repository guard 和残留 `!important`，待线上 Adapter 修复后做最终一遍。
+- [x] P7-08 反向搜索 Non-goals：生产树无 backend/auth/team/marketplace/cloud-sync/model-playground 平台化模块，Manifest 和 content script 边界仍符合 V1。
 - [ ] P7-09 README 已更新；全部权威文档的最终实现态收口待真实浏览器验收后完成。
 
 ---
@@ -164,7 +164,7 @@
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链。
 - [ ] P8-08 验证第一个真实 ChatGPT Web Adapter。
 - [x] P8-09 Manifest 权限审查：固定权限仅 `storage` / `sidePanel`；AI 网络权限使用 optional host permission 按实际 origin 请求；Content Script 仅绑定 ChatGPT 域名。
-- [ ] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属。
+- [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属：提交 npm lockfile、CI 改用 `npm ci`，锁文件跨平台审计 223 个依赖；审计结论记录于 `docs/DEPENDENCY-LICENSE-AUDIT.md`。
 - [ ] P8-11 生成 V1 release notes / 已知限制。
 
 **V1 完成定义：** `docs/PRODUCT.md` 的成功标准全部有真实验证证据，且 P0-P8 所有未取消任务完成。
@@ -173,12 +173,12 @@
 
 ## 当前状态
 
-当前阶段：**真实 Extension 核心实现已经进入 `main`，GitHub Actions 的依赖安装、TypeScript、ESLint、聚焦单测、Extension build 已通过；Chrome 已完成一次真实 Extension 加载，尚未宣称 V1 完成。**
+当前阶段：**真实 Extension 核心实现已经进入 `main`；CI 使用已提交的 npm lockfile + `npm ci` 做可复现安装，并持续执行跨平台依赖许可证审计、TypeScript、ESLint、54 项聚焦单测和 Extension build；Chrome 已完成一次真实 Extension 加载，尚未宣称 V1 完成。**
 
 当前最优先剩余工作：
 
 1. Edge 真实加载与 Chrome/Edge 完整 Side Panel 主链；
 2. ChatGPT 当前线上 DOM 的真实 Adapter 验证；
 3. 浏览器重启恢复与无 AI 降级；
-4. V1 体验错误路径、状态一致性与代码减法审查；
-5. 许可证、release notes 和最终文档收口。
+4. 真实 Side Panel 窄宽度/键盘/错误路径/状态一致性收口；
+5. 最终代码减法、release notes 和权威文档收口。
