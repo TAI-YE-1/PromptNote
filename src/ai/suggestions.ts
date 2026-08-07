@@ -1,7 +1,7 @@
 import type { SectionKind } from '../prompt/sectionKinds'
-import type { AiAction, PromptSuggestion } from './types'
+import type { PromptSuggestion, SuggestionAiAction } from './types'
 
-const labels: Record<AiAction, string> = {
+const labels: Record<SuggestionAiAction, string> = {
   clarify: '改清楚',
   shorten: '缩短',
   split_constraints: '拆成约束',
@@ -11,7 +11,7 @@ const labels: Record<AiAction, string> = {
 }
 
 export function makeReplacementSuggestion(input: {
-  action: AiAction
+  action: SuggestionAiAction
   sourceText: string
   replacementText: string
   sourceRevision: number
@@ -30,7 +30,7 @@ export function makeReplacementSuggestion(input: {
 }
 
 export function makeAppendSuggestion(input: {
-  action: AiAction
+  action: SuggestionAiAction
   replacementText: string
   sourceRevision: number
   sectionKind?: SectionKind
