@@ -40,7 +40,9 @@ async function fetchAi(url: string, init: RequestInit): Promise<Response> {
         throw new Error(`AI 请求超过 ${AI_REQUEST_TIMEOUT_MS / 1000} 秒，已停止等待。`)
       }
     }
-    throw error
+    throw new Error('无法连接 AI Provider。请检查 API Base URL、网络连接与站点访问授权。', {
+      cause: error,
+    })
   }
 }
 
