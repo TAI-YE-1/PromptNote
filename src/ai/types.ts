@@ -1,10 +1,18 @@
 export type AiProviderId = 'openai-compatible' | 'anthropic'
 export type AiScope = 'selection' | 'context'
-export type AiAction = 'clarify' | 'shorten' | 'split_constraints' | 'draft_acceptance' | 'ambiguity' | 'structure'
+export type AiAction =
+  | 'clarify'
+  | 'shorten'
+  | 'split_constraints'
+  | 'draft_acceptance'
+  | 'ambiguity'
+  | 'structure'
+  | 'complete'
 
 export interface AiSettings {
   enabled: boolean
   configured: boolean
+  completionEnabled: boolean
   provider: AiProviderId
   model: string
   baseUrl: string
@@ -20,7 +28,7 @@ export interface AiRequest {
 
 export interface PromptSuggestion {
   id: string
-  action: AiAction
+  action: Exclude<AiAction, 'complete'>
   label: string
   sourceText: string
   replacementText: string
