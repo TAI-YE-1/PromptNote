@@ -43,6 +43,12 @@ function keyEvent(key: string) {
   return { key, preventDefault: vi.fn() } as unknown as KeyboardEvent
 }
 
+function runGhostKey(harness: ReturnType<typeof createHarness>, event: KeyboardEvent) {
+  const handler = harness.plugin.props.handleKeyDown
+  if (!handler) throw new Error('Ghost completion key handler is missing.')
+  return handler.call(harness.plugin, harness.view, event)
+}
+
 describe('ghost completion', () => {
   it('accepts the visible completion with Tab and makes it real document text', () => {
     const harness = createHarness('目标')
@@ -50,9 +56,7 @@ describe('ghost completion', () => {
 
     expect(getGhostCompletion(harness.state())?.text).toBe('：完成权限重构')
     const event = keyEvent('Tab')
-    const handler = harness.plugin.props.handleKeyDown
-    if (!handler) throw new Error('Ghost completion key handler is missing.')
-    const handled = handler.call(harness.plugin, harness.view, event)
+    const handled = runGhostKey(harness, event)
 
     expect(handled).toBe(true)
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -60,14 +64,22 @@ describe('ghost completion', () => {
     expect(getGhostCompletion(harness.state())?.text).toBeNull()
   })
 
+  it('preserves meaningful leading whitespace when accepting an English completion', () => {
+    const harness = createHarness('hello')
+    showCompletion(harness.view, ' world   ')
+
+    expect(getGhostCompletion(harness.state())?.text).toBe(' world')
+    runGhostKey(harness, keyEvent('Tab'))
+
+    expect(harness.state().doc.textContent).toBe('hello world')
+  })
+
   it('dismisses the completion with Escape without changing document text', () => {
     const harness = createHarness('背景')
     showCompletion(harness.view, '：只做当前任务')
 
     const event = keyEvent('Escape')
-    const handler = harness.plugin.props.handleKeyDown
-    if (!handler) throw new Error('Ghost completion key handler is missing.')
-    const handled = handler.call(harness.plugin, harness.view, event)
+    const handled = runGhostKey(harness, event)
 
     expect(handled).toBe(true)
     expect(event.preventDefault).toHaveBeenCalledOnce()
