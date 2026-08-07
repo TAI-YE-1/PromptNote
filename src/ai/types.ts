@@ -8,6 +8,7 @@ export type AiAction =
   | 'ambiguity'
   | 'structure'
   | 'complete'
+export type SuggestionAiAction = Exclude<AiAction, 'complete'>
 
 export interface AiSettings {
   enabled: boolean
@@ -28,7 +29,7 @@ export interface AiRequest {
 
 export interface PromptSuggestion {
   id: string
-  action: Exclude<AiAction, 'complete'>
+  action: SuggestionAiAction
   label: string
   sourceText: string
   replacementText: string
