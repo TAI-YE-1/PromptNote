@@ -13,7 +13,11 @@ import { ChromePromptRepository } from './storage/promptRepository'
 import { ChromeAiSettingsRepository, defaultAiSettings } from './storage/aiSettingsRepository'
 import { defaultBaseUrl, ensureAiHostPermission, getAiProvider } from './ai/provider'
 import { lintPrompt } from './ai/lint'
-import { makeAppendSuggestion, makeReplacementSuggestion } from './ai/suggestions'
+import {
+  isSuggestionCurrent,
+  makeAppendSuggestion,
+  makeReplacementSuggestion,
+} from './ai/suggestions'
 import type { AiSettings, PromptSuggestion } from './ai/types'
 import type { ComposerState, ContentRequest, ContentResponse, InsertMode } from './extension/messages'
 import {
@@ -112,7 +116,7 @@ export function App() {
   )
   const localFindings = useMemo(() => (current ? lintPrompt(current) : []), [current])
   const suggestionIsStale = Boolean(
-    suggestion && current && suggestion.sourceRevision !== current.revision,
+    suggestion && current && !isSuggestionCurrent(suggestion, current.revision),
   )
 
   async function persistDocument(document: PromptDocument) {
@@ -260,6 +264,13 @@ export function App() {
   async function saveAiSettings() {
     setAiError(null)
     try {
+      if (!aiDraft.enabled) {
+        await aiSettingsRepository.save(aiDraft)
+        setAiSettings(aiDraft)
+        setAiPanel(null)
+        setToast('AI 辅助已关闭')
+        return
+      }
       validateAiSettings(aiDraft)
       if (!(await ensureAiHostPermission(aiDraft.baseUrl))) {
         throw new Error('没有授予该 AI 地址的网络访问权限。')
@@ -357,7 +368,7 @@ export function App() {
 
   function acceptSuggestion() {
     if (!suggestion || !current) return
-    if (suggestion.sourceRevision !== current.revision) {
+    if (!isSuggestionCurrent(suggestion, current.revision)) {
       setError('正文已经变化，这条 AI 建议已过期，不能直接应用。')
       return
     }
