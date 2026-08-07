@@ -50,7 +50,9 @@ describe('ghost completion', () => {
 
     expect(getGhostCompletion(harness.state())?.text).toBe('：完成权限重构')
     const event = keyEvent('Tab')
-    const handled = harness.plugin.props.handleKeyDown?.(harness.view, event)
+    const handler = harness.plugin.props.handleKeyDown
+    if (!handler) throw new Error('Ghost completion key handler is missing.')
+    const handled = handler.call(harness.plugin, harness.view, event)
 
     expect(handled).toBe(true)
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -63,7 +65,9 @@ describe('ghost completion', () => {
     showCompletion(harness.view, '：只做当前任务')
 
     const event = keyEvent('Escape')
-    const handled = harness.plugin.props.handleKeyDown?.(harness.view, event)
+    const handler = harness.plugin.props.handleKeyDown
+    if (!handler) throw new Error('Ghost completion key handler is missing.')
+    const handled = handler.call(harness.plugin, harness.view, event)
 
     expect(handled).toBe(true)
     expect(event.preventDefault).toHaveBeenCalledOnce()
