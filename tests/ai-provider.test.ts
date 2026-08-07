@@ -1,0 +1,83 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getAiProvider } from '../src/ai/provider'
+import type { AiSettings } from '../src/ai/types'
+
+const openAiSettings: AiSettings = {
+  enabled: true,
+  configured: true,
+  provider: 'openai-compatible',
+  model: 'test-model',
+  baseUrl: 'https://example.com/v1',
+  apiKey: 'test-key',
+  scope: 'selection',
+}
+
+const anthropicSettings: AiSettings = {
+  ...openAiSettings,
+  provider: 'anthropic',
+  baseUrl: 'https://api.anthropic.test',
+}
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('AI providers', () => {
+  it('calls an OpenAI-compatible /v1 endpoint without duplicating /v1', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '明确后的文本' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getAiProvider(openAiSettings).generate(openAiSettings, {
+      action: 'clarify',
+      content: '尽量改好',
+    })
+
+    expect(result).toBe('明确后的文本')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://example.com/v1/chat/completions')
+  })
+
+  it('extracts Anthropic text responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ content: [{ type: 'text', text: '验收标准建议' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await expect(
+      getAiProvider(anthropicSettings).generate(anthropicSettings, {
+        action: 'draft_acceptance',
+        content: '任务内容',
+      }),
+    ).resolves.toBe('验收标准建议')
+  })
+
+  it('surfaces provider HTTP failures instead of returning fake success', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('invalid api key', { status: 401 })))
+
+    await expect(
+      getAiProvider(openAiSettings).generate(openAiSettings, {
+        action: 'shorten',
+        content: '测试',
+      }),
+    ).rejects.toThrow(/invalid api key/)
+  })
+
+  it('converts aborted provider requests into a visible timeout error', async () => {
+    const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' })
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(timeout)))
+
+    await expect(
+      getAiProvider(openAiSettings).generate(openAiSettings, {
+        action: 'shorten',
+        content: '测试',
+      }),
+    ).rejects.toThrow(/请求超过 30 秒/)
+  })
+})
