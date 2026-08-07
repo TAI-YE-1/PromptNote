@@ -9,8 +9,8 @@ export interface ActiveBlockFormat {
 }
 
 export function getActiveBlockFormat(state: EditorState): ActiveBlockFormat | null {
-  const { $from } = state.selection
-  if ($from.depth !== 1) return null
+  const { $from, $to } = state.selection
+  if ($from.depth !== 1 || !$from.sameParent($to)) return null
 
   const node = $from.parent
   if (node.type.name === 'paragraph') {
