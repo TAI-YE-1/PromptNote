@@ -54,13 +54,13 @@
 - [x] P1-01 初始化 React + TypeScript 项目，保持依赖最小化。
 - [x] P1-02 配置 Chrome Manifest V3。
 - [x] P1-03 建立 Side Panel 页面并可由 Extension action 打开。
-- [x] P1-04 建立最小 background service worker，只保留 Side Panel 生命周期职责。
-- [x] P1-05 建立最小 content script 与受控消息桥。
+- [x] P1-04 建立最小 background service worker，只保留 Side Panel 生命周期与用户 action 触发的 page bridge 预热职责。
+- [x] P1-05 建立最小 page bridge / content script 与受控消息边界；不向所有网页静态常驻注入。
 - [x] P1-06 建立 TypeScript、ESLint、Prettier、Vitest 与 GitHub Actions 基线。
 - [x] P1-07 增加开发态构建与 Chrome/Edge 本地加载说明。
-- [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次真实手动加载。
+- [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次**当前最终 Manifest/按需注入架构**的真实手动加载。
 
-**关闭标准：** Chrome 已完成真实手动加载并进入 Side Panel；当前只缺 Edge 的对应加载证据。
+**关闭标准：** 旧版本 Chrome 已完成真实加载；因 Web Insert 权限/注入架构已调整为 `activeTab + scripting`，Chrome/Edge 均需在当前最终构建上再确认一次，不沿用旧 Manifest 证据。
 
 ---
 
@@ -121,21 +121,21 @@
 - [x] P5-08 实现全局动作：ambiguity check / draft acceptance / structure suggestion。
 - [x] P5-09 UI 明确展示原文与建议，必须接受后才修改；结构建议保持 advisory。
 - [x] P5-10 实现共享 source revision guard，拒绝应用过期 suggestion。
-- [ ] P5-11 完整验证未配置 AI、禁用 AI、Provider HTTP 失败、30 秒超时情况下的**真实浏览器主链**仍可编辑/保存/lint/Compiler/Copy。
+- [ ] P5-11 完整验证未配置 AI、禁用 AI、Provider HTTP/transport 失败、30 秒超时情况下的**真实浏览器主链**仍可编辑/保存/lint/Compiler/Copy/Insert；用户已验证“无 AI 可正常使用”和错误 Base URL 会明确失败，仍缺禁用/超时及当前最终构建全链证据。
 - [x] P5-12 补齐 suggestion UI 行为测试：可编辑 suggestion 显式 Accept / Ignore、过期 suggestion 禁止 Accept、advisory 只允许关闭且不得修改正文。
 
 ---
 
 ## P6 — Web Adapter 与真实网页插入
 
-- [x] P6-01 建立统一 `WebPromptAdapter` 接口。
-- [ ] P6-02 完成第一个真实站点 Adapter 的**线上 DOM 验证**；当前 ChatGPT Adapter 已实现，但尚未在真实 chatgpt.com 主链 smoke。
+- [x] P6-01 建立统一 `WebPromptAdapter` + 单一共享 caret insert engine；Adapter 只发现目标编辑器，不复制插入算法。
+- [ ] P6-02 完成第一个真实 AI 网页的**线上 DOM 验证**；旧 ChatGPT 插入链已真实跑通但性能差，当前已重构为通用 caret-first + ChatGPT selector 特殊兼容，需在最新构建重新 smoke。
 - [x] P6-03 插入只由用户明确触发，不自动发送。
-- [x] P6-04 输入框已有内容时明确选择 append / replace，避免静默覆盖。
-- [x] P6-05 Adapter 失败时明确失败并可退化为 Copy。
-- [x] P6-06 建立更接近真实 ChatGPT DOM 的 fixture：覆盖 `#prompt-textarea` contenteditable/ProseMirror 风格、Range/Selection 插入、execCommand 缺失/失败 fallback、legacy textarea 与无输入框失败路径。
-- [ ] P6-07 第一个 Adapter 稳定后再增加第二、第三站点。
-- [x] P6-08 content script 只做 Adapter/消息职责，未复制 Compiler/Storage/Editor 逻辑。
+- [x] P6-04 输入框已有内容时不再强制 append/replace 整框；有选区只替换选区，有 caret 插入 caret，无法确定目标时明确失败，避免静默覆盖。
+- [x] P6-05 Adapter / page bridge 失败时明确失败并可退化为 Copy。
+- [x] P6-06 建立通用网页输入 fixture：覆盖 textarea caret、textarea selection、contenteditable caret/selection、execCommand 缺失 fallback；ChatGPT fixture 只验证当前特殊 selector。
+- [-] P6-07 不再要求为了 V1 数量目标增加第二、第三站点专用 Adapter：标准输入框由通用 Adapter 覆盖，只有真实站点 DOM 确实需要特殊兼容时才增加对应 Adapter。
+- [x] P6-08 page bridge / content script 只做目标编辑器发现、caret 插入和消息职责，未复制 Compiler/Storage/Editor/AI 逻辑。
 
 ---
 
@@ -143,13 +143,14 @@
 
 - [x] P7-01 完成轻量文档切换/列表/搜索/新建/删除入口，不扩成 Prompt 管理后台。
 - [x] P7-02 完成最近文档恢复逻辑。
-- [ ] P7-03 检查真实 Side Panel 360px 等窄宽度可用性。
-- [ ] P7-04 检查键盘可达性和关键操作可发现性。
-- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态审查已修复保存误报、删除恢复、全局 AI 错误不可见等问题，仍待真实浏览器错误路径收口。
-- [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性；代码侧已修复部分成功状态误报，仍待真实浏览器验证。
-- [ ] P7-07 做最终代码减法审查；当前已删除重复状态/CSS override、冗余 Repository guard 和残留 `!important`，待线上 Adapter 修复后做最终一遍。
-- [x] P7-08 反向搜索 Non-goals：生产树无 backend/auth/team/marketplace/cloud-sync/model-playground 平台化模块，Manifest 和 content script 边界仍符合 V1。
-- [ ] P7-09 README 已更新；全部权威文档的最终实现态收口待真实浏览器验收后完成。
+- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；旧构建用户已反馈正常，但当前 Manifest/Web Insert 架构变化后仍需最终一轮。
+- [ ] P7-04 检查键盘可达性和关键操作可发现性；Esc 已实现为关闭当前最上层临时 UI，仍需最终构建浏览器确认。
+- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态审查已修复保存误报、删除恢复、全局 AI 错误不可见、底层 Chrome receiver 错误直出等问题，仍待真实浏览器错误路径收口。
+- [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性；代码侧已把 Insert 收成一次原子消息、自动保存后的文档列表改为本地增量更新，仍待真实浏览器重复操作验证。
+- [ ] P7-07 做最终代码减法审查；当前已删除重复 selection 状态/CSS override、冗余 Repository guard、残留 `!important`、旧 append/replace 冲突 UI/状态/CSS 与 ChatGPT-only 插入实现，待线上最终 smoke 后再反查一次。
+- [x] P7-08 反向搜索 Non-goals：生产树无 backend/auth/team/marketplace/cloud-sync/model-playground 平台化模块，权限/bridge 边界仍符合 V1。
+- [ ] P7-09 README 已同步当前实现；全部权威文档最终实现态收口待真实浏览器验收后完成。
+- [ ] P7-10 完成真实浏览器性能收口：代码已消除默认编辑热路径的 Storage 全量重读、关闭状态下 Lint/Preview 重算、双消息 Insert 和全网页常驻 bridge；仍需验证实际插入延迟与 Side Panel 启动/输入流畅度。当前主 Side Panel chunk 约 611KB minified（gzip 约 192KB），不通过调高 Vite warningLimit 掩盖，只有真实启动性能需要时再做 code splitting。
 
 ---
 
@@ -158,12 +159,12 @@
 - [x] P8-01 GitHub Actions TypeScript/static check 通过。
 - [x] P8-02 GitHub Actions 当前 unit/focused tests 全集通过。
 - [x] P8-03 GitHub Actions Extension build 通过。
-- [ ] P8-04 在 Chrome 完成真实主链 E2E。
-- [ ] P8-05 在 Edge 完成真实主链 smoke。
+- [ ] P8-04 在 Chrome 完成当前最终构建真实主链 E2E。
+- [ ] P8-05 在 Edge 完成当前最终构建真实主链 smoke。
 - [ ] P8-06 验证浏览器重启后的数据恢复。
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链。
-- [ ] P8-08 验证第一个真实 ChatGPT Web Adapter。
-- [x] P8-09 Manifest 权限审查：固定权限仅 `storage` / `sidePanel`；AI 网络权限使用 optional host permission 按实际 origin 请求；Content Script 仅绑定 ChatGPT 域名。
+- [ ] P8-08 验证当前 caret-first 通用插入架构在至少一个真实 AI 网页端到端可用。
+- [x] P8-09 Manifest 权限审查：固定权限为 `storage` / `sidePanel` / `activeTab` / `scripting`；不再静态常驻 `content_scripts`，网页 bridge 只在用户明确点击扩展图标后按当前 tab 临时注入；AI 网络仍使用 optional host permission 按实际 Provider origin 请求。
 - [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属：提交 npm lockfile、CI 改用 `npm ci`，锁文件跨平台审计 223 个依赖；审计结论记录于 `docs/DEPENDENCY-LICENSE-AUDIT.md`。
 - [ ] P8-11 生成 V1 release notes / 已知限制。
 
@@ -173,12 +174,12 @@
 
 ## 当前状态
 
-当前阶段：**真实 Extension 核心实现已经进入 `main`；CI 使用已提交的 npm lockfile + `npm ci` 做可复现安装，并持续执行跨平台依赖许可证审计、TypeScript、ESLint、54 项聚焦单测和 Extension build；Chrome 已完成一次真实 Extension 加载，尚未宣称 V1 完成。**
+当前阶段：**真实 Extension 核心实现已经进入 `main`；Web Insert 已从 ChatGPT-only append/replace 重构为通用 caret-first 插入，使用 `activeTab + scripting` 按用户动作注入 page bridge；默认编辑热路径已减少 Storage/Lint/Compiler/消息重复工作。CI 使用 npm lockfile + `npm ci`，持续执行跨平台许可证审计、TypeScript、ESLint、14 个测试文件 / 55 项测试和 Extension build。当前最新代码门禁已通过，但重构后的真实浏览器最终验收尚未完成。**
 
 当前最优先剩余工作：
 
-1. Edge 真实加载与 Chrome/Edge 完整 Side Panel 主链；
-2. ChatGPT 当前线上 DOM 的真实 Adapter 验证；
-3. 浏览器重启恢复与无 AI 降级；
-4. 真实 Side Panel 窄宽度/键盘/错误路径/状态一致性收口；
+1. 在最新构建验证 ChatGPT caret 插入/选区替换的实际速度，并在一个普通非 ChatGPT 输入框验证通用 Adapter；
+2. Chrome / Edge 当前最终 Manifest 的主链 smoke、360px 与键盘；
+3. 浏览器重启恢复与无 AI/错误 AI/超时降级；
+4. 真实错误路径、重复操作状态一致性和性能收口；
 5. 最终代码减法、release notes 和权威文档收口。
