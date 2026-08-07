@@ -36,23 +36,25 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .ai-chip--ready .ai-chip__dot { background: #3e7b5b; }
 
 .workspace { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
-.editor-scroll { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 24px 20px 92px; }
+.editor-scroll { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 24px 20px 84px; }
 .prompt-editor { position: relative; }
-.prompt-editor__content { min-height: calc(100vh - 180px); outline: none; color: #2d332e; font-size: 14px; line-height: 1.74; }
+.prompt-editor__content { min-height: calc(100vh - 172px); outline: none; color: #2d332e; font-size: 14px; line-height: 1.74; }
 .prompt-editor__content p { margin: 0 0 13px; }
 .prompt-editor__content h1, .prompt-editor__content h2, .prompt-editor__content h3 { margin: 18px 0 8px; line-height: 1.3; }
 .prompt-editor__content ul, .prompt-editor__content ol { padding-left: 22px; }
 .prompt-editor__content pre { padding: 12px; border-radius: 10px; overflow: auto; background: #f3f4f0; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .prompt-editor__content blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid #c9d1ca; color: #667067; }
-.prompt-editor__content section[data-prompt-section] { position: relative; margin: 8px -6px 18px; padding: 27px 12px 14px 14px; border: 1px solid #e1e8e2; border-left: 3px solid #a9c0b0; border-radius: 10px; background: #fafbf8; box-shadow: 0 1px 0 rgba(35,74,58,.025); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
-.prompt-editor__content section[data-prompt-section] + section[data-prompt-section] { margin-top: 20px; }
-.prompt-editor__content section[data-prompt-section]::before { content: attr(data-label); position: absolute; left: 11px; top: 5px; padding: 1px 6px; border-radius: 999px; background: #edf3ef; color: #355846; font-size: 10px; font-weight: 800; line-height: 1.45; letter-spacing: .035em; }
+.prompt-editor__content section[data-prompt-section] { position: relative; margin: 10px -4px 20px; padding: 29px 14px 15px 15px; border: 1px solid #cad7cc; border-left: 4px solid #6f927b; border-radius: 11px; background: #f5f8f5; box-shadow: 0 1px 2px rgba(35,74,58,.045); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+.prompt-editor__content section[data-prompt-section] + section[data-prompt-section] { margin-top: 22px; }
+.prompt-editor__content section[data-prompt-section]::before { content: attr(data-label); position: absolute; left: 11px; top: 6px; padding: 2px 7px; border: 1px solid #d3e0d6; border-radius: 999px; background: #e7f0ea; color: #294f3c; font-size: 10px; font-weight: 800; line-height: 1.45; letter-spacing: .035em; }
 .prompt-editor__content section[data-prompt-section] > :last-child { margin-bottom: 0; }
-.prompt-editor__content section[data-prompt-section]:hover { border-color: #cad8cf; border-left-color: #86a28f; background: #f8faf7; }
-.prompt-editor__content section[data-prompt-section]:focus-within { border-color: #b7ccbd; border-left-color: #5f856e; background: #f7faf7; box-shadow: 0 0 0 2px rgba(95,133,110,.08); }
-.prompt-editor__content .ProseMirror-selectednode { outline: none; background: #f4f7f4; }
+.prompt-editor__content section[data-prompt-section]:hover { border-color: #afc4b4; border-left-color: #527961; background: #f2f7f3; }
+.prompt-editor__content section[data-prompt-section]:focus-within { border-color: #91ae99; border-left-color: #315f47; background: #f1f7f3; box-shadow: 0 0 0 2px rgba(49,95,71,.09); }
+.prompt-editor__content .ProseMirror-selectednode { outline: none; background: #f1f6f2; }
+.prompt-ghost-completion { color: #9aa49d; opacity: .92; white-space: pre-wrap; pointer-events: none; user-select: none; }
 
 .actionbar { position: absolute; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr 1.05fr 1.25fr; gap: 5px; padding: 10px 12px; border-top: 1px solid #ebeae4; background: rgba(252,252,250,.97); backdrop-filter: blur(10px); }
+.actionbar--three { grid-template-columns: 1fr 1fr 1.35fr; }
 .actionbar__light, .ghost-button, .primary-button { min-height: 34px; padding: 8px 10px; border-radius: 9px; font-size: 11px; }
 .actionbar__light { border: 1px solid transparent; background: transparent; color: #596159; }
 .actionbar__light:hover { background: #f0f2ed; color: #2f4036; }
@@ -101,6 +103,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .preview-body pre { min-height: 430px; margin: 14px 0 0; padding: 14px; border: 1px solid #e3e4de; border-radius: 12px; background: #f8f8f5; color: #394139; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.62 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .preview-actions { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #ebeae4; background: var(--paper); }
 .preview-actions button { flex: 1; }
+.preview-actions--single { justify-content: flex-end; }
+.preview-actions--single button { flex: 0 1 180px; }
 
 .overlay { position: fixed; z-index: 70; inset: 0; display: flex; align-items: flex-end; background: rgba(24,37,31,.28); }
 .sheet { width: 100%; max-height: 84vh; overflow: auto; padding: 14px; border-radius: 18px 18px 0 0; background: var(--paper); box-shadow: 0 -10px 35px rgba(35,55,43,.12); }
@@ -134,6 +138,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .settings-form label > span { display: block; margin-bottom: 5px; color: #6c736d; font-size: 10px; font-weight: 700; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .settings-form .toggle-row > span { margin: 0; }
+.settings-form .toggle-row input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; accent-color: var(--forest); }
 .toggle-row strong, .toggle-row small { display: block; }
 .toggle-row small { margin-top: 3px; color: var(--muted); font-size: 9px; font-weight: 400; }
 .privacy-note { margin-top: 12px; padding: 10px; border-radius: 10px; background: #f4f5f1; color: #687069; font-size: 9px; line-height: 1.55; }
