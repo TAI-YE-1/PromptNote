@@ -1,5 +1,18 @@
 import { mergeAttributes, Node } from '@tiptap/core'
-import { isSectionKind, sectionKindMeta } from '../prompt/sectionKinds'
+import { isSectionKind, sectionKindMeta, type SectionKind } from '../prompt/sectionKinds'
+
+export function normalizeSectionKind(value: unknown): SectionKind {
+  return isSectionKind(value) ? value : 'context'
+}
+
+export function promptSectionDomAttributes(value: unknown) {
+  const kind = normalizeSectionKind(value)
+  return {
+    'data-prompt-section': 'true',
+    'data-kind': kind,
+    'data-label': sectionKindMeta[kind].label,
+  }
+}
 
 export const PromptSection = Node.create({
   name: 'promptSection',
@@ -11,8 +24,10 @@ export const PromptSection = Node.create({
     return {
       kind: {
         default: 'context',
-        parseHTML: (element) => element.getAttribute('data-kind') ?? 'context',
-        renderHTML: (attributes) => ({ 'data-kind': String(attributes.kind) }),
+        parseHTML: (element) => normalizeSectionKind(element.getAttribute('data-kind')),
+        renderHTML: (attributes) => ({
+          'data-kind': normalizeSectionKind(attributes.kind),
+        }),
       },
     }
   },
@@ -21,16 +36,7 @@ export const PromptSection = Node.create({
     return [{ tag: 'section[data-prompt-section]' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const kind = isSectionKind(HTMLAttributes.kind) ? HTMLAttributes.kind : 'context'
-    return [
-      'section',
-      mergeAttributes(HTMLAttributes, {
-        'data-prompt-section': 'true',
-        'data-kind': kind,
-        'data-label': sectionKindMeta[kind].label,
-      }),
-      0,
-    ]
+  renderHTML({ node, HTMLAttributes }) {
+    return ['section', mergeAttributes(HTMLAttributes, promptSectionDomAttributes(node.attrs.kind)), 0]
   },
 })
