@@ -61,8 +61,8 @@ class FakeRange {
     this.append = false
   }
 
-  collapse(toEnd: boolean) {
-    this.append = toEnd
+  collapse(toStart: boolean) {
+    this.append = !toStart
   }
 
   insert(text: string) {
