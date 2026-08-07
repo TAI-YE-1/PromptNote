@@ -22,7 +22,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('AI providers', () => {
   it('calls an OpenAI-compatible /v1 endpoint without duplicating /v1', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ choices: [{ message: { content: '明确后的文本' } }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -42,7 +42,7 @@ describe('AI providers', () => {
   it('extracts Anthropic text responses', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(JSON.stringify({ content: [{ type: 'text', text: '验收标准建议' }] }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -59,7 +59,12 @@ describe('AI providers', () => {
   })
 
   it('surfaces provider HTTP failures instead of returning fake success', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('invalid api key', { status: 401 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response('invalid api key', { status: 401 }),
+      ),
+    )
 
     await expect(
       getAiProvider(openAiSettings).generate(openAiSettings, {
@@ -71,7 +76,10 @@ describe('AI providers', () => {
 
   it('converts aborted provider requests into a visible timeout error', async () => {
     const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' })
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(timeout)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Promise.reject(timeout)),
+    )
 
     await expect(
       getAiProvider(openAiSettings).generate(openAiSettings, {
