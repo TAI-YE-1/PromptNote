@@ -15,7 +15,7 @@ export interface EditorSelectionSnapshot {
   text: string
   from: number
   to: number
-  blockFormat: EditableBlockFormat | null
+  blockFormat: EditableBlockFormat
   rect: {
     left: number
     top: number
@@ -119,7 +119,12 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       return
     }
 
-    const text = editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n')
+    const activeBlock = getActiveBlockFormat(editor.state)
+    if (!activeBlock) {
+      props.onSelectionChange(null)
+      return
+    }
+
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
 
@@ -127,13 +132,11 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     if (!rootRect) return
 
     const rect = selection.getRangeAt(0).getBoundingClientRect()
-    const activeBlock = getActiveBlockFormat(editor.state)
-
     props.onSelectionChange({
-      text,
+      text: editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n'),
       from: editor.state.selection.from,
       to: editor.state.selection.to,
-      blockFormat: activeBlock?.format ?? null,
+      blockFormat: activeBlock.format,
       rect: {
         left: rect.left - rootRect.left,
         top: rect.top - rootRect.top,
