@@ -110,6 +110,25 @@ export function App() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    const dismissTopmost = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+
+      if (insertConflict) setInsertConflict(null)
+      else if (aiPanel) setAiPanel(null)
+      else if (documentSheetOpen) setDocumentSheetOpen(false)
+      else if (previewOpen) setPreviewOpen(false)
+      else if (slashOpen) setSlashOpen(false)
+      else if (selection) setSelection(null)
+      else return
+
+      event.preventDefault()
+    }
+
+    window.addEventListener('keydown', dismissTopmost)
+    return () => window.removeEventListener('keydown', dismissTopmost)
+  }, [aiPanel, documentSheetOpen, insertConflict, previewOpen, selection, slashOpen])
+
   const compiled = useMemo(
     () => (current ? compilePrompt(current, previewFormat) : ''),
     [current, previewFormat],
@@ -571,7 +590,11 @@ function safeFileName(value: string) {
 }
 
 function messageOf(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
+  const message = error instanceof Error ? error.message : String(error)
+  if (/Could not establish connection|Receiving end does not exist/i.test(message)) {
+    return 'PromptNote 尚未连接到当前网页。若刚重新加载或更新了扩展，请刷新 ChatGPT 标签页后重试。'
+  }
+  return message
 }
 
 function saveLabel(state: SaveState) {
