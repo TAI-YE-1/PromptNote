@@ -10,7 +10,6 @@ const COMPLETION_MIN_CONTEXT = 8
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
-  revision: number | null
   onError(message: string): void
 }
 
@@ -69,7 +68,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [input.context, input.revision, input.settings, ready])
+  }, [input.context, input.onError, input.settings, ready])
 
   return completionText
 }
