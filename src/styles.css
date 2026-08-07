@@ -70,10 +70,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .slash-item strong { font-size: 12px; }
 .slash-item small { margin-top: 1px; color: var(--muted); font-size: 10px; }
 
-.selection-toolbar { position: absolute; z-index: 45; display: flex; align-items: center; gap: 3px; max-width: calc(100% - 24px); padding: 5px; border-radius: 10px; transform: translate(-50%, -100%); overflow-x: auto; background: var(--forest-deep); color: #fff; box-shadow: 0 10px 28px rgba(24,56,44,.28); }
-.selection-toolbar button { padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: #fff; font-size: 10px; white-space: nowrap; }
-.selection-toolbar button:hover { background: rgba(255,255,255,.1); }
-.selection-toolbar > span { width: 1px; height: 17px; flex: 0 0 auto; background: rgba(255,255,255,.18); }
 .inline-status { margin: 12px 0; padding: 9px 10px; border-radius: 10px; background: #f2f6f3; color: #557062; font-size: 10px; }
 
 .suggestion-card, .lint-card { margin: 14px 0; padding: 13px; border: 1px solid #dfe5df; border-left: 3px solid var(--forest-line); border-radius: 13px; background: #f7faf7; }
