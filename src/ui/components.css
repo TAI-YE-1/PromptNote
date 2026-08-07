@@ -1,0 +1,217 @@
+.selection-context {
+  position: absolute;
+  z-index: 45;
+  width: max-content;
+  transform: translate(-50%, -100%);
+}
+
+.selection-context__trigger {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid #d8dfd9;
+  border-radius: 999px;
+  background: rgba(252, 252, 250, .98);
+  color: var(--forest-deep);
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 7px 18px rgba(35, 74, 58, .12);
+}
+
+.selection-context__trigger:hover,
+.selection-context__trigger[aria-expanded='true'] {
+  border-color: #c4d2c8;
+  background: var(--forest-soft);
+}
+
+.selection-context__separator {
+  color: #a1aaa3;
+}
+
+.selection-context__chevron {
+  margin-left: 1px;
+  color: #718078;
+  font-size: 11px;
+}
+
+.selection-context__menu {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 7px);
+  width: min(252px, calc(100vw - 32px));
+  padding: 8px;
+  transform: translateX(-50%);
+  border: 1px solid #dce2dd;
+  border-radius: 13px;
+  background: rgba(252, 252, 250, .99);
+  box-shadow: 0 14px 34px rgba(35, 74, 58, .16);
+}
+
+.selection-context__section-label {
+  padding: 2px 4px 6px;
+  color: #8b948d;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+
+.selection-context__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.selection-context__actions button,
+.selection-context__more {
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #45544b;
+  font-size: 10px;
+}
+
+.selection-context__actions button {
+  min-height: 32px;
+  padding: 6px 5px;
+}
+
+.selection-context__actions button:hover,
+.selection-context__more:hover {
+  background: #eef3ef;
+  color: var(--forest-deep);
+}
+
+.selection-context__more {
+  width: 100%;
+  margin-top: 3px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.selection-context__format {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  padding: 8px 4px 2px;
+  border-top: 1px solid #e9ebe7;
+  color: #7b847d;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.selection-context__format select {
+  min-width: 0;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  border: 0;
+  border-radius: 9px;
+  outline: none;
+  background: #eef3ef;
+  color: var(--forest-deep);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheet-search {
+  margin-top: 14px;
+}
+
+.document-list {
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.document-item {
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.document-item--active {
+  border-color: #dbe5de;
+}
+
+.backup-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #ebece7;
+}
+
+.backup-actions .ghost-button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fff;
+  color: #405047;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.backup-actions .ghost-button:hover {
+  border-color: #d7e0d9;
+  background: #f5f8f5;
+}
+
+.file-import {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-import input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
+
+.backup-actions + .privacy-note {
+  margin-top: 8px;
+  padding: 0 2px;
+  background: transparent;
+  color: #8a908a;
+  line-height: 1.5;
+}
+
+.backup-actions ~ .sheet-actions {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #ebece7;
+}
+
+.backup-actions ~ .sheet-actions .primary-button {
+  min-width: 118px;
+}
+
+@media (max-width: 380px) {
+  .selection-context__menu {
+    width: min(236px, calc(100vw - 20px));
+  }
+
+  .selection-context__actions button {
+    padding-inline: 3px;
+    font-size: 9px;
+  }
+
+  .backup-actions .ghost-button {
+    min-height: 40px;
+  }
+}
