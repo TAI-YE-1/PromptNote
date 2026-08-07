@@ -13,15 +13,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tiptap/core": "3.29.1",
-    "@tiptap/pm": "3.29.1",
+    "@tiptap/core": "3.29.2",
+    "@tiptap/pm": "3.29.2",
     "@tiptap/react": "3.29.1",
     "@tiptap/starter-kit": "3.29.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@eslint/js": "10.7.0",
     "@types/chrome": "0.2.2",
     "@types/node": "22.20.1",
     "@types/react": "19.2.17",
