@@ -23,7 +23,7 @@
 - [x] P0-04 建立 `docs/PROMPT-DOCUMENT-CONTRACT.md`，固定唯一内容源与 Schema 边界。
 - [x] P0-05 建立 `docs/ARCHITECTURE.md`，固定模块职责、依赖方向和状态边界。
 - [x] P0-06 建立 `docs/DECISIONS.md`，记录初始关键决策。
-- [x] P0-07 建立 `TASKS.md` 唯一开发任务账本。
+- [x] P0-07 建立 `TASKS.md` 唯一任务账本。
 - [x] P0-08 建立 `AGENTS.md` AI 开发协作规则。
 
 ---
@@ -54,13 +54,13 @@
 - [x] P1-01 初始化 React + TypeScript 项目，保持依赖最小化。
 - [x] P1-02 配置 Chrome Manifest V3。
 - [x] P1-03 建立 Side Panel 页面并可由 Extension action 打开。
-- [x] P1-04 建立最小 background service worker，只保留 Side Panel 生命周期与用户 action 触发的 page bridge 预热职责。
+- [x] P1-04 建立最小 background service worker，只保留 Side Panel 生命周期与用户 action 触发的 page bridge 准备职责。
 - [x] P1-05 建立最小 page bridge / content script 与受控消息边界；不向所有网页静态常驻注入。
 - [x] P1-06 建立 TypeScript、ESLint、Prettier、Vitest 与 GitHub Actions 基线。
 - [x] P1-07 增加开发态构建与 Chrome/Edge 本地加载说明。
-- [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次**当前最终 Manifest/按需注入架构**的真实手动加载。
+- [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次**当前最终 Manifest/按站点授权/按需注入架构**的真实手动加载。
 
-**关闭标准：** 旧版本 Chrome 已完成真实加载；因 Web Insert 权限/注入架构已调整为 `activeTab + scripting`，Chrome/Edge 均需在当前最终构建上再确认一次，不沿用旧 Manifest 证据。
+**关闭标准：** 旧版本 Chrome 已完成真实加载；因 Web Insert 权限/注入架构已调整为当前站点 optional host permission + `activeTab/scripting` 兜底，Chrome/Edge 均需在当前最终构建上再确认一次，不沿用旧 Manifest 证据。
 
 ---
 
@@ -129,11 +129,11 @@
 ## P6 — Web Adapter 与真实网页插入
 
 - [x] P6-01 建立统一 `WebPromptAdapter` + 单一共享 caret insert engine；Adapter 只发现目标编辑器，不复制插入算法。
-- [ ] P6-02 完成第一个真实 AI 网页的**线上 DOM 验证**；旧 ChatGPT 插入链曾真实跑通。caret-first 重构后的最新真机测试暴露扩展重载后 stale bridge 全局布尔 guard 会阻止新 runtime listener 注册，已改为 live ping 检测 + 旧 listener 清理 + 缺失 receiver 时重新注入，需在最新构建重新 smoke。
+- [ ] P6-02 完成第一个真实 AI 网页的**线上 DOM 验证**；caret-first 真机测试先后暴露 stale bridge receiver 和“点击插入但页面无可见变化”两类问题。当前已改为 live ping + 旧 listener 清理、当前站点 optional host permission、缺失 receiver 重注入，并对 contenteditable 增加“DOM 实际变化”成功判定与 Range/input fallback；需在最新构建重新 smoke。
 - [x] P6-03 插入只由用户明确触发，不自动发送。
 - [x] P6-04 输入框已有内容时不再强制 append/replace 整框；有选区只替换选区，有 caret 插入 caret，无法确定目标时明确失败，避免静默覆盖。
 - [x] P6-05 Adapter / page bridge 失败时明确失败并可退化为 Copy。
-- [x] P6-06 建立通用网页输入 fixture：覆盖 textarea caret、textarea selection、contenteditable caret/selection、execCommand 缺失 fallback；ChatGPT fixture 只验证当前特殊 selector。
+- [x] P6-06 建立通用网页输入 fixture：覆盖 textarea caret、textarea selection、contenteditable caret/selection、execCommand 缺失 fallback，以及 execCommand 报成功但 DOM 未变化的假成功 fallback；ChatGPT fixture 只验证当前特殊 selector。
 - [-] P6-07 不再要求为了 V1 数量目标增加第二、第三站点专用 Adapter：标准输入框由通用 Adapter 覆盖，只有真实站点 DOM 确实需要特殊兼容时才增加对应 Adapter。
 - [x] P6-08 page bridge / content script 只做目标编辑器发现、caret 插入和消息职责，未复制 Compiler/Storage/Editor/AI 逻辑。
 
@@ -143,14 +143,14 @@
 
 - [x] P7-01 完成轻量文档切换/列表/搜索/新建/删除入口，不扩成 Prompt 管理后台。
 - [x] P7-02 完成最近文档恢复逻辑。
-- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；旧构建用户已反馈正常，但当前 Manifest/Web Insert 架构变化后仍需最终一轮。
+- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；用户反馈旧语义块边界过弱，当前已改为常态可见轻边框、左侧强调线、标签底色与更明确块间距，仍需最终构建浏览器确认。
 - [ ] P7-04 检查键盘可达性和关键操作可发现性；Esc 已实现为关闭当前最上层临时 UI，仍需最终构建浏览器确认。
-- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态/真机审查已修复保存误报、删除恢复、全局 AI 错误不可见、Chrome receiver 原始错误和扩展重载后的 stale bridge 问题，仍待真实浏览器错误路径收口。
+- [ ] P7-05 完整审查所有错误路径无假成功、无静默失败；静态/真机审查已修复保存误报、删除恢复、全局 AI 错误不可见、Chrome receiver 原始错误、stale bridge，以及 contenteditable API 报成功但 DOM 无变化的插入假成功，仍待真实浏览器错误路径收口。
 - [ ] P7-06 检查 Copy / Insert / Save 的重复操作与状态一致性；代码侧已把 Insert 收成一次原子消息、自动保存后的文档列表改为本地增量更新，仍待真实浏览器重复操作验证。
 - [ ] P7-07 做最终代码减法审查；当前已删除重复 selection 状态/CSS override、冗余 Repository guard、残留 `!important`、旧 append/replace 冲突 UI/状态/CSS 与 ChatGPT-only 插入实现，待线上最终 smoke 后再反查一次。
 - [x] P7-08 反向搜索 Non-goals：生产树无 backend/auth/team/marketplace/cloud-sync/model-playground 平台化模块，权限/bridge 边界仍符合 V1。
-- [ ] P7-09 README 已同步当前实现；全部权威文档最终实现态收口待真实浏览器验收后完成。
-- [ ] P7-10 完成真实浏览器性能收口：代码已消除默认编辑热路径的 Storage 全量重读、关闭状态下 Lint/Preview 重算、双消息 Insert 和全网页常驻 bridge；bridge 现在用 live ping 避免无效重复注入并清理旧 DOM listener。仍需验证实际插入延迟与 Side Panel 启动/输入流畅度。当前主 Side Panel chunk 约 611KB minified（gzip 约 192KB），不通过调高 Vite warningLimit 掩盖，只有真实启动性能需要时再做 code splitting。
+- [ ] P7-09 README 与 UX/ARCHITECTURE 已同步当前插入/语义块实现；全部权威文档最终实现态收口待真实浏览器验收后完成。
+- [ ] P7-10 完成真实浏览器性能收口：代码已消除默认编辑热路径的 Storage 全量重读、关闭状态下 Lint/Preview 重算、双消息 Insert 和全网页常驻 bridge；bridge 使用 live ping 避免无效重复注入并清理旧 DOM listener，站点权限允许后不再依赖短暂 activeTab。仍需验证实际插入延迟与 Side Panel 启动/输入流畅度。当前主 Side Panel chunk 约 611KB minified（gzip 约 192KB），不通过调高 Vite warningLimit 掩盖，只有真实启动性能需要时再做 code splitting。
 
 ---
 
@@ -164,7 +164,7 @@
 - [ ] P8-06 验证浏览器重启后的数据恢复。
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链。
 - [ ] P8-08 验证当前 caret-first 通用插入架构在至少一个真实 AI 网页端到端可用。
-- [x] P8-09 Manifest 权限审查：固定权限为 `storage` / `sidePanel` / `activeTab` / `scripting`；不再静态常驻 `content_scripts`，网页 bridge 只在用户明确点击扩展图标后按当前 tab 临时注入；AI 网络仍使用 optional host permission 按实际 Provider origin 请求。
+- [x] P8-09 Manifest 权限审查：固定权限为 `storage` / `sidePanel` / `activeTab` / `scripting`；不静态常驻 `content_scripts`。Web Insert 在扩展 action 用户手势下只请求当前网页 origin 的 optional host permission，拒绝时仍可用当前 `activeTab` 一次性兜底；AI 网络也只按实际 Provider origin 请求 optional host permission，不申请全网永久访问。
 - [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属：提交 npm lockfile、CI 改用 `npm ci`，锁文件跨平台审计 223 个依赖；审计结论记录于 `docs/DEPENDENCY-LICENSE-AUDIT.md`。
 - [ ] P8-11 生成 V1 release notes / 已知限制。
 
@@ -174,12 +174,12 @@
 
 ## 当前状态
 
-当前阶段：**真实 Extension 核心实现已经进入 `main`；Web Insert 已从 ChatGPT-only append/replace 重构为通用 caret-first 插入，使用 `activeTab + scripting` 按用户动作注入 page bridge；bridge 存活性改为 live ping，并能在扩展重载后替换旧 listener/重新注入；默认编辑热路径已减少 Storage/Lint/Compiler/消息重复工作。CI 使用 npm lockfile + `npm ci`，持续执行跨平台许可证审计、TypeScript、ESLint、14 个测试文件 / 55 项测试和 Extension build。当前最新代码门禁已通过，但重构后的真实浏览器最终验收尚未完成。**
+当前阶段：**真实 Extension 核心实现已经进入 `main`；Web Insert 为通用 caret-first 插入，网页 bridge 使用 live ping/旧 listener 清理，扩展 action 只为当前站点请求 optional host permission；contenteditable 插入增加真实 DOM 变化验证与 fallback。语义块常态边界也已增强。CI 使用 npm lockfile + `npm ci`，持续执行跨平台许可证审计、TypeScript、ESLint、14 个测试文件 / 56 项测试和 Extension build。当前最新代码门禁已通过，但上述真机修复仍待最新构建浏览器复测。**
 
 当前最优先剩余工作：
 
-1. 在最新构建验证 ChatGPT caret 插入/选区替换的实际速度，并在一个普通非 ChatGPT 输入框验证通用 Adapter；
-2. Chrome / Edge 当前最终 Manifest 的主链 smoke、360px 与键盘；
+1. 在最新构建验证 ChatGPT caret 插入/选区替换是否真实生效及实际速度，并在一个普通非 ChatGPT 输入框验证通用 Adapter；
+2. 复核最新语义块边界、Chrome / Edge 当前 Manifest 主链、360px 与键盘；
 3. 浏览器重启恢复与无 AI/错误 AI/超时降级；
 4. 真实错误路径、重复操作状态一致性和性能收口；
 5. 最终代码减法、release notes 和权威文档收口。
