@@ -3,8 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { makeAppendSuggestion, makeReplacementSuggestion } from '../src/ai/suggestions'
 import { SuggestionCard } from '../src/ui/components'
 
-type ButtonProps = {
+type ElementProps = {
   children?: ReactNode
+}
+
+type ButtonProps = ElementProps & {
   disabled?: boolean
   onClick?: () => void
 }
@@ -13,14 +16,14 @@ type ButtonElement = ReactElement<ButtonProps, 'button'>
 
 function nodeText(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node)
-  if (!isValidElement(node)) return ''
-  return Children.toArray(node.props.children as ReactNode).map(nodeText).join('')
+  if (!isValidElement<ElementProps>(node)) return ''
+  return Children.toArray(node.props.children).map(nodeText).join('')
 }
 
 function findButton(node: ReactNode, label: string): ButtonElement | null {
-  if (!isValidElement(node)) return null
+  if (!isValidElement<ElementProps>(node)) return null
   if (node.type === 'button' && nodeText(node).trim() === label) return node as ButtonElement
-  for (const child of Children.toArray(node.props.children as ReactNode)) {
+  for (const child of Children.toArray(node.props.children)) {
     const match = findButton(child, label)
     if (match) return match
   }
