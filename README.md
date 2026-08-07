@@ -28,7 +28,7 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - source revision 过期建议保护；
 - 通用网页插入：标准 `input / textarea / contenteditable` 按当前选区或光标位置插入；
 - ChatGPT 特殊 Adapter 只保留必要的输入框 selector 兼容；
-- 用户点击扩展图标时使用 `activeTab + scripting` 按需注入轻量网页 bridge，不向所有网页常驻 Content Script；
+- 用户点击扩展图标时仅针对当前站点请求 optional host permission，并按需注入轻量网页 bridge，不向所有网页常驻 Content Script；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 尚未把 V1 标记为完成。新的 caret-first 通用插入链、浏览器重启恢复、AI 全异常降级、最终 Chrome / Edge 主链与键盘可达性仍需真实浏览器收口。以 `TASKS.md` 为唯一完成度账本。
@@ -53,7 +53,7 @@ npm run build
 2. 开启“开发者模式”；
 3. 选择“加载已解压的扩展程序”；
 4. 选择本项目构建后的 `dist/` 目录；
-5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel；该明确用户动作同时为当前标签页授予临时 `activeTab` 访问并预热网页插入 bridge。
+5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel；首次在该站点使用时，浏览器可能询问是否允许 PromptNote 访问当前站点。允许后，该站点后续插入不再依赖临时 `activeTab` 授权。
 
 ### Edge 本地加载
 
@@ -61,7 +61,7 @@ npm run build
 2. 开启“开发人员模式”；
 3. 选择“加载解压缩的扩展”；
 4. 选择构建后的 `dist/` 目录；
-5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel。
+5. 在目标网页点击 PromptNote 扩展图标打开 Side Panel；首次站点访问权限与 Chrome 同理按当前 origin 请求。
 
 ## V1 主链
 
@@ -80,6 +80,7 @@ npm run build
 - `chrome.storage.local` 是浏览器本地存储，不应被视为加密保险库；
 - 只有用户明确触发 AI 动作时才发送所需内容；
 - 自定义 AI Base URL 使用 Chrome optional host permission，按实际配置的 origin 请求权限；
+- 网页插入也只按当前目标站点 origin 请求 optional host permission，不申请全网永久访问；
 - AI 请求设置可见超时与错误，不伪造成功。
 
 ## 网页插入
@@ -95,7 +96,7 @@ PromptNote 的默认插入心智与普通“粘贴”一致，而不是按网站
 
 通用能力覆盖标准 `input / textarea / contenteditable`。站点 Adapter 只负责确有必要的特殊 DOM 发现，例如 ChatGPT 当前优先识别 `#prompt-textarea`；插入算法只有共享的一份。
 
-PromptNote 不向所有网页常驻 Content Script。用户点击扩展图标后，Extension 使用 `activeTab + scripting` 对当前标签页临时注入轻量 bridge；这和 AI Provider 使用的 optional host permission 是两个不同权限边界。
+PromptNote 不向所有网页常驻 Content Script。用户在目标站点点击扩展图标时，Extension 只为当前 origin 请求 optional host permission，并使用 `scripting` 注入轻量 bridge；用户拒绝持久站点授权时，当前 action 仍可依赖一次性的 `activeTab` 完成临时注入。contenteditable 插入还会验证 DOM 是否真实变化，浏览器 API 即使返回“成功”但实际没有写入，也不会再被当成成功。
 
 ## 性能策略
 
