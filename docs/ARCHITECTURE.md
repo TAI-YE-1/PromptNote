@@ -235,6 +235,8 @@ interface WebPromptAdapter {
 - 多个候选且无法确定目标 → 失败，不猜测；
 - 永不自动 submit/send。
 
+对 `contenteditable` / 富编辑器，浏览器旧式 `execCommand('insertText')` 只能作为第一尝试，不能把返回 `true` 当作成功证据。共享引擎必须验证编辑器 DOM 是否真实发生预期变化；未变化则走 Range + `input` fallback，最终仍无变化则返回明确失败，禁止 UI 假报“已插入”。
+
 要求：
 
 - Adapter 只接收/定位 DOM，不理解 PromptDocument Schema；
@@ -305,9 +307,11 @@ AI 配置的保存与正文自动保存是两个不同语义，不得共用一�
 Background 只处理 Extension 生命周期和用户动作入口：
 
 - 用户点击扩展图标时打开 Side Panel；
-- 利用 `activeTab + scripting` 对当前标签页进行一次轻量 page bridge 预热。
+- 针对当前网页 origin 请求 optional host permission；
+- 允许后为该站点持久获得插入所需 host access；
+- 若用户拒绝持久站点授权，则当前 action 仍可使用 `activeTab + scripting` 做一次性 bridge 预热。
 
-不常驻监听页面正文，不保存 Prompt 内容，不演变成消息业务中枢。
+不得直接申请全网永久 host permission，不常驻监听页面正文，不保存 Prompt 内容，不演变成消息业务中枢。
 
 ### Content Script / Page Bridge
 
@@ -320,11 +324,11 @@ Page Bridge 只在明确用户动作下对当前标签页注入，并负责：
 - 执行共享 caret insert；
 - Side Panel 与网页之间的单次受控消息桥接。
 
-Bridge 必须有重复注入 guard，避免重复注册 message listener。
+Bridge 存活性以真实 ping 为准，不允许仅用页面全局布尔值推断旧 runtime listener 仍然有效。重复/版本更新注入时，当前 bridge 必须先清理上一版 message listener 与 DOM tracking listener，再安装当前实现，避免 stale receiver 和 listener 累积。
 
 不得在 Content Script 复制 Compiler、Storage、Editor 或 AI Provider 业务逻辑。
 
-Manifest 的 `activeTab` 提供用户动作触发的临时页面访问；`scripting` 只用于按需注入 page bridge。AI Provider 的任意 Base URL 继续通过 optional host permission 单独请求，两类权限语义不得混用。
+Manifest 的 `activeTab` 负责当前 action 的一次性临时访问，`scripting` 只用于按需注入 page bridge；当前网页长期插入授权和 AI Provider 网络授权都使用 optional host permission，但必须按各自实际 origin 单独请求，不得混成全网权限。
 
 ## 8. 错误处理
 
@@ -335,7 +339,7 @@ Manifest 的 `activeTab` 提供用户动作触发的临时页面访问；`script
 - AI 未配置 → AI 动作进入设置，但核心功能继续可用；
 - AI 连接测试失败 → 显示真实 Provider 错误，不伪装已连接；
 - AI 调用失败 → 保留编辑能力并显示失败；
-- Adapter/Bridge 失败 → 提示用户点击目标输入框/重新授权当前标签页，并提供 Copy，不伪造“已插入”；
+- Adapter/Bridge 失败 → 提示用户点击目标输入框/重新授权当前站点，并提供 Copy，不伪造“已插入”；
 - Storage 保存失败 → 明确未保存；
 - 未知 PromptDocument schemaVersion → 拒绝静默加载并给出可恢复提示。
 
@@ -351,6 +355,7 @@ V1 优先：
 - AI Provider adapter / connection test 的错误归一化测试；
 - AI suggestion 接受、拒绝、过期 revision 测试；
 - 通用 textarea / selection / contenteditable caret fixture；
+- contenteditable “API 报成功但 DOM 未变化”假成功 fixture；
 - 站点特殊 Adapter 的 DOM 发现 fixture；
 - 一个真实浏览器端到端主链测试。
 
