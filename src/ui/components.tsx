@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { PromptDocument } from '../prompt/schema'
 import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
 import type { CompileFormat } from '../prompt/compiler'
@@ -17,7 +17,12 @@ export function SlashMenu(props: { onClose(): void; onInsert(kind: SectionKind):
       {sectionKinds.map((kind) => {
         const meta = sectionKindMeta[kind]
         return (
-          <button key={kind} className="slash-item" onClick={() => props.onInsert(kind)}>
+          <button
+            key={kind}
+            className="slash-item"
+            data-kind={kind}
+            onClick={() => props.onInsert(kind)}
+          >
             <span className="slash-item__icon">{meta.icon}</span>
             <span>
               <strong>{meta.label}</strong>
@@ -37,33 +42,15 @@ export function SelectionContextMenu(props: {
   onConvert(format: EditableBlockFormat): void
 }) {
   const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    setOpen(false)
-  }, [props.selection.from, props.selection.to])
-
-  const format = props.selection.blockFormat
-  const formatLabel = format === 'paragraph'
+  const left = props.selection.rect.left + props.selection.rect.width / 2
+  const top = Math.max(44, props.selection.rect.top - 8)
+  const currentLabel = props.selection.blockFormat === 'paragraph'
     ? '普通段落'
-    : format
-      ? sectionKindMeta[format].label
-      : '文本'
-  const center = props.selection.rect.left + props.selection.rect.width / 2
-  const halfMenuWidth = 126
-  const left = Math.max(
-    halfMenuWidth,
-    Math.min(center, Math.max(halfMenuWidth, props.selection.rect.containerWidth - halfMenuWidth)),
-  )
-  const top = Math.max(42, props.selection.rect.top - 8)
-
-  function run(action: 'clarify' | 'shorten' | 'split_constraints') {
-    setOpen(false)
-    props.onAction(action)
-  }
+    : sectionKindMeta[props.selection.blockFormat].label
 
   return (
     <div
-      className="selection-context"
+      className={`selection-context ${open ? 'selection-context--open' : ''}`}
       style={{ left, top }}
       onMouseDown={(event) => event.stopPropagation()}
     >
@@ -72,48 +59,34 @@ export function SelectionContextMenu(props: {
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span>{formatLabel}</span>
-        <span className="selection-context__separator">·</span>
-        <span>AI</span>
-        <span className="selection-context__chevron">⌄</span>
+        <span>{currentLabel}</span>
+        <span>·</span>
+        <span>AI 辅助</span>
+        <span aria-hidden>⌄</span>
       </button>
-
       {open && (
-        <div className="selection-context__menu">
-          <div className="selection-context__section-label">AI 辅助</div>
+        <div className="selection-context__popover">
+          <div className="selection-context__label">AI 辅助</div>
           <div className="selection-context__actions">
-            <button onClick={() => run('clarify')}>改清楚</button>
-            <button onClick={() => run('shorten')}>缩短</button>
-            <button onClick={() => run('split_constraints')}>拆成约束</button>
+            <button onClick={() => props.onAction('clarify')}>改清楚</button>
+            <button onClick={() => props.onAction('shorten')}>缩短</button>
+            <button onClick={() => props.onAction('split_constraints')}>拆成约束</button>
           </div>
-          <button
-            className="selection-context__more"
-            onClick={() => {
-              setOpen(false)
-              props.onMore()
-            }}
-          >
-            更多 AI 辅助…
-          </button>
-
-          {format && (
-            <label className="selection-context__format">
-              <span>文本类型</span>
-              <select
-                value={format}
-                aria-label="转换当前文本块类型"
-                onChange={(event) => {
-                  setOpen(false)
-                  props.onConvert(event.target.value as EditableBlockFormat)
-                }}
-              >
-                <option value="paragraph">普通段落</option>
-                {sectionKinds.map((kind) => (
-                  <option key={kind} value={kind}>{sectionKindMeta[kind].label}</option>
-                ))}
-              </select>
-            </label>
-          )}
+          <button className="selection-context__more" onClick={props.onMore}>更多 AI 辅助…</button>
+          <div className="selection-context__divider" />
+          <label className="selection-context__format">
+            <span>文本类型</span>
+            <select
+              aria-label="转换当前文本块类型"
+              value={props.selection.blockFormat}
+              onChange={(event) => props.onConvert(event.target.value as EditableBlockFormat)}
+            >
+              <option value="paragraph">普通段落</option>
+              {sectionKinds.map((kind) => (
+                <option key={kind} value={kind}>{sectionKindMeta[kind].label}</option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
     </div>
