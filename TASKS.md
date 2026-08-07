@@ -60,7 +60,7 @@
 - [x] P1-07 增加开发态构建与 Chrome/Edge 本地加载说明。
 - [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次真实手动加载。
 
-**关闭标准：** 当前只缺真实浏览器加载证据；代码和构建骨架已闭合。
+**关闭标准：** Chrome 已完成真实手动加载并进入 Side Panel；当前只缺 Edge 的对应加载证据。
 
 ---
 
@@ -89,10 +89,10 @@
 - [x] P3-04 实现 Slash Menu。
 - [x] P3-05 支持 Goal / Context / Instruction / Constraint / Example / Output Format / Acceptance。
 - [x] P3-06 支持自由文本与语义块混写。
-- [ ] P3-07 支持普通段落与语义块之间的显式转换，转换不得丢正文。
+- [x] P3-07 支持普通段落与语义块之间的显式转换，转换不得丢正文。
 - [ ] P3-08 验证 undo/redo 对语义块、转换和 AI suggestion 应用的行为。
 - [x] P3-09 实现选区与编辑命令基础，AI suggestion 只通过 Editor command 应用。
-- [ ] P3-10 增加 PromptSection、Slash Menu、转换、undo/redo 聚焦测试。
+- [ ] P3-10 增加 PromptSection、Slash Menu、转换、undo/redo 聚焦测试；当前已有 PromptSection DOM 标签与段落↔语义块无损转换测试，Slash Menu / undo / redo 仍待补齐。
 
 ---
 
@@ -173,12 +173,12 @@
 
 ## 当前状态
 
-当前阶段：**真实 Extension 核心实现已经进入 `main`，GitHub Actions 的依赖安装、TypeScript、ESLint、聚焦单测、Extension build 已通过；尚未宣称 V1 完成。**
+当前阶段：**真实 Extension 核心实现已经进入 `main`，GitHub Actions 的依赖安装、TypeScript、ESLint、聚焦单测、Extension build 已通过；Chrome 已完成一次真实 Extension 加载，尚未宣称 V1 完成。**
 
 当前最优先剩余工作：
 
-1. Chrome + Edge 真实加载与 Side Panel 主链；
+1. Edge 真实加载与 Chrome/Edge 完整 Side Panel 主链；
 2. ChatGPT 当前线上 DOM 的真实 Adapter 验证；
 3. 浏览器重启恢复与无 AI 降级；
-4. 段落↔结构块转换与 undo/redo 专项闭环；
+4. undo/redo、Slash Menu 与编辑器专项测试闭环；
 5. V1 体验、许可证、release notes 最终收口。
