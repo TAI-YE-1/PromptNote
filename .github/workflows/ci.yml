@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -17,13 +20,17 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: npm install --ignore-scripts
-      - name: Upload resolved lockfile
-        uses: actions/upload-artifact@v7
-        with:
-          name: resolved-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit resolved lockfile once
+        if: github.event_name == 'push'
+        run: |
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "build: pin npm dependency resolution"
+          git push origin HEAD:main
       - name: Audit dependency licenses
         run: npm run license:audit
       - name: Typecheck
