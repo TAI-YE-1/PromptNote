@@ -103,6 +103,12 @@ class FakeRange {
     return new FakeRange(this.target, this.start, this.end)
   }
 
+  toString() {
+    if (!this.target) return ''
+    const text = this.target.textContent ?? ''
+    return text.slice(this.start, this.end)
+  }
+
   selectNodeContents(element: FakeHTMLElement) {
     this.target = element
     this.start = 0
@@ -172,6 +178,7 @@ export function installChatGptContentEditableFixture(input?: {
   end?: number
   execCommandSucceeds?: boolean
   execCommandAvailable?: boolean
+  execCommandMutates?: boolean
 }) {
   const composer = new FakeChatGptComposer(input?.text ?? '')
   const range = new FakeRange(
@@ -182,7 +189,7 @@ export function installChatGptContentEditableFixture(input?: {
   const selection = createSelection(range)
   const execCommand = vi.fn((_command: string, _showUi: boolean, value: string) => {
     if (input?.execCommandSucceeds === false) return false
-    selection.getRangeAt(0).replaceSelection(value)
+    if (input?.execCommandMutates !== false) selection.getRangeAt(0).replaceSelection(value)
     return true
   })
 
@@ -241,6 +248,7 @@ function installGlobals(input: {
   vi.stubGlobal('document', {
     activeElement: input.activeElement,
     addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     querySelector(selector: string) {
       if (selector === '#prompt-textarea') return input.promptComposer ?? null
       if (selector === 'textarea[data-id="root"]') return null
