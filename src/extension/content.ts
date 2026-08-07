@@ -1,13 +1,28 @@
 import { chatGptAdapter } from '../adapters/chatgpt'
 import { genericWebAdapter } from '../adapters/generic'
-import { insertIntoEditable, startEditableTracking } from '../adapters/editable'
+import {
+  insertIntoEditable,
+  startEditableTracking,
+  stopEditableTracking,
+} from '../adapters/editable'
 import type { WebPromptAdapter } from '../adapters/types'
 import type { ContentRequest, ContentResponse } from './messages'
 
 const adapters: WebPromptAdapter[] = [chatGptAdapter, genericWebAdapter]
+const bridgeGlobal = globalThis as typeof globalThis & {
+  __promptNoteBridgeCleanup?: () => void
+  __promptNoteBridgeInstalled?: boolean
+}
+
+bridgeGlobal.__promptNoteBridgeCleanup?.()
+delete bridgeGlobal.__promptNoteBridgeInstalled
 
 startEditableTracking()
 chrome.runtime.onMessage.addListener(handleMessage)
+bridgeGlobal.__promptNoteBridgeCleanup = () => {
+  chrome.runtime.onMessage.removeListener(handleMessage)
+  stopEditableTracking()
+}
 
 function handleMessage(
   request: ContentRequest,
