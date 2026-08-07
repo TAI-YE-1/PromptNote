@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -19,18 +19,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - name: Install dependencies
-        run: npm install --ignore-scripts
-      - name: Commit resolved lockfile once
-        if: github.event_name == 'push'
-        run: |
-          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "build: pin npm dependency resolution"
-          git push origin HEAD:main
+        run: npm ci --ignore-scripts
       - name: Audit dependency licenses
         run: npm run license:audit
       - name: Typecheck
