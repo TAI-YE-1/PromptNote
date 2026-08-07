@@ -65,6 +65,23 @@ export function parsePromptDocument(value: unknown): PromptDocument {
   return doc as PromptDocument
 }
 
+export function createPromptDocumentExport(document: PromptDocument): PromptDocumentExport {
+  return {
+    exportedAt: new Date().toISOString(),
+    document: parsePromptDocument(structuredClone(document)),
+  }
+}
+
+export function parsePromptDocumentExport(value: unknown): PromptDocumentExport {
+  if (!value || typeof value !== 'object') throw new Error('PromptDocument 备份不是对象。')
+  const backup = value as Partial<PromptDocumentExport>
+  if (typeof backup.exportedAt !== 'string') throw new Error('PromptDocument 备份时间无效。')
+  return {
+    exportedAt: backup.exportedAt,
+    document: parsePromptDocument(backup.document),
+  }
+}
+
 function validateSectionKinds(node: PromptNodeJSON): void {
   if (node.type === 'promptSection') {
     const kind = node.attrs?.kind
