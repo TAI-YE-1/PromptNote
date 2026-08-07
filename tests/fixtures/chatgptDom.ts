@@ -113,6 +113,14 @@ export function installLegacyTextareaFixture(text = '') {
   return { composer }
 }
 
+export function installUnsupportedChatGptFixture() {
+  installBaseGlobals()
+  vi.stubGlobal('window', { getSelection: () => null })
+  vi.stubGlobal('document', {
+    querySelector: () => null,
+  })
+}
+
 function installGlobals(input: {
   composer: FakeHTMLElement
   range: FakeRange
@@ -120,11 +128,7 @@ function installGlobals(input: {
   execCommand: ReturnType<typeof vi.fn>
   textarea?: FakeTextarea
 }) {
-  vi.stubGlobal('HTMLElement', FakeHTMLElement)
-  vi.stubGlobal('HTMLTextAreaElement', FakeTextarea)
-  vi.stubGlobal('HTMLInputElement', FakeInput)
-  vi.stubGlobal('Event', FakeEvent)
-  vi.stubGlobal('InputEvent', FakeInputEvent)
+  installBaseGlobals()
   vi.stubGlobal('window', {
     getSelection: () => input.selection,
   })
@@ -140,4 +144,12 @@ function installGlobals(input: {
     createRange: () => input.range,
     execCommand: input.execCommand,
   })
+}
+
+function installBaseGlobals() {
+  vi.stubGlobal('HTMLElement', FakeHTMLElement)
+  vi.stubGlobal('HTMLTextAreaElement', FakeTextarea)
+  vi.stubGlobal('HTMLInputElement', FakeInput)
+  vi.stubGlobal('Event', FakeEvent)
+  vi.stubGlobal('InputEvent', FakeInputEvent)
 }
