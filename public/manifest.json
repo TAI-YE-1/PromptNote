@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "像写文档一样写 Prompt。",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "sidePanel", "scripting", "activeTab"],
+  "permissions": ["storage", "sidePanel"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
   "action": {
     "default_title": "打开 PromptNote"
