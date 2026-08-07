@@ -28,7 +28,7 @@ export class ChromePromptRepository implements PromptRepository {
     const result = await chrome.storage.local.get(DOCUMENTS_KEY)
     const raw = result[DOCUMENTS_KEY]
     if (!raw) return {}
-    if (!raw || typeof raw !== 'object') throw new Error('本地 Prompt 数据格式损坏。')
+    if (typeof raw !== 'object') throw new Error('本地 Prompt 数据格式损坏。')
     const parsed: StoredDocuments = {}
     for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
       parsed[id] = parsePromptDocument(value)
