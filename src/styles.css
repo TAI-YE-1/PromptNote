@@ -44,10 +44,12 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .prompt-editor__content ul, .prompt-editor__content ol { padding-left: 22px; }
 .prompt-editor__content pre { padding: 12px; border-radius: 10px; overflow: auto; background: #f3f4f0; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .prompt-editor__content blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid #c9d1ca; color: #667067; }
-.prompt-editor__content section[data-prompt-section] { position: relative; margin: 2px -7px 14px; padding: 22px 8px 12px 12px; border-left: 2px solid transparent; border-radius: 0 11px 11px 0; transition: .14s ease; }
-.prompt-editor__content section[data-prompt-section]::before { content: attr(data-label); position: absolute; left: 12px; top: 3px; color: #486557; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
-.prompt-editor__content section[data-prompt-section]:hover,
-.prompt-editor__content section[data-prompt-section]:focus-within { border-left-color: var(--forest-line); background: #f7f8f4; }
+.prompt-editor__content section[data-prompt-section] { position: relative; margin: 8px -6px 18px; padding: 27px 12px 14px 14px; border: 1px solid #e1e8e2; border-left: 3px solid #a9c0b0; border-radius: 10px; background: #fafbf8; box-shadow: 0 1px 0 rgba(35,74,58,.025); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+.prompt-editor__content section[data-prompt-section] + section[data-prompt-section] { margin-top: 20px; }
+.prompt-editor__content section[data-prompt-section]::before { content: attr(data-label); position: absolute; left: 11px; top: 5px; padding: 1px 6px; border-radius: 999px; background: #edf3ef; color: #355846; font-size: 10px; font-weight: 800; line-height: 1.45; letter-spacing: .035em; }
+.prompt-editor__content section[data-prompt-section] > :last-child { margin-bottom: 0; }
+.prompt-editor__content section[data-prompt-section]:hover { border-color: #cad8cf; border-left-color: #86a28f; background: #f8faf7; }
+.prompt-editor__content section[data-prompt-section]:focus-within { border-color: #b7ccbd; border-left-color: #5f856e; background: #f7faf7; box-shadow: 0 0 0 2px rgba(95,133,110,.08); }
 .prompt-editor__content .ProseMirror-selectednode { outline: none; background: #f4f7f4; }
 
 .actionbar { position: absolute; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr 1.05fr 1.25fr; gap: 5px; padding: 10px 12px; border-top: 1px solid #ebeae4; background: rgba(252,252,250,.97); backdrop-filter: blur(10px); }
