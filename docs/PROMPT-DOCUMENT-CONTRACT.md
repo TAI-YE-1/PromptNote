@@ -4,19 +4,20 @@
 
 ## 1. 唯一内容源
 
-PromptNote 的唯一可持久化内容源是 `PromptDocument`。
+PromptNote 的唯一可持久化正文源是 `PromptDocument`。
 
 以下内容不得成为第二份可独立编辑或持久化的正文状态：
 
 - Markdown 预览；
 - XML 预览；
 - Plain Text 预览；
-- Web Adapter 输入缓存；
 - AI suggestion；
+- inline ghost completion；
+- Lint finding；
 - 临时表单字段；
 - 模型专用 Prompt 副本。
 
-所有输出都必须从 `PromptDocument` 派生。
+所有输出都必须从 `PromptDocument` 派生。ghost completion 只有在用户按 `Tab` 接受、通过 Editor transaction 写入后，才成为 PromptDocument 的真实正文。
 
 ## 2. PromptDocument V1
 
@@ -40,7 +41,7 @@ interface PromptDocument {
 - `title` 是文档元数据，不从正文标题反向推断；
 - `content` 是 TipTap JSON 文档树；
 - 时间使用 ISO 8601 字符串；
-- 不在 V1 添加模型、网站、API Key 等运行环境字段到 PromptDocument。
+- 不在 V1 添加模型、网站、API Key、补全开关等运行环境字段到 PromptDocument。
 
 ## 3. TipTap 内容模型
 
@@ -75,10 +76,6 @@ interface PromptSectionAttrs {
 }
 ```
 
-`promptSection` 内部承载普通 block content。
-
-这样可避免 `goalNode`、`contextNode`、`constraintNode` 等大量重复实现。
-
 ## 4. Section Kind 权威定义
 
 V1 的 `kind` 集合只有：
@@ -95,8 +92,6 @@ V1 的 `kind` 集合只有：
 
 Slash Menu、渲染器、Compiler、Lint、测试不得各自硬编码另一份不同列表。
 
-实现时必须从单一权威常量/Schema 派生显示名称、菜单项和编译行为。
-
 ## 5. 内容与展示分离
 
 `promptSection.kind` 表达语义，不保存：
@@ -107,9 +102,7 @@ Slash Menu、渲染器、Compiler、Lint、测试不得各自硬编码另一份�
 - Markdown 标题文本；
 - XML 标签字符串。
 
-这些由展示层或 Compiler 映射。
-
-例如 `constraint` 可以在 UI 显示为“🔒 约束”，在 Markdown 编译为 `## 约束`，在 XML 编译为 `<constraints>`，但 PromptDocument 只保存 `kind: 'constraint'`。
+同样，ghost completion 的灰色样式、Decoration DOM 和临时文本都属于 Editor 展示/派生状态，不进入 PromptDocument JSON。
 
 ## 6. Compiler 契约
 
@@ -131,42 +124,63 @@ type PromptOutputFormat = 'plain' | 'markdown' | 'xml';
 - Compiler 不读 DOM；
 - Compiler 不访问 Storage；
 - Compiler 不调用 AI；
-- 同一输入与相同 options 必须得到稳定输出；
-- 格式差异只能存在于 Compiler 层，不创建模型专用正文副本。
+- Compiler 不读取未接受的 ghost completion；
+- 同一输入与相同 options 必须得到稳定输出。
 
-## 7. AI Suggestion 契约
+## 7. AI Suggestion 与 Inline Completion 契约
 
-AI assistance 的返回值不是 PromptDocument。
+### 7.1 Suggestion / Finding
+
+普通 AI assistance 的编辑结果不是 PromptDocument。
 
 概念结构：
 
 ```ts
 interface PromptSuggestion {
   id: string;
-  documentId: string;
-  sourceRevision: string;
-  operation:
+  sourceRevision: number;
+  action:
     | 'clarify'
     | 'shorten'
-    | 'find_ambiguity'
     | 'split_constraints'
     | 'draft_acceptance'
-    | 'lint';
-  target: SuggestionTarget;
-  proposedContent?: unknown;
-  findings?: PromptLintFinding[];
+    | 'ambiguity'
+    | 'structure';
+  target: 'selection' | 'append-section' | 'advisory';
+  replacementText: string;
 }
 ```
 
 规则：
 
-- AI 只产生 suggestion / finding；
 - suggestion 不能直接持久化覆盖正文；
 - 用户接受后，由 Editor command 将变更应用到当前 PromptDocument；
-- 必须校验 suggestion 所基于的 revision，避免用户继续编辑后应用过期建议；
+- 必须校验 source revision；
 - AI 失败不得影响 PromptDocument 的读写。
 
-具体 range / position 结构以 TipTap 实现为准，但只能存在一套定位定义。
+### 7.2 Inline Completion
+
+Inline completion 是与 PromptSuggestion 分离的短生命周期 Editor 状态。
+
+```ts
+interface GhostCompletionState {
+  text: string | null;
+  position: number | null;
+}
+```
+
+规则：
+
+- 不带 PromptDocument 持久字段；
+- 不触发 PromptDocument revision；
+- 不进入 autosave；
+- 不进入 Compiler；
+- 不进入 PromptDocument JSON 导入/导出；
+- doc/selection 变化后必须失效；
+- `Esc` 只清除 ghost；
+- `Tab` 接受后，通过真实 Editor transaction 把文本写入 PromptDocument，此时才产生正常正文 revision/save。
+
+`completionEnabled` 是 Extension Preference，不是 PromptDocument 字段。
 
 ## 8. Prompt Lint 契约
 
@@ -175,33 +189,31 @@ Lint finding 是派生数据：
 ```ts
 interface PromptLintFinding {
   id: string;
-  ruleId: string;
   severity: 'info' | 'warning';
   message: string;
-  target?: SuggestionTarget;
+  detail?: string;
+  source: 'local' | 'ai';
 }
 ```
 
 Lint 结果默认不持久化为正文，也不阻止编译。
 
-确定性的本地规则优先于调用 AI；需要语义判断的规则可通过 AI assistance 补充。
-
 ## 9. Storage 契约
 
-V1 本地持久化保存 `PromptDocument`，不保存独立 Markdown/XML 正文。
+V1 本地正文持久化只保存 `PromptDocument`，不保存独立 Markdown/XML 正文或 ghost completion。
 
 Storage API 概念上保持：
 
 ```ts
 interface PromptRepository {
   get(id: string): Promise<PromptDocument | null>;
-  list(): Promise<PromptDocumentSummary[]>;
+  list(): Promise<PromptDocument[]>;
   save(document: PromptDocument): Promise<void>;
-  delete(id: string): Promise<void>;
+  remove(id: string): Promise<void>;
 }
 ```
 
-V1 可使用 `chrome.storage.local` 实现；业务代码只能依赖 Repository 接口，不能到处直接调用 Chrome Storage API。
+AI preferences 使用独立 namespace/repository，可保存 `completionEnabled`，但不得混入 PromptDocument。
 
 ## 10. 导入 / 导出
 
@@ -209,11 +221,9 @@ V1 可使用 `chrome.storage.local` 实现；业务代码只能依赖 Repository
 
 用于备份与迁移的标准格式是带 `schemaVersion` 的 PromptDocument JSON。
 
-### 10.2 文本导出
+### 10.2 文本输出
 
-Plain Text / Markdown / XML 是发布/复制格式，不保证能无损还原所有 PromptDocument 语义。
-
-因此不得把文本导出重新定义成主存储格式。
+Plain Text / Markdown / XML 是复制/发布格式，不保证无损还原所有 PromptDocument 语义，因此不得重新定义成主存储格式。
 
 ## 11. Schema 变化规则
 
@@ -231,5 +241,6 @@ Plain Text / Markdown / XML 是发布/复制格式，不保证能无损还原所
 
 - 保留 `schemaV2` / `newDocument` 双轨实现；
 - 在多个模块重复硬编码 section kind；
+- 把 ghost completion 写进 PromptDocument；
 - 用默认值静默吞掉未知版本；
 - 因单个测试失败就认定测试过期。
