@@ -1,10 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { PromptSection } from './promptSection'
 import type { PromptNodeJSON } from '../prompt/schema'
-import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
+import type { SectionKind } from '../prompt/sectionKinds'
 import {
   createBlockConversionTransaction,
   getActiveBlockFormat,
@@ -15,13 +15,21 @@ export interface EditorSelectionSnapshot {
   text: string
   from: number
   to: number
-  rect: { left: number; top: number; width: number; height: number }
+  blockFormat: EditableBlockFormat | null
+  rect: {
+    left: number
+    top: number
+    width: number
+    height: number
+    containerWidth: number
+  }
 }
 
 export interface PromptEditorHandle {
   insertSection(kind: SectionKind, text?: string): void
   replaceRange(from: number, to: number, text: string): void
   appendSection(kind: SectionKind, text: string): void
+  convertSelectedBlock(format: EditableBlockFormat): void
   focus(): void
 }
 
@@ -33,18 +41,11 @@ interface PromptEditorProps {
   onSlashRequest(): void
 }
 
-interface BlockFormatPickerState {
-  format: EditableBlockFormat
-  left: number
-  top: number
-}
-
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
   props,
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const [blockFormatPicker, setBlockFormatPicker] = useState<BlockFormatPickerState | null>(null)
   const editor = useEditor({
     extensions: [StarterKit, PromptSection],
     content: props.content as JSONContent,
@@ -69,8 +70,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       errorOnInvalidContent: true,
     })
     props.onSelectionChange(null)
-    setBlockFormatPicker(null)
   }, [editor, props.documentId])
+
+  function convertSelectedBlock(format: EditableBlockFormat) {
+    if (!editor) return
+    const transaction = createBlockConversionTransaction(editor.state, format)
+    if (!transaction) return
+    editor.view.dispatch(transaction.scrollIntoView())
+    editor.commands.focus()
+    props.onSelectionChange(null)
+  }
 
   useImperativeHandle(
     ref,
@@ -96,6 +105,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           .insertContent({ type: 'promptSection', attrs: { kind }, content: [{ type: 'text', text }] })
           .run()
       },
+      convertSelectedBlock,
       focus() {
         editor?.commands.focus()
       },
@@ -106,51 +116,32 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   function captureSelection() {
     if (!editor || editor.state.selection.empty) {
       props.onSelectionChange(null)
-      setBlockFormatPicker(null)
       return
     }
 
     const text = editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n')
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
-    const rect = selection.getRangeAt(0).getBoundingClientRect()
+
     const rootRect = rootRef.current?.getBoundingClientRect()
     if (!rootRect) return
 
-    const relativeRect = {
-      left: rect.left - rootRect.left,
-      top: rect.top - rootRect.top,
-      width: rect.width,
-      height: rect.height,
-    }
+    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    const activeBlock = getActiveBlockFormat(editor.state)
 
     props.onSelectionChange({
       text,
       from: editor.state.selection.from,
       to: editor.state.selection.to,
-      rect: relativeRect,
+      blockFormat: activeBlock?.format ?? null,
+      rect: {
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height,
+        containerWidth: rootRect.width,
+      },
     })
-
-    const activeBlock = getActiveBlockFormat(editor.state)
-    setBlockFormatPicker(
-      activeBlock
-        ? {
-            format: activeBlock.format,
-            left: relativeRect.left + relativeRect.width / 2,
-            top: relativeRect.top + relativeRect.height + 8,
-          }
-        : null,
-    )
-  }
-
-  function convertSelectedBlock(format: EditableBlockFormat) {
-    if (!editor) return
-    const transaction = createBlockConversionTransaction(editor.state, format)
-    if (!transaction) return
-    editor.view.dispatch(transaction.scrollIntoView())
-    editor.commands.focus()
-    props.onSelectionChange(null)
-    setBlockFormatPicker(null)
   }
 
   return (
@@ -163,25 +154,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       }}
     >
       <EditorContent editor={editor} />
-      {blockFormatPicker && (
-        <label
-          className="block-format-picker"
-          style={{ left: blockFormatPicker.left, top: blockFormatPicker.top }}
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <span>文本类型</span>
-          <select
-            value={blockFormatPicker.format}
-            aria-label="转换当前文本块类型"
-            onChange={(event) => convertSelectedBlock(event.target.value as EditableBlockFormat)}
-          >
-            <option value="paragraph">普通段落</option>
-            {sectionKinds.map((kind) => (
-              <option key={kind} value={kind}>{sectionKindMeta[kind].label}</option>
-            ))}
-          </select>
-        </label>
-      )}
     </div>
   )
 })
