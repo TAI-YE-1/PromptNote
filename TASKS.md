@@ -30,6 +30,25 @@
 
 ---
 
+## P0.5 — 可交互 UX 原型验证
+
+- [x] P0.5-01 建立 `docs/PROTOTYPE.md`，固定原型目标、范围、状态与验收标准。
+- [ ] P0.5-02 在 Figma 建立约 440px 基准 Side Panel 主界面，不做 Dashboard。
+- [ ] P0.5-03 完成 Empty / Writing / Slash Menu / Structured 四个核心编辑状态。
+- [ ] P0.5-04 完成 Selection Toolbar 与 AI Suggestion 接受/忽略状态。
+- [ ] P0.5-05 完成 Prompt Check / Lint finding 状态，不引入 Prompt 分数。
+- [ ] P0.5-06 完成 Plain / Markdown Preview，只读且不形成第二编辑入口。
+- [ ] P0.5-07 完成轻量 Document Switcher，不引入文件夹/团队/市场等平台化能力。
+- [ ] P0.5-08 完成 Insert 正常、目标输入已有内容、Adapter 失败→Copy 三种状态。
+- [ ] P0.5-09 跑通“自然书写 → Slash 结构化 → AI 建议 → Check → Preview → Insert”的可点击主链。
+- [ ] P0.5-10 检查约 360px 与 520px 两种宽度状态。
+- [ ] P0.5-11 按 `docs/PROTOTYPE.md` 8 条验收问题复核并记录结论。
+- [ ] P0.5-12 将确认后的交互结论同步回 `docs/UX.md`；如产品边界变化，同步 PRODUCT / DECISIONS。
+
+**关闭标准：** 核心交互可在 Figma 中完整点击验证；用户原文与 AI 建议边界清楚；结构块仍具有文档感；窄宽度主链可用；没有引入 PRODUCT Non-goals。P0.5 关闭后才开始 P1 正式代码。
+
+---
+
 ## P1 — 最小 Extension 骨架
 
 - [ ] P1-01 初始化 React + TypeScript 项目，保持依赖最小化。
@@ -161,6 +180,6 @@
 
 ## 当前状态
 
-当前阶段：**P0 文档基线完成，尚未开始业务代码。**
+当前阶段：**P0 文档基线完成，P0.5 原型规格已建立，尚未开始正式业务代码。**
 
-下一实施包：**P1 — 最小 Extension 骨架。**
+下一实施包：**P0.5 — Figma 可交互 UX 原型验证。**
