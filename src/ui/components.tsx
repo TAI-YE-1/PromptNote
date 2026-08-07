@@ -5,7 +5,6 @@ import type { CompileFormat } from '../prompt/compiler'
 import type { AiAction, AiSettings, PromptLintFinding, PromptSuggestion } from '../ai/types'
 import type { EditorSelectionSnapshot } from '../editor/PromptEditor'
 import type { EditableBlockFormat } from '../editor/blockConversion'
-import type { InsertMode } from '../extension/messages'
 
 export function SlashMenu(props: { onClose(): void; onInsert(kind: SectionKind): void }) {
   return (
@@ -372,25 +371,6 @@ function AiMenuButton(props: { title: string; detail: string; disabled: boolean;
       <span><strong>{props.title}</strong><small>{props.detail}</small></span>
       <span>›</span>
     </button>
-  )
-}
-
-export function InsertConflictDialog(props: {
-  mode: InsertMode
-  onMode(mode: InsertMode): void
-  onClose(): void
-  onConfirm(): void
-}) {
-  return (
-    <div className="modal-overlay">
-      <section className="dialog">
-        <h3>当前输入框已有内容</h3>
-        <p>PromptNote 不会静默覆盖。请选择这次如何处理。</p>
-        <label><input type="radio" checked={props.mode === 'append'} onChange={() => props.onMode('append')} /> 追加到现有内容后</label>
-        <label><input type="radio" checked={props.mode === 'replace'} onChange={() => props.onMode('replace')} /> 替换现有内容</label>
-        <div className="card-actions"><button className="ghost-button" onClick={props.onClose}>取消</button><button className="primary-button" onClick={props.onConfirm}>继续</button></div>
-      </section>
-    </div>
   )
 }
 
