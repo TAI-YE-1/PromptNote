@@ -196,7 +196,7 @@ Prompt Marketplace、团队协作、Agent Workflow、MCP 平台、模型 Playgro
 
 ## D013 — P1 前先完成 P0.5 可交互 UX 原型验证
 
-**状态：Accepted**
+**状态：Superseded by D014**
 
 ### 决定
 
@@ -213,8 +213,37 @@ PromptNote 的核心差异不是技术可行性，而是“自己写 Prompt 是�
 - `TASKS.md` 增加 P0.5，P0.5 关闭前不得开始 P1；
 - 原型只验证交互，不实现真实 Schema、Storage、Compiler、Adapter 或 AI API；
 - 原型确认后将结论回写 `docs/UX.md`；
-- 正式代码仍从 P1 干净开始，不复制原型临时代码；
-- Figma 是 UX reference，不取代 PRODUCT、CONTRACT、ARCHITECTURE 等权威来源。
+- 正式代码仍从 P1 干净开始，不复制原型临时代码。
+
+---
+
+## D014 — P0.5 改为单文件 HTML 可交互原型
+
+**状态：Accepted**
+
+**Supersedes:** D013 中“使用 Figma 作为原型载体”的部分；P1 前先完成 P0.5 UX 验证的原则继续有效。
+
+### 决定
+
+P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不再依赖 Figma。
+
+原型必须把 HTML、CSS、JavaScript 内嵌在一个文件中，可直接双击在 Chrome / Edge 打开，不依赖 Node、npm、React、CDN、后端或真实 AI API。
+
+### 原因
+
+- 当前不应让 Figma 额度成为 UX 验证的阻塞项；
+- PromptNote 的原型需要真实模拟输入、Slash Menu、selection toolbar、suggestion、lint、preview、document switcher、insert conflict 等状态，HTML 比静态设计稿更容易直接体验；
+- 单文件状态驱动原型可以保持极低依赖和低代码债；
+- 使用 React / TipTap 会过早进入 P1-P3 正式实现，失去“先验证体验”的意义。
+
+### 实现约束
+
+- 使用单一前端状态模型和 `render()` 或等价机制驱动状态；
+- 不为每个原型状态复制独立页面实现；
+- AI、Lint、Compiler、Adapter 全部使用假数据或轻量模拟；
+- 可以提供明确标记为 `Prototype Controls` 的评审控制区；
+- P0.5 HTML 原型不是 PromptDocument Schema、正式 Compiler 或 Extension 代码的权威来源；
+- 原型确认后只把 UX 结论同步到权威文档，正式代码仍从 P1 干净开始。
 
 ---
 
