@@ -5,13 +5,9 @@ import type { WebPromptAdapter } from '../adapters/types'
 import type { ContentRequest, ContentResponse } from './messages'
 
 const adapters: WebPromptAdapter[] = [chatGptAdapter, genericWebAdapter]
-const bridgeGlobal = globalThis as typeof globalThis & { __promptNoteBridgeInstalled?: boolean }
 
-if (!bridgeGlobal.__promptNoteBridgeInstalled) {
-  bridgeGlobal.__promptNoteBridgeInstalled = true
-  startEditableTracking()
-  chrome.runtime.onMessage.addListener(handleMessage)
-}
+startEditableTracking()
+chrome.runtime.onMessage.addListener(handleMessage)
 
 function handleMessage(
   request: ContentRequest,
@@ -19,6 +15,11 @@ function handleMessage(
   sendResponse: (response: ContentResponse) => void,
 ): false {
   try {
+    if (request.type === 'PROMPTNOTE_BRIDGE_PING') {
+      sendResponse({ ok: true, bridge: true })
+      return false
+    }
+
     if (request.type !== 'PROMPTNOTE_INSERT_AT_CARET') {
       sendResponse({ ok: false, error: '未知 Content Script 请求。' })
       return false
