@@ -3,204 +3,154 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PromptNote / 提词笺 — Forest Paper Prototype</title>
+<title>PromptNote / 提词笺 — Forest Paper AI Prototype</title>
 <style>
 :root{
-  --forest:#234a3a;--forest-deep:#18382c;--forest-soft:#eaf1ed;--forest-line:#b9ccbf;
-  --paper:#fcfcfa;--canvas:#f2f1ec;--ink:#252824;--muted:#747870;--line:#e4e4dd;
-  --soft:#f4f5f1;--warn:#8a5b15;--warn-soft:#fbf4e6;
+  --forest:#234a3a;--forest-deep:#18382c;--forest-mid:#3d6755;--forest-soft:#eaf1ed;--forest-line:#b9ccbf;
+  --paper:#fcfcfa;--canvas:#f2f1ec;--ink:#252824;--muted:#747870;--line:#e4e4dd;--soft:#f4f5f1;
+  --warn:#8a5b15;--warn-soft:#fbf4e6;--danger:#a33a31;--danger-soft:#fff2f0;
 }
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--canvas)}
-button,input{font:inherit}button{cursor:pointer}
+button,input,select{font:inherit}button{cursor:pointer}
 .stage{min-height:100vh;display:grid;place-items:center;padding:34px;background:radial-gradient(circle at 76% 12%,rgba(35,74,58,.07),transparent 27%),linear-gradient(180deg,#f5f4ef,#efeee8)}
 .demo{width:min(1080px,100%);display:grid;grid-template-columns:1fr auto;gap:18px;align-items:stretch}
 .mock{min-width:360px;min-height:740px;padding:27px;border:1px solid #e4e3dc;border-radius:22px;background:rgba(252,252,250,.68);box-shadow:0 8px 28px rgba(35,55,43,.04)}
-.tag{display:inline-flex;padding:5px 9px;border:1px solid #ddddD6;border-radius:999px;background:rgba(252,252,250,.9);font-size:11px;color:#777d76}
+.tag{display:inline-flex;padding:5px 9px;border:1px solid #ddddd6;border-radius:999px;background:rgba(252,252,250,.9);font-size:11px;color:#777d76}
 .mock h2{margin:14px 0 8px;font-size:23px;letter-spacing:-.02em}.mock p{max-width:640px;font-size:13px;line-height:1.65;color:var(--muted)}
 .chat{margin-top:64px;min-height:445px;padding:16px;border:1px solid #e6e5df;border-radius:19px;background:#f7f7f4;display:flex;flex-direction:column;justify-content:flex-end}
 .bubble{align-self:flex-end;padding:11px 13px;border-radius:17px;background:#edf0eb;color:#526057;font-size:12px}
-.fake-input{margin-top:13px;min-height:68px;padding:13px;border:1px solid #e3e3dd;border-radius:15px;background:var(--paper);font-size:12px;color:#999}
-.fake-input.busy{border-color:#ddc99a;background:#fffaf0;color:#635b49}
+.fake-input{margin-top:13px;min-height:68px;padding:13px;border:1px solid #e3e3dd;border-radius:15px;background:var(--paper);font-size:12px;color:#999}.fake-input.busy{border-color:#ddc99a;background:#fffaf0;color:#635b49}
 .wrap{width:440px;transition:.18s}.panel{width:100%;height:740px;position:relative;overflow:hidden;display:flex;flex-direction:column;border:1px solid #dbddd6;border-radius:23px;background:var(--paper);box-shadow:0 26px 72px rgba(35,55,43,.17),0 2px 8px rgba(35,55,43,.05)}
-.top{height:56px;flex:0 0 auto;display:grid;grid-template-columns:34px 1fr 34px;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #ecebe5;background:rgba(252,252,250,.96)}
+.top{height:56px;flex:0 0 auto;display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #ecebe5;background:rgba(252,252,250,.96)}
 .icon{width:34px;height:34px;border:0;border-radius:9px;background:transparent;color:#596159}.icon:hover{background:#f0f2ed}
 .title{width:100%;border:0;outline:0;background:transparent;color:#293029;font-size:14px;font-weight:680;letter-spacing:-.01em}
+.ai-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 9px;border:1px solid #dce3dd;border-radius:999px;background:#f8faf7;color:#4f6558;font-size:10px;font-weight:700;white-space:nowrap}.ai-chip:hover{background:var(--forest-soft);color:var(--forest)}.ai-dot{width:6px;height:6px;border-radius:50%;background:#aab0aa}.ai-chip.ready .ai-dot{background:#3e7b5b}.ai-chip.disabled .ai-dot{background:#c7a25e}
 .view{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}.editor{flex:1;min-height:0;overflow:auto;padding:26px 22px 94px}
-.empty{padding:74px 5px;color:var(--muted);line-height:1.6}.empty strong{display:block;margin-bottom:7px;color:#3e4841;font-size:16px}
-.quick{display:flex;gap:7px;margin-top:16px}
-.ghost,.primary,.light,.tab,.menu button{border:1px solid var(--line);border-radius:9px;background:var(--paper);color:#555d56}.ghost,.primary,.light{padding:8px 10px;font-size:11px}
-.ghost:hover,.light:hover,.tab:hover,.menu button:hover{background:#f0f2ed}.primary{border-color:var(--forest);background:var(--forest);color:white}.primary:hover{background:var(--forest-deep)}
-.block{margin:1px -8px 12px;padding:6px 8px 13px 12px;border-left:2px solid transparent;border-radius:0 11px 11px 0;transition:.14s}
-.block.section:hover,.block.section:focus-within{border-left-color:var(--forest-line);background:#f7f8f4}
-.kind{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;color:#486557;font-size:10px;font-weight:800;letter-spacing:.04em}
-.kind button{opacity:0;border:0;background:transparent;color:#959b95}.block:hover .kind button,.block:focus-within .kind button{opacity:1}
+.empty{padding:74px 5px;color:var(--muted);line-height:1.6}.empty strong{display:block;margin-bottom:7px;color:#3e4841;font-size:16px}.quick{display:flex;gap:7px;margin-top:16px}
+.ghost,.primary,.light,.tab,.menu button,.small-action{border:1px solid var(--line);border-radius:9px;background:var(--paper);color:#555d56}.ghost,.primary,.light,.small-action{padding:8px 10px;font-size:11px}
+.ghost:hover,.light:hover,.tab:hover,.menu button:hover,.small-action:hover{background:#f0f2ed}.primary{border-color:var(--forest);background:var(--forest);color:white}.primary:hover{background:var(--forest-deep)}.primary:disabled{opacity:.45;cursor:not-allowed}
+.block{margin:1px -8px 12px;padding:6px 8px 13px 12px;border-left:2px solid transparent;border-radius:0 11px 11px 0;transition:.14s}.block.section:hover,.block.section:focus-within{border-left-color:var(--forest-line);background:#f7f8f4}
+.kind{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;color:#486557;font-size:10px;font-weight:800;letter-spacing:.04em}.kind button{opacity:0;border:0;background:transparent;color:#959b95}.block:hover .kind button,.block:focus-within .kind button{opacity:1}
 .body{min-height:24px;outline:0;color:#2d332e;font-size:14px;line-height:1.74;white-space:pre-wrap}.body:empty:before{content:attr(data-placeholder);color:#aeb2ac}
 .add-row{display:flex;align-items:center;gap:8px;margin-top:5px;color:#9a9f98;font-size:11px}.add-row button{width:26px;height:26px;padding:0}
 .slash{position:absolute;z-index:35;left:22px;top:91px;width:min(300px,calc(100% - 44px));max-height:420px;overflow:auto;padding:8px;border:1px solid #dcdfd8;border-radius:15px;background:#fdfdfb;box-shadow:0 18px 50px rgba(35,74,58,.16)}
-.menu-title{padding:7px 8px 5px;color:#939a94;font-size:9px;font-weight:800;letter-spacing:.09em}
-.menu button{width:100%;display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:center;margin:2px 0;padding:8px;border-color:transparent;text-align:left}
-.menu-icon{width:29px;height:29px;display:grid;place-items:center;border-radius:9px;background:var(--forest-soft);color:var(--forest)}
-.menu b{display:block;font-size:12px}.menu small{display:block;margin-top:1px;color:var(--muted);font-size:10px}
-.selection{position:absolute;z-index:45;left:50%;top:280px;transform:translate(-50%,-100%);display:flex;gap:3px;align-items:center;padding:5px;border-radius:10px;background:var(--forest-deep);box-shadow:0 10px 28px rgba(24,56,44,.28)}
-.selection button{padding:6px 8px;border:0;border-radius:6px;background:transparent;color:white;font-size:10px}.selection button:hover{background:#ffffff16}.sep{width:1px;height:17px;background:#ffffff2a}
+.menu-title{padding:7px 8px 5px;color:#939a94;font-size:9px;font-weight:800;letter-spacing:.09em}.menu button{width:100%;display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:center;margin:2px 0;padding:8px;border-color:transparent;text-align:left}
+.menu-icon{width:29px;height:29px;display:grid;place-items:center;border-radius:9px;background:var(--forest-soft);color:var(--forest)}.menu b{display:block;font-size:12px}.menu small{display:block;margin-top:1px;color:var(--muted);font-size:10px}
+.selection{position:absolute;z-index:46;display:flex;gap:3px;align-items:center;padding:5px;border-radius:10px;background:var(--forest-deep);box-shadow:0 10px 28px rgba(24,56,44,.28);transform:translate(-50%,-100%)}
+.selection button{padding:6px 8px;border:0;border-radius:6px;background:transparent;color:white;font-size:10px;white-space:nowrap}.selection button:hover{background:#ffffff16}.sep{width:1px;height:17px;background:#ffffff2a}
 .card{margin:14px 0;padding:13px;border:1px solid #dfe5df;border-left:3px solid var(--forest-line);border-radius:13px;background:#f7faf7}.card.warn{border-left-color:#d7bc83;background:var(--warn-soft)}
-.card-head{display:flex;justify-content:space-between;gap:8px;color:#466253;font-size:10px;font-weight:800}.stale{color:var(--warn);font-size:9px}
-.small-label{margin:9px 0 4px;color:#999;font-size:9px}.compare{padding:9px;border:1px solid #e7e9e3;border-radius:9px;background:#fdfdfb;color:#394139;font-size:12px;line-height:1.55}
+.card-head{display:flex;justify-content:space-between;gap:8px;color:#466253;font-size:10px;font-weight:800}.stale{color:var(--warn);font-size:9px}.small-label{margin:9px 0 4px;color:#999;font-size:9px}.compare{padding:9px;border:1px solid #e7e9e3;border-radius:9px;background:#fdfdfb;color:#394139;font-size:12px;line-height:1.55}
 .actions{display:flex;justify-content:flex-end;gap:7px;margin-top:10px}.finding{display:grid;grid-template-columns:18px 1fr auto;gap:7px;padding:9px 0;border-top:1px solid #e6e7e1;font-size:11px}.finding:first-of-type{border-top:0}.finding small{display:block;margin-top:2px;color:var(--muted)}
+.deep-check{margin-top:10px;padding-top:10px;border-top:1px solid #e5e8e3;display:flex;align-items:center;justify-content:space-between;gap:10px}.deep-check span{font-size:10px;color:var(--muted)}
 .bottom{position:absolute;z-index:20;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr 1.1fr 1.25fr;gap:5px;padding:10px 12px;border-top:1px solid #ebeae4;background:rgba(252,252,250,.96);backdrop-filter:blur(10px)}
 .bottom .light{border-color:transparent;background:transparent}.bottom .light:hover{background:#f0f2ed;color:#2f4036}.bottom .primary{border-radius:10px}
-.preview-head{height:56px;display:grid;grid-template-columns:34px 1fr 34px;align-items:center;padding:0 12px;border-bottom:1px solid #ecebe5}.preview-title{text-align:center;font-size:13px;font-weight:700}
-.preview-body{flex:1;overflow:auto;padding:18px 18px 86px}.tabs{display:flex;gap:4px;padding:4px;border-radius:10px;background:#f0f1ed}.tab{flex:1;padding:7px;border-color:transparent;background:transparent;font-size:11px}.tab.active{border-color:#dcded8;background:var(--paper);color:var(--forest);box-shadow:0 1px 2px rgba(35,74,58,.05)}
+.preview-head{height:56px;display:grid;grid-template-columns:34px 1fr 34px;align-items:center;padding:0 12px;border-bottom:1px solid #ecebe5}.preview-title{text-align:center;font-size:13px;font-weight:700}.preview-body{flex:1;overflow:auto;padding:18px 18px 86px}
+.tabs{display:flex;gap:4px;padding:4px;border-radius:10px;background:#f0f1ed}.tab{flex:1;padding:7px;border-color:transparent;background:transparent;font-size:11px}.tab.active{border-color:#dcded8;background:var(--paper);color:var(--forest)}
 pre{min-height:430px;margin-top:14px;padding:14px;border:1px solid #e3e4de;border-radius:12px;background:#f8f8f5;color:#394139;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.62 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .preview-actions{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px;border-top:1px solid #ebeae4;background:var(--paper)}.preview-actions button{flex:1}
-.overlay{position:absolute;z-index:70;inset:0;display:flex;align-items:flex-end;background:#18251f45}.sheet{width:100%;max-height:76%;overflow:auto;padding:14px;border-radius:18px 18px 0 0;background:var(--paper);box-shadow:0 -10px 35px rgba(35,55,43,.12)}
-.sheet-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700}.search{width:100%;margin:10px 0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;outline:0;background:#fff}
+.overlay{position:absolute;z-index:70;inset:0;display:flex;align-items:flex-end;background:#18251f45}.sheet{width:100%;max-height:82%;overflow:auto;padding:14px;border-radius:18px 18px 0 0;background:var(--paper);box-shadow:0 -10px 35px rgba(35,55,43,.12)}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.sheet-title{font-size:13px;font-weight:750}.sheet-sub{margin-top:3px;color:var(--muted);font-size:10px}.search,.field-input,.field-select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;outline:0;background:white;color:#3b403c;font-size:11px}.search{margin:10px 0}
 .doc{width:100%;padding:10px;border:0;border-radius:9px;background:transparent;text-align:left}.doc:hover,.doc.active{background:var(--forest-soft);color:var(--forest-deep)}
-.modal-bg{position:absolute;z-index:80;inset:0;display:grid;place-items:center;padding:18px;background:#18251f55}.modal{width:min(330px,100%);padding:17px;border-radius:16px;background:var(--paper);box-shadow:0 18px 56px rgba(35,55,43,.2)}
-.modal h3{margin:0 0 7px;font-size:14px}.modal p{margin:0 0 12px;color:var(--muted);font-size:11px;line-height:1.55}.radio{display:block;padding:7px 0;font-size:12px}
-.toast{position:absolute;z-index:100;left:50%;bottom:74px;transform:translateX(-50%);padding:8px 11px;border-radius:9px;background:var(--forest-deep);color:#fff;font-size:11px;white-space:nowrap;box-shadow:0 8px 24px rgba(24,56,44,.22)}
-.proto-launch{position:fixed;z-index:120;left:18px;top:18px;padding:8px 11px;border:1px solid #d9ddd7;border-radius:999px;background:rgba(252,252,250,.94);color:#4e5b53;font-size:11px;box-shadow:0 8px 24px rgba(35,74,58,.1);backdrop-filter:blur(10px)}
-.controls{position:fixed;z-index:120;left:18px;top:18px;width:268px;padding:18px 16px;border:1px solid var(--line);border-radius:17px;background:rgba(252,252,250,.97);box-shadow:0 18px 48px rgba(35,74,58,.14);backdrop-filter:blur(12px)}
-.controls-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#7c847d;font-size:18px}.controls h1{margin:13px 0 5px;font-size:20px}.controls p{color:var(--muted);font-size:12px;line-height:1.55}
+.ai-hero{padding:12px;border:1px solid #e0e5df;border-radius:13px;background:#f8faf7}.ai-status{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}.status-dot{width:8px;height:8px;border-radius:50%;background:#aaa}.status-dot.ok{background:#3e7b5b}.status-dot.off{background:#c7a25e}.ai-hero p{margin:7px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
+.ai-actions{display:grid;gap:6px;margin-top:12px}.ai-action{width:100%;display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:center;padding:9px;border:1px solid transparent;border-radius:10px;background:transparent;text-align:left}.ai-action:hover{background:#f1f4f0}.ai-action .glyph{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:var(--forest-soft);color:var(--forest)}.ai-action b{display:block;font-size:11px}.ai-action small{display:block;margin-top:2px;color:var(--muted);font-size:9px}.ai-action .arrow{color:#9aa09a}
+.form{display:grid;gap:11px;margin-top:12px}.field label{display:block;margin-bottom:5px;color:#6c736d;font-size:10px;font-weight:700}.field-hint{margin-top:4px;color:#9a9f99;font-size:9px;line-height:1.45}.secret-wrap{display:grid;grid-template-columns:1fr auto;gap:6px}.secret-wrap button{padding:0 9px}
+.privacy{margin-top:12px;padding:10px;border-radius:10px;background:#f4f5f1;color:#687069;font-size:9px;line-height:1.55}.settings-actions{display:flex;gap:7px;margin-top:12px}.settings-actions button{flex:1}
+.test-result{margin-top:9px;padding:8px 9px;border-radius:9px;background:var(--forest-soft);color:#365c49;font-size:10px}.test-result.fail{background:var(--danger-soft);color:var(--danger)}
+.modal-bg{position:absolute;z-index:80;inset:0;display:grid;place-items:center;padding:18px;background:#18251f55}.modal{width:min(330px,100%);padding:17px;border-radius:16px;background:var(--paper);box-shadow:0 18px 56px rgba(35,55,43,.2)}.modal h3{margin:0 0 7px;font-size:14px}.modal p{margin:0 0 12px;color:var(--muted);font-size:11px;line-height:1.55}.radio{display:block;padding:7px 0;font-size:12px}
+.toast{position:absolute;z-index:100;left:50%;bottom:74px;transform:translateX(-50%);padding:8px 11px;border-radius:9px;background:var(--forest-deep);color:#fff;font-size:11px;white-space:nowrap}
+.proto-launch{position:fixed;z-index:120;left:18px;top:18px;padding:8px 11px;border:1px solid #d9ddd7;border-radius:999px;background:rgba(252,252,250,.94);color:#4e5b53;font-size:11px;box-shadow:0 8px 24px rgba(35,74,58,.1)}
+.controls{position:fixed;z-index:120;left:18px;top:18px;width:280px;padding:18px 16px;border:1px solid var(--line);border-radius:17px;background:rgba(252,252,250,.97);box-shadow:0 18px 48px rgba(35,74,58,.14)}.controls-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#7c847d;font-size:18px}.controls h1{margin:13px 0 5px;font-size:20px}.controls p{color:var(--muted);font-size:12px;line-height:1.55}
 .group{margin:17px 0}.group-label{margin-bottom:7px;color:#929992;font-size:9px;font-weight:800;letter-spacing:.09em}.control-row{display:flex;flex-wrap:wrap;gap:6px}.ctl{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#5b625c;font-size:11px}.ctl.active{border-color:#b8cbbf;background:var(--forest-soft);color:var(--forest)}
 .toggle{display:flex;align-items:center;justify-content:space-between;margin:9px 0;font-size:12px}.switch{width:36px;height:21px;padding:3px;border-radius:999px;background:#c9cec9}.switch:after{content:"";display:block;width:15px;height:15px;border-radius:50%;background:white;transition:.15s}.switch.on{background:var(--forest)}.switch.on:after{transform:translateX(15px)}
-@media(max-width:960px){.demo{grid-template-columns:1fr}.mock{display:none}.controls{left:10px;top:10px;max-width:calc(100vw - 20px)}.proto-launch{left:10px;top:10px}}
-@media(max-width:560px){.stage{padding:8px}.wrap{max-width:100%}}
+@media(max-width:960px){.demo{grid-template-columns:1fr}.mock{display:none}.controls{left:10px;top:10px;max-width:calc(100vw - 20px)}.proto-launch{left:10px;top:10px}}@media(max-width:560px){.stage{padding:8px}.wrap{max-width:100%}}
 </style>
 </head>
-<body>
-<div id="app"></div>
+<body><div id="app"></div>
 <script>
 (()=>{"use strict";
-const META={
- goal:["目标","◎","你希望 AI 最终完成什么"],context:["背景","▣","必要上下文与当前状态"],
- instruction:["任务","→","需要执行的具体动作"],constraint:["约束","⛓","不能做什么、必须遵守什么"],
- example:["示例","◇","输入、输出或参考样例"],output:["输出格式","↳","希望结果如何呈现"],
- acceptance:["验收标准","✓","什么情况下算完成"],paragraph:["普通段落","¶","自由文本"]
-};
-const base={
- a:{id:"a",title:"修复权限问题",blocks:[
-  {id:"a1",kind:"goal",content:"修复 owner 权限判断错误，让 owner 可以正常撤销和分配角色。"},
-  {id:"a2",kind:"context",content:"当前飞书端会提示 owner 没有权限管理角色，但此前这条能力已经修复过，怀疑新逻辑又走回了 admin-only 判断。"},
-  {id:"a3",kind:"constraint",content:"先检查真实代码和当前调用链，不要先改。尽量只处理这个问题，不扩大修改范围。"},
-  {id:"a4",kind:"acceptance",content:"owner 可以撤销 owner/operator/frontdesk；admin 原有能力不回退；其它角色权限不受影响。"}]},
- b:{id:"b",title:"S15 数据规则",blocks:[{id:"b1",kind:"goal",content:"梳理 S15 的销售基线数据使用规则。"},{id:"b2",kind:"constraint",content:"只处理算法和数据使用，不改现有架构。"}]},
- c:{id:"c",title:"新建酒店流程",blocks:[{id:"c1",kind:"context",content:"所有酒店业务表结构一致，仅数据库名不同。"},{id:"c2",kind:"instruction",content:"设计新建酒店时同时绑定数据库和读写账号的最小流程。"}]}
-};
+const META={goal:["目标","◎","你希望 AI 最终完成什么"],context:["背景","▣","必要上下文与当前状态"],instruction:["任务","→","需要执行的具体动作"],constraint:["约束","⛓","不能做什么、必须遵守什么"],example:["示例","◇","输入、输出或参考样例"],output:["输出格式","↳","希望结果如何呈现"],acceptance:["验收标准","✓","什么情况下算完成"],paragraph:["普通段落","¶","自由文本"]};
+const base={a:{id:"a",title:"修复权限问题",blocks:[{id:"a1",kind:"goal",content:"修复 owner 权限判断错误，让 owner 可以正常撤销和分配角色。"},{id:"a2",kind:"context",content:"当前飞书端会提示 owner 没有权限管理角色，但此前这条能力已经修复过，怀疑新逻辑又走回了 admin-only 判断。"},{id:"a3",kind:"constraint",content:"先检查真实代码和当前调用链，不要先改。尽量只处理这个问题，不扩大修改范围。"},{id:"a4",kind:"acceptance",content:"owner 可以撤销 owner/operator/frontdesk；admin 原有能力不回退；其它角色权限不受影响。"}]},b:{id:"b",title:"S15 数据规则",blocks:[{id:"b1",kind:"goal",content:"梳理 S15 的销售基线数据使用规则。"},{id:"b2",kind:"constraint",content:"只处理算法和数据使用，不改现有架构。"}]},c:{id:"c",title:"新建酒店流程",blocks:[{id:"c1",kind:"context",content:"所有酒店业务表结构一致，仅数据库名不同。"},{id:"c2",kind:"instruction",content:"设计新建酒店时同时绑定数据库和读写账号的最小流程。"}]}};
 const clone=o=>JSON.parse(JSON.stringify(o));
-const fresh=()=>({docs:clone(base),id:"a",width:440,view:"edit",slash:false,suggestion:null,lint:false,format:"plain",docsOpen:false,controls:false,adapter:true,targetBusy:false,dialog:null,choice:"append",toast:null,revision:1});
+const fresh=()=>({docs:clone(base),id:"a",width:440,view:"edit",slash:false,selection:null,selectionPos:{x:220,y:260},suggestion:null,suggestionStale:false,lint:false,format:"plain",docsOpen:false,aiSheet:null,controls:false,adapter:true,targetBusy:false,dialog:null,choice:"append",toast:null,revision:1,ai:{enabled:true,configured:false,provider:"OpenAI-compatible",model:"",baseUrl:"",apiKey:"",showKey:false,test:"idle",scope:"selection"}});
 let s=fresh(),timer;
 const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)],doc=()=>s.docs[s.id];
 const esc=x=>String(x??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
 function notify(t){s.toast=t;clearTimeout(timer);render();timer=setTimeout(()=>{s.toast=null;render()},1500)}
-function compiled(fmt=s.format){
- const blocks=doc().blocks;
- if(fmt==="plain")return blocks.map(b=>b.kind==="paragraph"?b.content:`${META[b.kind][0]}\n${b.content}`).join("\n\n");
- if(fmt==="markdown")return blocks.map(b=>b.kind==="paragraph"?b.content:`## ${META[b.kind][0]}\n\n${b.content}`).join("\n\n");
- const xml=x=>String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
- return "<prompt>\n"+blocks.map(b=>`  <${b.kind}>${xml(b.content)}</${b.kind}>`).join("\n")+"\n</prompt>";
+function compiled(fmt=s.format){const blocks=doc().blocks;if(fmt==="plain")return blocks.map(b=>b.kind==="paragraph"?b.content:`${META[b.kind][0]}\n${b.content}`).join("\n\n");if(fmt==="markdown")return blocks.map(b=>b.kind==="paragraph"?b.content:`## ${META[b.kind][0]}\n\n${b.content}`).join("\n\n");const xml=x=>String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");return"<prompt>\n"+blocks.map(b=>`  <${b.kind}>${xml(b.content)}</${b.kind}>`).join("\n")+"\n</prompt>"}
+function aiLabel(){if(!s.ai.enabled)return["AI 已关闭","disabled"];if(!s.ai.configured)return["AI 未配置",""];return["AI 已连接","ready"]}
+function mock(){return`<section class="mock"><span class="tag">当前 AI 网页 · 模拟</span><h2>旁边就是你正在使用的 AI</h2><p>PromptNote 的 AI 只在你主动触发时使用；本地编辑、结构化、检查、预览和复制不依赖 AI。</p><div class="chat"><div class="bubble">帮我检查一下这个权限问题。</div><div class="fake-input ${s.targetBusy?"busy":""}">${s.targetBusy?"这里已经有一段尚未发送的文字……":"发送消息…"}</div></div></section>`}
+function controls(){if(!s.controls)return`<button class="proto-launch" data-action="controls">原型控制</button>`;const states=[["empty","空状态"],["slash","Slash"],["selection","选区 AI"],["ai-unconfigured","AI 未配置"],["ai-configured","AI 已配置"],["lint","检查"],["preview","预览"],["fail","插入失败"]];return`<aside class="controls"><button class="controls-close" data-action="controls">×</button><span class="tag">Prototype Controls · P0.5</span><h1>PromptNote / 提词笺</h1><p>这些控制项只用于评审，不属于正式产品。</p><div class="group"><div class="group-label">快速状态</div><div class="control-row">${states.map(x=>`<button class="ctl" data-jump="${x[0]}">${x[1]}</button>`).join("")}</div></div><div class="group"><div class="group-label">SIDE PANEL 宽度</div><div class="control-row">${[360,440,520].map(w=>`<button class="ctl ${s.width===w?"active":""}" data-width="${w}">${w}px</button>`).join("")}</div></div><div class="group"><div class="group-label">插入环境</div><div class="toggle"><span>Adapter 可用</span><span class="switch ${s.adapter?"on":""}" data-toggle="adapter"></span></div><div class="toggle"><span>输入框已有内容</span><span class="switch ${s.targetBusy?"on":""}" data-toggle="target"></span></div></div><button class="ctl" data-action="reset">重置演示</button></aside>`}
+function blocks(){if(!doc().blocks.length)return`<div class="empty"><strong>开始写你的 Prompt…</strong><div>直接输入自然语言即可。输入 <b>/</b> 可以添加目标、背景、约束等结构。</div><div class="quick"><button class="ghost" data-action="start">直接开始写</button><button class="ghost" data-action="slash">/ 添加结构</button></div></div>`;return doc().blocks.map(b=>`<article class="block ${b.kind!=="paragraph"?"section":""}">${b.kind!=="paragraph"?`<div class="kind"><span>${META[b.kind][0]}</span><button data-action="toggle-kind" data-id="${b.id}">···</button></div>`:""}<div class="body" contenteditable="true" spellcheck="false" data-id="${b.id}" data-placeholder="继续输入…">${esc(b.content).replaceAll("\n","<br>")}</div></article>`).join("")+`<div class="add-row"><button class="ghost" data-action="slash">/</button><span>添加结构，或直接继续写</span></div>`}
+function slashMenu(){const kinds=["goal","context","instruction","constraint","example","output","acceptance"];return`<div class="slash menu"><div class="menu-title">PROMPT 结构</div>${kinds.map(k=>`<button data-kind="${k}"><span class="menu-icon">${META[k][1]}</span><span><b>${META[k][0]}</b><small>${META[k][2]}</small></span></button>`).join("")}<div class="menu-title">基础块</div><button data-kind="paragraph"><span class="menu-icon">¶</span><span><b>普通段落</b><small>继续自由书写</small></span></button></div>`}
+function selectionBar(){if(!s.selection)return"";const x=Math.max(120,Math.min(s.width-120,s.selectionPos.x)),y=Math.max(105,s.selectionPos.y);return`<div class="selection" style="left:${x}px;top:${y}px"><button data-ai-action="clarify">改清楚</button><button data-ai-action="shorten">缩短</button><button data-ai-action="split">拆成约束</button><span class="sep"></span><button data-action="ai-open">AI…</button></div>`}
+function suggestion(){const x=s.suggestion;return`<section class="card ${s.suggestionStale?"warn":""}"><div class="card-head"><span>AI 建议 · ${x.label}</span>${s.suggestionStale?`<span class="stale">正文已变化 · 建议已过期</span>`:""}</div><div class="small-label">${x.mode==="insert"?"将添加":"原文"}</div><div class="compare">${esc(x.source||"在当前 Prompt 中新增内容")}</div><div class="small-label">建议</div><div class="compare">${esc(x.result).replaceAll("\n","<br>")}</div><div class="actions"><button class="ghost" data-action="ignore">忽略</button><button class="primary" data-action="accept" ${s.suggestionStale?"disabled":""}>接受</button></div></section>`}
+function findings(){const text=doc().blocks.map(b=>b.content).join("\n"),out=[];if(text.includes("尽量"))out.push(["⚠","“尽量”表达比较模糊","可以改成更明确的约束。"]);if(!doc().blocks.some(b=>b.kind==="acceptance"))out.push(["⚠","当前没有明确验收标准","建议补充“什么情况下算完成”。"]);if(doc().blocks.length<3)out.push(["○","内容结构较弱","可以逐步增加目标、约束或验收标准。"]);return out.length?out:[["✓","没有发现明显结构问题","这里不提供 Prompt 分数。"]]}
+function lintCard(){return`<section class="card"><div class="card-head"><span>本地 Prompt 检查</span></div>${findings().map(x=>`<div class="finding"><span>${x[0]}</span><div>${x[1]}<small>${x[2]}</small></div><button class="ghost">查看</button></div>`).join("")}<div class="deep-check"><span>${s.ai.configured&&s.ai.enabled?"需要语义判断时，可进一步调用已配置的 AI。":"AI 未配置也不影响以上本地检查。"}</span><button class="small-action" data-action="ai-deep-check">${s.ai.configured&&s.ai.enabled?"AI 深度检查":"配置 AI"}</button></div></section>`}
+function editor(){const [label,cls]=aiLabel();return`<header class="top"><button class="icon" data-action="docs">☰</button><input class="title" data-title value="${esc(doc().title)}"><button class="ai-chip ${cls}" data-action="ai-open"><span class="ai-dot"></span>${label}</button></header><div class="view"><div class="editor">${blocks()}${s.suggestion?suggestion():""}${s.lint?lintCard():""}${s.slash?slashMenu():""}${selectionBar()}</div><div class="bottom"><button class="light" data-action="check">检查</button><button class="light" data-action="preview">预览</button><button class="light" data-action="copy">复制 ▾</button><button class="primary" data-action="insert">插入</button></div></div>`}
+function preview(){return`<div class="view"><header class="preview-head"><button class="icon" data-action="back">←</button><div class="preview-title">Prompt Preview</div><span></span></header><div class="preview-body"><div class="tabs">${[["plain","Plain"],["markdown","Markdown"],["xml","XML"]].map(x=>`<button class="tab ${s.format===x[0]?"active":""}" data-format="${x[0]}">${x[1]}</button>`).join("")}</div><pre>${esc(compiled())}</pre></div><div class="preview-actions"><button class="ghost" data-action="copy">复制</button><button class="primary" data-action="insert">插入</button></div></div>`}
+function docsSheet(){return`<div class="overlay"><div class="sheet"><div class="sheet-head"><div><div class="sheet-title">Prompt</div><div class="sheet-sub">最近使用的本地文档</div></div><button class="icon" data-action="close-docs">×</button></div><input class="search" placeholder="搜索…">${Object.values(s.docs).map(d=>`<button class="doc ${d.id===s.id?"active":""}" data-doc="${d.id}">${esc(d.title)}</button>`).join("")}<button class="doc" data-action="new">＋ 新建 Prompt</button></div></div>`}
+function aiSheet(){
+ if(s.aiSheet==="settings"||!s.ai.configured){
+  return`<div class="overlay"><div class="sheet"><div class="sheet-head"><div><div class="sheet-title">AI 辅助设置</div><div class="sheet-sub">仅用于你主动触发的辅助动作</div></div><button class="icon" data-action="close-ai">×</button></div>
+  <div class="ai-hero"><div class="ai-status"><span class="status-dot ${s.ai.configured?"ok":"off"}"></span>${s.ai.configured?"已配置":"尚未配置 AI"}</div><p>本地编辑、结构化、Compiler、Copy 和基础 Prompt 检查不依赖 AI。</p></div>
+  <div class="form">
+   <div class="field"><label>启用 AI 辅助</label><div class="toggle"><span>${s.ai.enabled?"已启用":"已关闭"}</span><span class="switch ${s.ai.enabled?"on":""}" data-toggle="ai-enabled"></span></div></div>
+   <div class="field"><label>Provider</label><select class="field-select" data-ai-field="provider"><option ${s.ai.provider==="OpenAI-compatible"?"selected":""}>OpenAI-compatible</option><option ${s.ai.provider==="Anthropic"?"selected":""}>Anthropic</option><option ${s.ai.provider==="Custom"?"selected":""}>Custom</option></select><div class="field-hint">正式实现由统一 Provider Adapter 处理，UI 不直接依赖 SDK。</div></div>
+   <div class="field"><label>Model</label><input class="field-input" data-ai-field="model" value="${esc(s.ai.model)}" placeholder="例如：填写你实际使用的模型 ID"></div>
+   <div class="field"><label>API Base URL <span style="font-weight:400;color:#999">（可选）</span></label><input class="field-input" data-ai-field="baseUrl" value="${esc(s.ai.baseUrl)}" placeholder="默认使用 Provider 官方地址或你的兼容端点"></div>
+   <div class="field"><label>API Key</label><div class="secret-wrap"><input class="field-input" type="${s.ai.showKey?"text":"password"}" data-ai-field="apiKey" value="${esc(s.ai.apiKey)}" placeholder="仅保存在本地扩展设置中"><button class="ghost" data-action="toggle-key">${s.ai.showKey?"隐藏":"显示"}</button></div></div>
+   <div class="field"><label>默认发送范围</label><select class="field-select" data-ai-field="scope"><option value="selection" ${s.ai.scope==="selection"?"selected":""}>仅选中文字（默认）</option><option value="context" ${s.ai.scope==="context"?"selected":""}>选区 + 相邻上下文</option></select><div class="field-hint">需要全文的动作（例如“检查整个 Prompt”）会在触发时明确标注。</div></div>
+  </div>
+  ${s.ai.test==="ok"?`<div class="test-result">连接测试成功（原型模拟），配置尚未发送真实请求。</div>`:s.ai.test==="fail"?`<div class="test-result fail">连接失败（原型模拟）。正式实现会显示真实 Provider 错误。</div>`:""}
+  <div class="privacy">隐私边界：PromptDocument 不保存 API Key；AI 配置属于扩展偏好。只有用户明确触发 AI 动作时才发送所需内容，原型阶段不会发出任何网络请求。</div>
+  <div class="settings-actions"><button class="ghost" data-action="test-ai">测试连接</button><button class="primary" data-action="save-ai">保存配置</button></div>
+  </div></div>`;
+ }
+ return`<div class="overlay"><div class="sheet"><div class="sheet-head"><div><div class="sheet-title">AI 辅助</div><div class="sheet-sub">${esc(s.ai.provider)} · ${esc(s.ai.model||"未填写模型")}</div></div><button class="icon" data-action="close-ai">×</button></div>
+ <div class="ai-hero"><div class="ai-status"><span class="status-dot ${s.ai.enabled?"ok":"off"}"></span>${s.ai.enabled?"AI 已就绪":"AI 已关闭"}</div><p>${s.ai.enabled?"只在你选择动作后调用，不会自动改写。":"打开设置即可重新启用；核心编辑功能不受影响。"}</p></div>
+ <div class="ai-actions">
+  <button class="ai-action" data-global-ai="ambiguity"><span class="glyph">?</span><span><b>检查当前 Prompt 的歧义</b><small>需要发送当前 Prompt；结果只作为建议</small></span><span class="arrow">›</span></button>
+  <button class="ai-action" data-global-ai="acceptance"><span class="glyph">✓</span><span><b>补充验收标准</b><small>生成一个可接受/忽略的验收标准建议</small></span><span class="arrow">›</span></button>
+  <button class="ai-action" data-global-ai="structure"><span class="glyph">≡</span><span><b>给出结构整理建议</b><small>只建议结构，不自动重写全文</small></span><span class="arrow">›</span></button>
+ </div>
+ <div class="actions"><button class="ghost" data-action="ai-settings">设置</button></div>
+ </div></div>`;
 }
-function mock(){
- return `<section class="mock"><span class="tag">当前 AI 网页 · 模拟</span><h2>旁边就是你正在使用的 AI</h2><p>原型只模拟 Side Panel 的使用场景，不操作真实网页 DOM。</p><div class="chat"><div class="bubble">帮我检查一下这个权限问题。</div><div class="fake-input ${s.targetBusy?"busy":""}">${s.targetBusy?"这里已经有一段尚未发送的文字……":"发送消息…"}</div></div></section>`;
-}
-function controls(){
- if(!s.controls)return `<button class="proto-launch" data-action="controls">原型控制</button>`;
- const states=[["empty","空状态"],["structured","结构化"],["slash","Slash"],["suggestion","AI 建议"],["lint","检查"],["preview","预览"],["fail","插入失败"]];
- return `<aside class="controls"><button class="controls-close" data-action="controls">×</button><span class="tag">Prototype Controls · P0.5</span><h1>PromptNote / 提词笺</h1><p>这些控制项只用于评审，不属于正式产品。</p>
- <div class="group"><div class="group-label">快速状态</div><div class="control-row">${states.map(x=>`<button class="ctl" data-jump="${x[0]}">${x[1]}</button>`).join("")}</div></div>
- <div class="group"><div class="group-label">SIDE PANEL 宽度</div><div class="control-row">${[360,440,520].map(w=>`<button class="ctl ${s.width===w?"active":""}" data-width="${w}">${w}px</button>`).join("")}</div></div>
- <div class="group"><div class="group-label">插入环境</div><div class="toggle"><span>Adapter 可用</span><span class="switch ${s.adapter?"on":""}" data-toggle="adapter"></span></div><div class="toggle"><span>输入框已有内容</span><span class="switch ${s.targetBusy?"on":""}" data-toggle="target"></span></div></div>
- <button class="ctl" data-action="reset">重置演示</button></aside>`;
-}
-function blocks(){
- if(!doc().blocks.length)return `<div class="empty"><strong>开始写你的 Prompt…</strong><div>直接输入自然语言即可。输入 <b>/</b> 可以添加目标、背景、约束等结构。</div><div class="quick"><button class="ghost" data-action="start">直接开始写</button><button class="ghost" data-action="slash">/ 添加结构</button></div></div>`;
- return doc().blocks.map(b=>`<article class="block ${b.kind!=="paragraph"?"section":""}">
- ${b.kind!=="paragraph"?`<div class="kind"><span>${META[b.kind][0]}</span><button data-action="toggle-kind" data-id="${b.id}">···</button></div>`:""}
- <div class="body" contenteditable="true" spellcheck="false" data-id="${b.id}" data-placeholder="继续输入…">${esc(b.content).replaceAll("\n","<br>")}</div></article>`).join("")+
- `<div class="add-row"><button class="ghost" data-action="slash">/</button><span>添加结构，或直接继续写</span></div>`;
-}
-function slashMenu(){
- const kinds=["goal","context","instruction","constraint","example","output","acceptance"];
- return `<div class="slash menu"><div class="menu-title">PROMPT 结构</div>${kinds.map(k=>`<button data-kind="${k}"><span class="menu-icon">${META[k][1]}</span><span><b>${META[k][0]}</b><small>${META[k][2]}</small></span></button>`).join("")}<div class="menu-title">基础块</div><button data-kind="paragraph"><span class="menu-icon">¶</span><span><b>普通段落</b><small>继续自由书写</small></span></button></div>`;
-}
-function suggestion(){
- const x=s.suggestion;return `<section class="card"><div class="card-head"><span>AI 建议 · ${x.mode}</span></div><div class="small-label">原文</div><div class="compare">${esc(x.source)}</div><div class="small-label">建议</div><div class="compare">${esc(x.result).replaceAll("\n","<br>")}</div><div class="actions"><button class="ghost" data-action="ignore">忽略</button><button class="primary" data-action="accept">接受</button></div></section>`;
-}
-function findings(){
- const text=doc().blocks.map(b=>b.content).join("\n"),out=[];
- if(text.includes("尽量"))out.push(["⚠","“尽量”表达比较模糊","可以改成更明确的约束。"]);
- if(!doc().blocks.some(b=>b.kind==="acceptance"))out.push(["⚠","当前没有明确验收标准","建议补充“什么情况下算完成”。"]);
- if(doc().blocks.length<3)out.push(["○","内容结构较弱","可以逐步增加目标、约束或验收标准。"]);
- return out.length?out:[["✓","没有发现明显结构问题","这里不提供 Prompt 分数。"]];
-}
-function lintCard(){return `<section class="card"><div class="card-head"><span>Prompt 检查</span></div>${findings().map(x=>`<div class="finding"><span>${x[0]}</span><div>${x[1]}<small>${x[2]}</small></div><button class="ghost">查看</button></div>`).join("")}</section>`}
-function editor(){
- return `<header class="top"><button class="icon" data-action="docs">☰</button><input class="title" data-title value="${esc(doc().title)}"><button class="icon">···</button></header>
- <div class="view"><div class="editor">${blocks()}${s.suggestion?suggestion():""}${s.lint?lintCard():""}${s.slash?slashMenu():""}</div>
- <div class="bottom"><button class="light" data-action="check">检查</button><button class="light" data-action="preview">预览</button><button class="light" data-action="copy">复制 ▾</button><button class="primary" data-action="insert">插入</button></div></div>`;
-}
-function preview(){
- return `<div class="view"><header class="preview-head"><button class="icon" data-action="back">←</button><div class="preview-title">Prompt Preview</div><span></span></header><div class="preview-body"><div class="tabs">${[["plain","Plain"],["markdown","Markdown"],["xml","XML"]].map(x=>`<button class="tab ${s.format===x[0]?"active":""}" data-format="${x[0]}">${x[1]}</button>`).join("")}</div><pre>${esc(compiled())}</pre></div><div class="preview-actions"><button class="ghost" data-action="copy">复制</button><button class="primary" data-action="insert">插入</button></div></div>`;
-}
-function docsSheet(){
- const list=Object.values(s.docs);return `<div class="overlay"><div class="sheet"><div class="sheet-head"><span>Prompt</span><button class="icon" data-action="close-docs">×</button></div><input class="search" placeholder="搜索…">${list.map(d=>`<button class="doc ${d.id===s.id?"active":""}" data-doc="${d.id}">${esc(d.title)}</button>`).join("")}<button class="doc" data-action="new">＋ 新建 Prompt</button></div></div>`;
-}
-function modal(){
- if(s.dialog==="fail")return `<div class="modal-bg"><div class="modal"><h3>无法插入到当前页面</h3><p>你的 Prompt 没有丢失。当前 Adapter 不可用时仍可以复制。</p><div class="actions"><button class="ghost" data-action="close-modal">取消</button><button class="primary" data-action="copy-close">复制到剪贴板</button></div></div></div>`;
- return `<div class="modal-bg"><div class="modal"><h3>当前输入框已有内容</h3><p>PromptNote 不会静默覆盖。</p>${[["append","追加到现有内容后"],["replace","替换现有内容"],["cancel","取消"]].map(x=>`<label class="radio"><input type="radio" name="choice" value="${x[0]}" ${s.choice===x[0]?"checked":""}> ${x[1]}</label>`).join("")}<div class="actions"><button class="ghost" data-action="close-modal">返回</button><button class="primary" data-action="confirm">继续</button></div></div></div>`;
-}
-function render(){
- document.getElementById("app").innerHTML=`${controls()}<main class="stage"><div class="demo">${mock()}<div><div class="wrap" style="width:${s.width}px"><section class="panel">${s.view==="edit"?editor():preview()}${s.docsOpen?docsSheet():""}${s.dialog?modal():""}${s.toast?`<div class="toast">${esc(s.toast)}</div>`:""}</section></div><div style="text-align:center;margin-top:10px;color:#8a908a;font-size:10px">${s.width}px Side Panel 模拟</div></div></div></main>`;
- bind();
-}
-function add(kind){doc().blocks.push({id:"x"+Date.now(),kind,content:""});s.slash=false;s.revision++;render();setTimeout(()=>$$('.body').at(-1)?.focus(),0)}
+function modal(){if(s.dialog==="fail")return`<div class="modal-bg"><div class="modal"><h3>无法插入到当前页面</h3><p>你的 Prompt 没有丢失。当前 Adapter 不可用时仍可以复制。</p><div class="actions"><button class="ghost" data-action="close-modal">取消</button><button class="primary" data-action="copy-close">复制到剪贴板</button></div></div></div>`;return`<div class="modal-bg"><div class="modal"><h3>当前输入框已有内容</h3><p>PromptNote 不会静默覆盖。</p>${[["append","追加到现有内容后"],["replace","替换现有内容"],["cancel","取消"]].map(x=>`<label class="radio"><input type="radio" name="choice" value="${x[0]}" ${s.choice===x[0]?"checked":""}> ${x[1]}</label>`).join("")}<div class="actions"><button class="ghost" data-action="close-modal">返回</button><button class="primary" data-action="confirm">继续</button></div></div></div>`}
+function render(){document.getElementById("app").innerHTML=`${controls()}<main class="stage"><div class="demo">${mock()}<div><div class="wrap" style="width:${s.width}px"><section class="panel">${s.view==="edit"?editor():preview()}${s.docsOpen?docsSheet():""}${s.aiSheet?aiSheet():""}${s.dialog?modal():""}${s.toast?`<div class="toast">${esc(s.toast)}</div>`:""}</section></div><div style="text-align:center;margin-top:10px;color:#8a908a;font-size:10px">${s.width}px Side Panel 模拟</div></div></div></main>`;bind()}
+function add(kind,content=""){doc().blocks.push({id:"x"+Date.now(),kind,content});s.slash=false;s.revision++;render();setTimeout(()=>$$('.body').at(-1)?.focus(),0)}
 function copy(){const ta=document.createElement("textarea");ta.value=compiled();document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch{}ta.remove();notify("已复制（原型）")}
 function insert(){if(!s.adapter){s.dialog="fail";render()}else if(s.targetBusy){s.dialog="conflict";render()}else notify("模拟插入成功 · 不会自动发送")}
-function demoSuggestion(mode="改清楚"){s.suggestion={mode,blockId:"a3",source:"尽量只处理这个问题，不扩大修改范围。",result:mode==="缩短"?"仅处理本问题，不扩大修改范围。":"仅修改与本问题直接相关的代码；不得扩大修改范围。"};s.lint=false;render()}
-function jump(x){
- if(x==="empty"){const id="empty";s.docs[id]={id,title:"未命名 Prompt",blocks:[]};s.id=id;s.view="edit";s.slash=false;s.suggestion=null;s.lint=false}
- if(x==="structured"){s.id="a";s.view="edit";s.slash=false;s.suggestion=null;s.lint=false}
- if(x==="slash"){s.id="a";s.view="edit";s.slash=true;s.suggestion=null;s.lint=false}
- if(x==="suggestion"){s.id="a";s.view="edit";demoSuggestion();return}
- if(x==="lint"){s.id="a";s.view="edit";s.lint=true;s.suggestion=null}
- if(x==="preview"){s.id="a";s.view="preview";s.format="markdown"}
- if(x==="fail"){s.id="a";s.view="edit";s.adapter=false;s.dialog="fail"}
- render();
-}
+function buildSelectionSuggestion(action){if(!s.ai.enabled||!s.ai.configured){s.aiSheet="settings";render();return}const src=s.selection?.text||"";const map={clarify:["改清楚","仅修改与本问题直接相关的代码；不得扩大修改范围。"],shorten:["缩短","仅处理本问题，不扩大修改范围。"],split:["拆成约束","• 仅修改与本问题直接相关的代码。\n• 不扩大修改范围。\n• 不改变其它角色已有权限。"]};const [label,result]=map[action];s.suggestion={label,mode:"replace",blockId:s.selection.blockId,source:src,result,sourceRevision:s.revision};s.selection=null;s.suggestionStale=false;render()}
+function globalAI(action){if(!s.ai.enabled||!s.ai.configured){s.aiSheet="settings";render();return}s.aiSheet=null;if(action==="acceptance"){s.suggestion={label:"生成验收标准",mode:"insert",kind:"acceptance",source:"在当前 Prompt 中新增“验收标准”结构块",result:"修改完成后：owner 可正常任命与撤销 owner/operator/frontdesk；admin 原有权限保持不变；其他角色权限不发生回退。",sourceRevision:s.revision}}else if(action==="ambiguity"){s.suggestion={label:"歧义检查",mode:"insert",kind:"paragraph",source:"AI 检查当前 Prompt 后发现 1 个可能歧义",result:"“不要先改”可以进一步明确为：在完成真实代码、调用链和权限定义检查前，不提交任何代码修改。",sourceRevision:s.revision}}else{s.suggestion={label:"结构建议",mode:"insert",kind:"paragraph",source:"当前 Prompt 的结构已经较清晰",result:"建议保留目标、背景、约束、验收标准四段；无需为了“标准化”强行增加更多结构块。",sourceRevision:s.revision}}render()}
+function acceptSuggestion(){const x=s.suggestion;if(!x||s.suggestionStale)return;if(x.mode==="insert"){add(x.kind||"paragraph",x.result);s.suggestion=null;notify("已接受 AI 建议");return}const b=doc().blocks.find(y=>y.id===x.blockId);if(b){b.content=b.content.includes(x.source)?b.content.replace(x.source,x.result):x.result;s.revision++}s.suggestion=null;render();notify("已接受 AI 建议")}
+function captureSelection(){const sel=window.getSelection();if(!sel||sel.isCollapsed||!sel.toString().trim()){s.selection=null;render();return}const el=sel.anchorNode?.parentElement?.closest?.(".body");if(!el)return;const rect=sel.getRangeAt(0).getBoundingClientRect(),panel=$(".panel").getBoundingClientRect();s.selection={blockId:el.dataset.id,text:sel.toString().trim()};s.selectionPos={x:rect.left-panel.left+rect.width/2,y:rect.top-panel.top-5};render()}
+function jump(x){if(x==="empty"){const id="empty";s.docs[id]={id,title:"未命名 Prompt",blocks:[]};s.id=id;s.view="edit";s.slash=false;s.selection=null;s.suggestion=null;s.lint=false;s.aiSheet=null}
+else if(x==="slash"){s.id="a";s.view="edit";s.slash=true;s.aiSheet=null}
+else if(x==="selection"){s.id="a";s.view="edit";s.ai.configured=true;s.ai.model="demo-model";s.selection={blockId:"a3",text:"尽量只处理这个问题，不扩大修改范围。"};s.selectionPos={x:220,y:320};s.aiSheet=null}
+else if(x==="ai-unconfigured"){s.id="a";s.ai.configured=false;s.ai.model="";s.ai.apiKey="";s.aiSheet="settings"}
+else if(x==="ai-configured"){s.id="a";s.ai.configured=true;s.ai.model="demo-model";s.ai.apiKey="sk-demo-local-only";s.aiSheet="menu"}
+else if(x==="lint"){s.id="a";s.view="edit";s.lint=true;s.aiSheet=null}
+else if(x==="preview"){s.id="a";s.view="preview";s.format="markdown";s.aiSheet=null}
+else if(x==="fail"){s.id="a";s.view="edit";s.adapter=false;s.dialog="fail";s.aiSheet=null}render()}
 function bind(){
- $$('[data-jump]').forEach(e=>e.onclick=()=>jump(e.dataset.jump));
- $$('[data-width]').forEach(e=>e.onclick=()=>{s.width=+e.dataset.width;render()});
- $$('[data-toggle]').forEach(e=>e.onclick=()=>{if(e.dataset.toggle==="adapter")s.adapter=!s.adapter;else s.targetBusy=!s.targetBusy;render()});
- $$('[data-kind]').forEach(e=>e.onclick=()=>add(e.dataset.kind));
- $$('[data-format]').forEach(e=>e.onclick=()=>{s.format=e.dataset.format;render()});
- $$('[data-doc]').forEach(e=>e.onclick=()=>{s.id=e.dataset.doc;s.docsOpen=false;s.view="edit";render()});
- $$('input[name="choice"]').forEach(e=>e.onchange=()=>s.choice=e.value);
- $$('[data-action]').forEach(e=>e.onclick=ev=>{
-   ev.stopPropagation();const a=e.dataset.action;
-   if(a==="controls"){s.controls=!s.controls;render()}
-   else if(a==="reset"){const keep=s.controls;s=fresh();s.controls=keep;render()}
-   else if(a==="start")add("paragraph");
-   else if(a==="slash"){s.slash=true;render()}
-   else if(a==="docs"){s.docsOpen=true;render()}
-   else if(a==="close-docs"){s.docsOpen=false;render()}
-   else if(a==="new"){const id="n"+Date.now();s.docs[id]={id,title:"未命名 Prompt",blocks:[]};s.id=id;s.docsOpen=false;render()}
-   else if(a==="toggle-kind"){const b=doc().blocks.find(x=>x.id===e.dataset.id);b.kind=b.kind==="paragraph"?"constraint":"paragraph";render()}
-   else if(a==="check"){s.lint=!s.lint;s.suggestion=null;render()}
-   else if(a==="preview"){s.view="preview";s.format="plain";render()}
-   else if(a==="back"){s.view="edit";render()}
-   else if(a==="copy")copy();
-   else if(a==="insert")insert();
-   else if(a==="ignore"){s.suggestion=null;render()}
-   else if(a==="accept"){const b=doc().blocks.find(x=>x.id===s.suggestion.blockId);if(b)b.content=b.content.replace(s.suggestion.source,s.suggestion.result);s.suggestion=null;render();notify("已接受建议")}
-   else if(a==="close-modal"){s.dialog=null;render()}
-   else if(a==="copy-close"){s.dialog=null;copy()}
-   else if(a==="confirm"){if(s.choice==="cancel"){s.dialog=null;render()}else{s.dialog=null;notify(s.choice==="replace"?"模拟：已替换输入框":"模拟：已追加到输入框")}}
+ $$('[data-jump]').forEach(e=>e.onclick=()=>jump(e.dataset.jump));$$('[data-width]').forEach(e=>e.onclick=()=>{s.width=+e.dataset.width;render()});
+ $$('[data-toggle]').forEach(e=>e.onclick=()=>{const k=e.dataset.toggle;if(k==="adapter")s.adapter=!s.adapter;else if(k==="target")s.targetBusy=!s.targetBusy;else if(k==="ai-enabled")s.ai.enabled=!s.ai.enabled;render()});
+ $$('[data-kind]').forEach(e=>e.onclick=()=>add(e.dataset.kind));$$('[data-format]').forEach(e=>e.onclick=()=>{s.format=e.dataset.format;render()});$$('[data-doc]').forEach(e=>e.onclick=()=>{s.id=e.dataset.doc;s.docsOpen=false;s.view="edit";render()});
+ $$('[data-ai-action]').forEach(e=>e.onclick=()=>buildSelectionSuggestion(e.dataset.aiAction));$$('[data-global-ai]').forEach(e=>e.onclick=()=>globalAI(e.dataset.globalAi));$$('input[name="choice"]').forEach(e=>e.onchange=()=>s.choice=e.value);
+ $$('[data-ai-field]').forEach(e=>e.oninput=()=>{s.ai[e.dataset.aiField]=e.value});
+ $$('[data-action]').forEach(e=>e.onclick=ev=>{ev.stopPropagation();const a=e.dataset.action;
+   if(a==="controls"){s.controls=!s.controls;render()}else if(a==="reset"){const keep=s.controls;s=fresh();s.controls=keep;render()}
+   else if(a==="start")add("paragraph");else if(a==="slash"){s.slash=true;s.selection=null;render()}else if(a==="docs"){s.docsOpen=true;render()}else if(a==="close-docs"){s.docsOpen=false;render()}else if(a==="new"){const id="n"+Date.now();s.docs[id]={id,title:"未命名 Prompt",blocks:[]};s.id=id;s.docsOpen=false;render()}
+   else if(a==="toggle-kind"){const b=doc().blocks.find(x=>x.id===e.dataset.id);b.kind=b.kind==="paragraph"?"constraint":"paragraph";s.revision++;render()}
+   else if(a==="check"){s.lint=!s.lint;s.suggestion=null;s.selection=null;render()}else if(a==="preview"){s.view="preview";s.format="plain";render()}else if(a==="back"){s.view="edit";render()}
+   else if(a==="copy")copy();else if(a==="insert")insert();else if(a==="ignore"){s.suggestion=null;render()}else if(a==="accept")acceptSuggestion()
+   else if(a==="ai-open"){s.aiSheet=s.ai.configured?"menu":"settings";s.selection=null;render()}else if(a==="close-ai"){s.aiSheet=null;render()}else if(a==="ai-settings"){s.aiSheet="settings";render()}
+   else if(a==="toggle-key"){s.ai.showKey=!s.ai.showKey;render()}else if(a==="test-ai"){s.ai.test=(s.ai.model&&s.ai.apiKey)?"ok":"fail";render()}else if(a==="save-ai"){if(!s.ai.model||!s.ai.apiKey){s.ai.test="fail";render();return}s.ai.configured=true;s.ai.test="ok";s.aiSheet="menu";render();notify("AI 配置已保存（原型模拟）")}
+   else if(a==="ai-deep-check"){if(!s.ai.configured||!s.ai.enabled){s.aiSheet="settings";render()}else globalAI("ambiguity")}
+   else if(a==="close-modal"){s.dialog=null;render()}else if(a==="copy-close"){s.dialog=null;copy()}else if(a==="confirm"){if(s.choice==="cancel"){s.dialog=null;render()}else{s.dialog=null;notify(s.choice==="replace"?"模拟：已替换输入框":"模拟：已追加到输入框")}}
  });
- $$('.body').forEach(e=>{
-   e.oninput=()=>{const b=doc().blocks.find(x=>x.id===e.dataset.id);b.content=e.innerText.replace(/\n+$/,'');s.revision++};
-   e.onkeydown=ev=>{if(ev.key==="/"){ev.preventDefault();s.slash=true;render()}};
-   e.onmouseup=()=>{const selection=window.getSelection()?.toString().trim();if(selection)demoSuggestion("改清楚")};
- });
+ $$('.body').forEach(e=>{e.oninput=()=>{const b=doc().blocks.find(x=>x.id===e.dataset.id),v=e.innerText.replace(/\n+$/,'');if(b.content!==v){b.content=v;s.revision++;if(s.suggestion&&s.suggestion.blockId===b.id)s.suggestionStale=s.suggestion.sourceRevision!==s.revision}};e.onkeydown=ev=>{if(ev.key==="/"){ev.preventDefault();s.slash=true;render()}};e.onmouseup=()=>setTimeout(captureSelection,0)});
  $('[data-title]')?.addEventListener("input",e=>doc().title=e.target.value);
 }
 render();
