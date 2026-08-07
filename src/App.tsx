@@ -119,6 +119,14 @@ export function App() {
     suggestion && current && !isSuggestionCurrent(suggestion, current.revision),
   )
 
+  async function refreshDocumentList(failureMessage: string) {
+    try {
+      setDocuments(await promptRepository.list())
+    } catch (listError) {
+      setError(`${failureMessage}：${messageOf(listError)}`)
+    }
+  }
+
   async function persistDocument(document: PromptDocument) {
     if (deletedDocumentIds.current.has(document.id)) return
     try {
@@ -130,11 +138,7 @@ export function App() {
       return
     }
 
-    try {
-      setDocuments(await promptRepository.list())
-    } catch (listError) {
-      setError(`文档已保存，但刷新列表失败：${messageOf(listError)}`)
-    }
+    await refreshDocumentList('文档已保存，但刷新列表失败')
   }
 
   function updateCurrentContent(content: PromptNodeJSON) {
@@ -175,31 +179,46 @@ export function App() {
       await promptRepository.save(created)
       await promptRepository.setCurrentId(created.id)
       setCurrent(created)
-      setDocuments(await promptRepository.list())
       setDocumentSheetOpen(false)
       window.setTimeout(() => editorRef.current?.focus(), 0)
+      await refreshDocumentList('Prompt 已创建，但刷新列表失败')
     } catch (createError) {
-      setError(messageOf(createError))
+      setError(`创建失败：${messageOf(createError)}`)
     }
   }
 
   async function deleteCurrentDocument() {
     if (!current || !window.confirm(`删除“${current.title || '未命名 Prompt'}”？此操作只删除本地副本。`)) return
     const deletingId = current.id
+    deletedDocumentIds.current.add(deletingId)
+
     try {
-      deletedDocumentIds.current.add(deletingId)
       await promptRepository.remove(deletingId)
-      const remaining = await promptRepository.list()
+    } catch (deleteError) {
+      deletedDocumentIds.current.delete(deletingId)
+      setError(`删除失败：${messageOf(deleteError)}`)
+      return
+    }
+
+    let remaining: PromptDocument[]
+    try {
+      remaining = await promptRepository.list()
+    } catch (listError) {
+      setError(`Prompt 已删除，但读取剩余文档失败：${messageOf(listError)}。请重新打开 PromptNote。`)
+      return
+    }
+
+    try {
       const next = remaining[0] ?? createPromptDocument()
       if (remaining.length === 0) await promptRepository.save(next)
       await promptRepository.setCurrentId(next.id)
       setDocuments(remaining.length ? remaining : [next])
       setCurrent(next)
       setSuggestion(null)
+      setSelection(null)
       setDocumentSheetOpen(false)
-    } catch (deleteError) {
-      deletedDocumentIds.current.delete(deletingId)
-      setError(`删除失败：${messageOf(deleteError)}`)
+    } catch (recoveryError) {
+      setError(`Prompt 已删除，但切换到下一文档失败：${messageOf(recoveryError)}。请重新打开 PromptNote。`)
     }
   }
 
@@ -251,11 +270,11 @@ export function App() {
       await promptRepository.save(imported)
       await promptRepository.setCurrentId(imported.id)
       setCurrent(imported)
-      setDocuments(await promptRepository.list())
       setSuggestion(null)
       setSelection(null)
       setDocumentSheetOpen(false)
       setToast('已导入 PromptDocument JSON')
+      await refreshDocumentList('备份已恢复，但刷新列表失败')
     } catch (importError) {
       setError(`导入失败：${messageOf(importError)}`)
     }
