@@ -207,7 +207,7 @@ function createSelection(initialRange: FakeRange) {
     get rangeCount() {
       return currentRange ? 1 : 0
     },
-    getRangeAt: vi.fn(() => {
+    getRangeAt: vi.fn((_index: number) => {
       if (!currentRange) throw new Error('Selection has no range.')
       return currentRange
     }),
