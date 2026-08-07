@@ -83,6 +83,7 @@ class FakeInputEvent extends FakeEvent {}
 export function installChatGptContentEditableFixture(input?: {
   text?: string
   execCommandSucceeds?: boolean
+  execCommandAvailable?: boolean
 }) {
   const composer = new FakeChatGptComposer(input?.text ?? '')
   const range = new FakeRange()
@@ -96,7 +97,12 @@ export function installChatGptContentEditableFixture(input?: {
     return true
   })
 
-  installGlobals({ composer, range, selection, execCommand })
+  installGlobals({
+    composer,
+    range,
+    selection,
+    execCommand: input?.execCommandAvailable === false ? undefined : execCommand,
+  })
   return { composer, execCommand, selection }
 }
 
@@ -107,9 +113,8 @@ export function installLegacyTextareaFixture(text = '') {
     removeAllRanges: vi.fn(),
     addRange: vi.fn(),
   }
-  const execCommand = vi.fn(() => false)
 
-  installGlobals({ composer, range, selection, execCommand, textarea: composer })
+  installGlobals({ composer, range, selection, textarea: composer })
   return { composer }
 }
 
@@ -125,7 +130,7 @@ function installGlobals(input: {
   composer: FakeHTMLElement
   range: FakeRange
   selection: { removeAllRanges: ReturnType<typeof vi.fn>; addRange: ReturnType<typeof vi.fn> }
-  execCommand: ReturnType<typeof vi.fn>
+  execCommand?: ReturnType<typeof vi.fn>
   textarea?: FakeTextarea
 }) {
   installBaseGlobals()
@@ -142,7 +147,7 @@ function installGlobals(input: {
       return null
     },
     createRange: () => input.range,
-    execCommand: input.execCommand,
+    ...(input.execCommand ? { execCommand: input.execCommand } : {}),
   })
 }
 
