@@ -247,6 +247,43 @@ P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不再
 
 ---
 
+## D015 — AI 配置是扩展偏好，不属于 PromptDocument
+
+**状态：Accepted**
+
+### 决定
+
+V1 的 AI Provider、Model、API Base URL、credential、启停状态和默认内容发送范围作为 Extension Preferences 独立保存。
+
+这些配置不得写入：
+
+- PromptDocument；
+- PromptDocument JSON 导入导出；
+- Compiler 输出；
+- 模型专用 Prompt 副本。
+
+### 原因
+
+AI 是可选助手，不是正文的一部分。把 Provider 或 credential 放进 PromptDocument 会造成状态源污染、导出泄密风险和模型绑定。
+
+### 交互约束
+
+- Top Bar 提供轻量 `AI 未配置 / AI 已连接 / AI 已关闭` 状态入口；
+- 选中文字只出现操作入口，不得自动调用 AI；
+- 只有用户显式触发时才调用 Provider；
+- 选区动作默认只发送选区；需要完整 Prompt 的动作必须明确提示；
+- 本地 deterministic lint 不依赖 AI；AI semantic lint 是可选增强；
+- AI 未配置、关闭或失败不得阻断编辑、保存、Compiler、Copy、Insert。
+
+### 实现影响
+
+- AI Provider 差异由统一 Adapter 处理；
+- UI / Editor 不直接散落 Provider SDK 调用；
+- preferences storage 与 PromptRepository 逻辑隔离；
+- credential 不得出现在日志、Prompt export 或 Compiler 字符串中。
+
+---
+
 ## 决策变更规则
 
 如果要推翻 Accepted 决策：
