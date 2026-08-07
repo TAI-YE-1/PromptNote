@@ -29,9 +29,27 @@ describe('ChromeAiSettingsRepository', () => {
     installChromeStorageMock()
   })
 
-  it('returns a disabled-network-safe default when no AI settings exist', async () => {
+  it('defaults inline completion to off when no AI settings exist', async () => {
     const repository = new ChromeAiSettingsRepository()
     await expect(repository.load()).resolves.toEqual(defaultAiSettings)
+    expect(defaultAiSettings.completionEnabled).toBe(false)
+  })
+
+  it('backfills completionEnabled=false for settings saved before completion existed', async () => {
+    store.set('promptnote.aiSettings.v1', {
+      enabled: true,
+      configured: true,
+      provider: 'openai-compatible',
+      model: 'legacy-model',
+      baseUrl: 'https://example.com',
+      apiKey: 'legacy-secret',
+      scope: 'selection',
+    })
+
+    const repository = new ChromeAiSettingsRepository()
+    const loaded = await repository.load()
+
+    expect(loaded.completionEnabled).toBe(false)
   })
 
   it('stores AI preferences separately from PromptDocument content', async () => {
@@ -39,6 +57,7 @@ describe('ChromeAiSettingsRepository', () => {
     const settings: AiSettings = {
       enabled: true,
       configured: true,
+      completionEnabled: true,
       provider: 'openai-compatible',
       model: 'test-model',
       baseUrl: 'https://example.com',
