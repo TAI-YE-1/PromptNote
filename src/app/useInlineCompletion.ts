@@ -19,7 +19,8 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
   const retryAfterRef = useRef(0)
   const cacheRef = useRef(new Map<string, string>())
   const contextPosition = input.context?.position ?? null
-  const contextBeforeText = input.context?.beforeText ?? ''
+  const rawContext = input.context?.beforeText ?? ''
+  const contextBeforeText = rawContext.slice(-input.settings.completionContextChars)
   const ready =
     input.settings.enabled &&
     input.settings.configured &&
