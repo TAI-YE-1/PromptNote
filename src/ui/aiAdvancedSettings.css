@@ -1,0 +1,137 @@
+.ai-advanced {
+  margin-top: 2px;
+  border: 1px solid #e0e5df;
+  border-radius: 11px;
+  background: #f8faf7;
+}
+
+.ai-advanced > summary {
+  padding: 10px 11px;
+  color: #46564c;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-advanced[open] > summary {
+  border-bottom: 1px solid #e3e8e3;
+}
+
+.ai-advanced__body {
+  display: grid;
+  gap: 14px;
+  padding: 11px;
+}
+
+.ai-advanced__group + .ai-advanced__group {
+  padding-top: 13px;
+  border-top: 1px solid #e3e8e3;
+}
+
+.ai-advanced__title {
+  margin-bottom: 8px;
+  color: #365144;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ai-advanced__field {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.ai-advanced__field > span {
+  color: #6c736d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ai-advanced__field select,
+.ai-advanced__field input,
+.ai-advanced__field textarea {
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid #dfe4df;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: #3b403c;
+  font-size: 10px;
+}
+
+.ai-advanced__field textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.ai-advanced__field select:focus,
+.ai-advanced__field input:focus,
+.ai-advanced__field textarea:focus {
+  border-color: #9eb3a5;
+  box-shadow: 0 0 0 2px rgba(49, 95, 71, .07);
+}
+
+.ai-advanced__tuning-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(108px, .72fr);
+  gap: 7px;
+  align-items: center;
+}
+
+.ai-advanced__tuning-row > select:only-child {
+  grid-column: 1 / -1;
+}
+
+.ai-advanced__custom-number {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ai-advanced__custom-number input {
+  padding-right: 42px;
+}
+
+.ai-advanced__custom-number > span {
+  position: absolute;
+  right: 9px;
+  color: #8b938d;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.ai-advanced__field small,
+.ai-advanced__hint,
+.ai-advanced__instruction-footer small {
+  color: #858d87;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.ai-advanced__instruction-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  margin-top: 7px;
+}
+
+.ai-advanced__instruction-footer small {
+  flex: 1;
+}
+
+.ai-advanced__instruction-footer .ghost-button {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  font-size: 9px;
+}
+
+@media (max-width: 380px) {
+  .ai-advanced__tuning-row {
+    grid-template-columns: 1fr;
+  }
+}
