@@ -20,13 +20,7 @@ PromptNote 从干净仓库重新实现，不直接 Fork flompt、PromptLayer 等
 
 ### 影响
 
-允许定向借鉴：
-
-- SimplestPrompt 的 Chrome Side Panel 思路；
-- TipTap / pagescms editor 的富文本和 Slash Menu 体验；
-- flompt 的 Prompt Block / Compiler 产品思路。
-
-原则：借能力，不继承代码债。
+允许定向借鉴 SimplestPrompt 的 Side Panel 思路、TipTap/pagescms editor 的富文本体验和 flompt 的 Prompt Block/Compiler 产品思路。原则：借能力，不继承代码债。
 
 ---
 
@@ -34,9 +28,7 @@ PromptNote 从干净仓库重新实现，不直接 Fork flompt、PromptLayer 等
 
 **状态：Accepted**
 
-中文名：提词笺。英文名：PromptNote。
-
-定位语：**“像写文档一样写 Prompt。”**
+中文名：提词笺。英文名：PromptNote。定位语：**“像写文档一样写 Prompt。”**
 
 ---
 
@@ -44,11 +36,7 @@ PromptNote 从干净仓库重新实现，不直接 Fork flompt、PromptLayer 等
 
 **状态：Accepted，内联补全例外由 D017 补充**
 
-### 决定
-
-用户是作者。AI 不默认整篇重写，不直接覆盖正文。普通局部/全局 AI 动作仍必须显式触发。
-
-D017 允许一个严格受控例外：用户单独开启内联补全后，可在编辑停顿时自动请求短续写，但 ghost text 不是正文，只有 `Tab` 接受后才进入 PromptDocument。
+用户是作者。AI 不默认整篇重写，不直接覆盖正文。普通局部/全局 AI 动作仍必须显式触发。D017 允许严格受控的 opt-in inline completion，ghost 只有 `Tab` 接受后才进入正文。
 
 ---
 
@@ -56,9 +44,7 @@ D017 允许一个严格受控例外：用户单独开启内联补全后，可在
 
 **状态：Accepted**
 
-浏览器 Extension 是第一交付形态，Side Panel 是主要编辑界面。
-
-Side Panel 适合在 ChatGPT / Claude / Gemini / Codex 等工具旁持续编辑，但 PromptNote 不因此承担修改这些网页 DOM 的职责。
+浏览器 Extension 是第一交付形态，Side Panel 是主要编辑界面。PromptNote 不因此承担修改第三方网页 DOM 的职责。
 
 ---
 
@@ -74,11 +60,7 @@ Side Panel 适合在 ChatGPT / Claude / Gemini / Codex 等工具旁持续编辑�
 
 **状态：Accepted**
 
-正文持久化只保存 PromptDocument / TipTap JSON。
-
-Markdown、Plain Text、XML、AI suggestion、ghost completion 都不是第二正文源。
-
-所有输出经 Compiler 派生；Preview 不可独立编辑；ghost completion 只有被用户接受后才成为正文。
+正文持久化只保存 PromptDocument / TipTap JSON。Markdown、Plain Text、XML、AI suggestion、ghost completion 都不是第二正文源；所有输出经 Compiler 派生。
 
 ---
 
@@ -110,13 +92,7 @@ Compiler 只做 `PromptDocument → Plain / Markdown / XML` 的纯派生转换�
 
 **状态：Superseded by D017**
 
-### 历史决定
-
-曾计划把 ChatGPT / Claude / Gemini 等网页的 DOM 识别与插入逻辑集中到 Adapter 层。
-
-### 现状
-
-D017 已将第三方网页 DOM 写入整个能力从 V1 删除，因此 Web Adapter 不再存在于生产架构。
+曾计划把 ChatGPT / Claude / Gemini 等网页的 DOM 差异集中到 Adapter 层。D017 已将第三方网页 DOM 写入从 V1 删除。
 
 ---
 
@@ -124,9 +100,7 @@ D017 已将第三方网页 DOM 写入整个能力从 V1 删除，因此 Web Adap
 
 **状态：Accepted，内联补全例外由 D017 补充**
 
-普通 AI 编辑能力仍返回 suggestion / lint finding，只有用户接受后 Editor command 才能修改 PromptDocument，并继续使用 source revision guard。
-
-D017 新增的 inline completion 不走 SuggestionCard，而以短生命周期 ghost decoration 存在；它同样不能直接成为正文。
+普通 AI 编辑能力返回 suggestion / lint finding，用户接受后 Editor command 才能修改 PromptDocument，并使用 source revision guard。D017 的 inline completion 以 ghost decoration 存在，同样不能直接成为正文。
 
 ---
 
@@ -134,17 +108,13 @@ D017 新增的 inline completion 不走 SuggestionCard，而以短生命周期 g
 
 **状态：Accepted**
 
-Prompt Marketplace、团队协作、Agent Workflow、MCP 平台、模型 Playground、A/B Test、企业权限、云同步等不进入 V1。
-
-核心主链现在是：**写 → 结构化 → 检查 → 编译 → 复制**。
+Prompt Marketplace、团队协作、Agent Workflow、MCP 平台、模型 Playground、A/B Test、企业权限、云同步等不进入 V1。核心主链是：**写 → 结构化 → 检查 → 编译 → 复制**。
 
 ---
 
 ## D013 — P1 前先完成 P0.5 可交互 UX 原型验证
 
 **状态：Superseded by D014**
-
-### 历史决定
 
 正式 React / Extension 实现之前先做可交互原型，验证 Side Panel 核心编辑体验。
 
@@ -156,9 +126,7 @@ Prompt Marketplace、团队协作、Agent Workflow、MCP 平台、模型 Playgro
 
 **Supersedes:** D013 中“使用 Figma 作为原型载体”的部分。
 
-P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不依赖 Node、React、CDN、后端或真实 AI API。
-
-原型只作为 UX reference，不是 PromptDocument、Compiler、正式 Extension 或当前产品范围的权威来源；后续正式产品决定可明确取代原型中的模拟能力。
+P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不依赖 Node、React、CDN、后端或真实 AI API。原型只作为 UX reference。
 
 ---
 
@@ -166,27 +134,9 @@ P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不依
 
 **状态：Accepted**
 
-### 决定
+AI enabled、inline completion enabled、Provider、Model、API Base URL、credential、默认内容发送范围都作为 Extension Preferences 独立保存，不进入 PromptDocument、导入导出或 Compiler。
 
-以下均作为 Extension Preferences 独立保存：
-
-- AI enabled；
-- inline completion enabled；
-- Provider；
-- Model；
-- API Base URL；
-- credential；
-- 默认内容发送范围。
-
-这些配置不得写入 PromptDocument、Prompt JSON 导入导出或 Compiler 输出。
-
-### 交互约束
-
-- Top Bar 提供 AI 状态入口；
-- 普通选区/全局 AI 动作必须显式触发；
-- 内联补全是独立开关，默认关闭；
-- 修改 Provider / Model / Base URL / API Key 后，连接成功状态与补全开关必须失效；
-- AI 未配置、关闭、失败或补全关闭不得阻断编辑、保存、Compiler、Copy。
+修改 Provider / Model / Base URL / API Key 后，连接成功状态与补全开关必须失效；AI 未配置、关闭、失败不得阻断编辑、保存、Compiler、Copy。
 
 ---
 
@@ -194,20 +144,7 @@ P0.5 使用 `prototype/promptnote-prototype.html` 单文件 HTML 原型，不依
 
 **状态：Superseded by D017**
 
-### 历史决定
-
-曾将 Web Insert 从 append/replace 重构为通用 caret-first 插入，并尝试以 `activeTab + scripting` / page bridge 降低站点耦合。
-
-### 被取代原因
-
-真实浏览器验证显示，这条链路仍带来：
-
-- 站点 DOM / 富编辑器兼容成本；
-- Extension 注入权限与 receiver 生命周期问题；
-- 与用户直接复制粘贴相比收益有限；
-- 额外代码、测试、权限和性能维护负担。
-
-D017 因此删除整个 Web Insert 能力，而不是继续叠加兼容补丁。
+曾将 Web Insert 重构为通用 caret-first 插入并尝试减少站点耦合。真实浏览器验证仍显示 DOM 兼容、receiver 生命周期和权限成本过高，收益不如复制粘贴，因此被 D017 整体取代。
 
 ---
 
@@ -217,77 +154,20 @@ D017 因此删除整个 Web Insert 能力，而不是继续叠加兼容补丁。
 
 **Supersedes:** D010、D016；并补充 D003、D011、D015。
 
-### 决定 A：第三方网页写入退出 V1
+### 决定
 
-V1 不再提供“插入网页”按钮，也不再维护：
+第三方网页写入退出 V1。删除 Web Adapter、ChatGPT Adapter、textarea/contenteditable 插入引擎、page bridge/content script、`activeTab`/`scripting` 权限与网页 fixture。外部交付统一使用 Copy。
 
-- Web Adapter；
-- ChatGPT 专用 Adapter；
-- 通用 textarea/contenteditable 插入引擎；
-- page bridge / content script；
-- `activeTab` / `scripting` 注入权限；
-- 网页 DOM fixture 与相关消息契约。
+AI 内联补全采用 IDE ghost text 心智：编辑停顿 → caret 后灰色短续写 → Tab 接受 → Esc 忽略。只有 `configured && enabled && completionEnabled` 同时成立才允许自动请求，补全开关默认关闭。
 
-外部交付统一使用 Copy。用户把编译结果粘贴到任何 AI 工具，不依赖站点 DOM。
+### 状态与性能边界
 
-### 决定 B：增加独立 opt-in 的内联补全
-
-AI 内联补全采用 IDE ghost text 心智：
-
-```text
-编辑停顿
-→ caret 后出现灰色短续写
-→ Tab 接受
-→ Esc 忽略
-```
-
-只有以下三个条件同时成立才允许自动请求 Provider：
-
-```text
-AI 已配置成功
-AND AI 辅助总开关已启用
-AND 编辑器内联补全开关已开启
-```
-
-补全开关默认关闭。只打开 AI 总开关不等于同意自动补全。
-
-### 状态与隐私边界
-
-- ghost completion 不属于 PromptDocument；
-- 不参与 autosave、Compiler、revision；
-- 只有 `Tab` 接受后才通过 Editor transaction 成为正文；
-- 修改 Provider / Model / Base URL / API Key 后，补全开关自动失效；
-- `optional_host_permissions` 仅用于用户实际配置的 AI Provider origin。
-
-### 性能约束
-
-- 编辑停顿防抖后再请求；
-- 每次只发送当前 text block 内受配置限制的 caret 局部上下文；
-- 新输入/移动 caret 时取消旧请求；
-- completion 使用短输出和低温度；
-- 失败后短退避，避免请求风暴；
-- stale completion 在 doc/selection/context budget 变化时立即清除。
-
-### 权限影响
-
-Manifest 固定权限收缩为：
-
-```text
-storage
-sidePanel
-```
-
-不再需要 `activeTab`、`scripting` 或第三方网页 host access。任意 optional host permission 仅服务 AI Provider 网络请求。
-
-### 产品原因
-
-PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而不是维护各网站输入框 DOM。删除 Web Insert 后：
-
-- 权限更小；
-- 运行时更轻；
-- 代码和测试面显著缩小；
-- 外部输出不再受网页改版影响；
-- AI 能力转而强化编辑器内部体验，更接近 IDE 辅助而不是浏览器自动化。
+- ghost 不属于 PromptDocument，不参与 autosave/Compiler/revision；
+- 修改 Provider / Model / Base URL / API Key 后补全开关失效；
+- 每次只发送当前 text block 的有限局部上下文；
+- 新输入/移动 caret 取消旧请求；
+- stale completion 在 doc/selection/context budget 变化时失效；
+- fixed permissions 收缩为 `storage` / `sidePanel`，optional host permission 只服务 AI Provider。
 
 ---
 
@@ -295,29 +175,11 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 **状态：Accepted**
 
-### 决定
+选中文字后，在 Side Panel 主 actionbar 上方显示 `SelectionActionBar`，直接提供局部 AI 与单块类型转换。选区状态只来自 ProseMirror EditorState，不使用 DOM selection、viewport rect、`coordsAtPos`。
 
-选中文字后，在 Side Panel 主 actionbar 上方显示稳定的选区工具条，直接提供“改清楚 / 缩短 / 拆约束 / 更多 AI”和单块类型转换。
+真实 Chrome 窄 Side Panel 证明旧浮动入口会偶发不出现、丢 selection、被滚动容器裁剪且多一次点击。继续修坐标属于维护失败交互，而不是修根因。
 
-选区状态只来自 ProseMirror EditorState：selected text、from/to、single-block format。不得把 DOM selection、viewport rect、`coordsAtPos` 结果作为选区业务状态，也不得恢复文字旁微型 `•••` 二级入口。
-
-### 原因
-
-真实 Chrome 窄 Side Panel 测试多次证明文字旁浮动入口存在：
-
-- 偶发不出现；
-- 浏览器 focus/selection 与 ProseMirror selection 竞争；
-- 出现后点击可能先丢失 selection；
-- 浮层容易被滚动容器裁剪或挤出边界；
-- 用户必须额外点击一次才能看到真正动作。
-
-继续修坐标属于维护失败交互，而不是修根因。
-
-### 影响
-
-- 删除旧 `SelectionContextMenu` 与 viewport rect 状态；
-- 跨块选区仍可执行文本 AI 动作，但禁止 block type 转换；
-- 选区工具与 AI busy / suggestion / lint 共用明确的 transient surface 优先级，不得互相覆盖。
+旧 `SelectionContextMenu` 与其兼容别名都不得保留；跨块选区允许文本 AI 动作但禁止 block type 转换。
 
 ---
 
@@ -325,20 +187,7 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 **状态：Accepted**
 
-### 决定
-
-性能优化优先减少真实热路径工作，而不是调大 warning、增加隐藏缓存状态或制造第二实现：
-
-- completion context budget 由 AI 设置显式传入 Editor，并进入 request identity；
-- streaming partial 在短窗口合并 UI 刷新，避免 token 粒度根树 render；
-- streaming capability 按 provider + endpoint + completion model 缓存，SSE 容忍 keep-alive；
-- Repository 启动恢复批量读取 documents/current id，更旧 revision 不得覆盖更新 revision；
-- AI 设置与本地 Prompt Sheet 按用户打开时 lazy-load，正文和设置状态仍由原有单一状态源提供；
-- Vite `>500KB` 主 chunk warning 只有真实 bundle/启动问题解决后才可消失，不允许通过提高 `chunkSizeWarningLimit` 伪装优化。
-
-### 影响
-
-代码审查必须优先检查重复 IO、重复派生、token 级根组件 render、无必要首屏模块、过期异步结果和旧 revision 写回。
+性能优化优先减少真实热路径工作，而不是调大 warning、增加隐藏缓存状态或制造第二实现：completion context budget 显式贯穿 Editor；streaming partial 合并刷新；Repository 批量恢复且 revision 单调；非首屏 UI 按需加载；`>500KB` warning 只能通过真实 bundle/启动问题解决后消失，不允许调高 `chunkSizeWarningLimit` 伪装优化。
 
 ---
 
@@ -346,27 +195,9 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 **状态：Accepted，适用于持续输入稳定性；已有文本问题由 D021 单独定义**
 
-### 决定
+`completionDelayMs` 只表示 caret 需要稳定多久，不等价于每次停顿都能发新请求。真实 Provider 请求有独立 cadence；IME composition 不发布 context；短时 429/5xx/timeout/transport 在原 context 有效时有限重试并尊重 `Retry-After`；新 context 取消旧 request/retry；persistent auth/config/quota error 不无限重试。
 
-`completionDelayMs` 只表示 caret 需要稳定多久才具备请求资格，不再等价于“每次停顿都可以立即向 Provider 发一个新请求”。真实 Provider 请求另有 cadence 和错误恢复规则：
-
-- 相邻网络请求存在独立最小启动间隔；
-- IME composition/组词期间不发布 completion context；
-- 短时 429、5xx、timeout、transport failure 在原 context 仍有效时有限次指数退避自动恢复，并尊重 `Retry-After`；
-- 用户继续输入、移动 caret 或产生新 context 时，旧请求与旧 retry 一并取消；
-- 单次短时错误不直接升级为“AI 补全不可用”；连续自动恢复失败后才提示；
-- 认证、配置、额度/配额耗尽等持久错误不进行无限重试，必须保留真实错误。
-
-### 原因
-
-在**持续输入**场景中，较长中文句子可能包含自然停顿和输入法 composition。如果把“300ms 没打字”直接映射为新的网络请求，会制造无意义请求甚至触发 Provider 限流。该风险是真实的通用稳定性问题，但**不能据此推断“一个早已存在的较长文本块聚焦后失败”就是输入风暴/IME 导致**。
-
-### 影响
-
-- `ai/completionTuning.ts` 成为 completion delay、request cadence、retry policy 的唯一数值权威；
-- Provider 错误必须能区分 transient/persistent，并保留 HTTP status / Retry-After 等必要元数据；
-- 不允许用“把 debounce 调大”代替 cadence 治理，也不允许用“隐藏 toast”代替真正的自动恢复；
-- Chrome 真机验收仍包含中文 IME 连续输入稳定性，但它与已有文本补全验收分开记录。
+该规则解决持续输入中的请求风暴风险，但不能据此推断“早已存在的长文本聚焦失败”就是 IME/request storm。
 
 ---
 
@@ -374,32 +205,71 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 **状态：Accepted**
 
-### 决定
+当 caret 放到之前已经存在的较长 block 中时：
 
-当用户把 caret 放到**之前已经存在**的较长 Prompt block 中时，补全链只允许基于当前 caret 的局部 context 工作。实现和诊断遵守：
+- `completionContextChars` 同时是发送上限与 context 读取成本边界；
+- streaming/non-streaming 由 body sniff 确认，不只信 `Content-Type`；
+- persistent error 不给后续新 context 设置跨 context 30 秒 cooldown；
+- success cache hit 在 prompt/provider/request 构造之前 fast-path；
+- blur / IME composition 同时使 context 与 ghost 失效；
+- failure 显示长度受控真实原因，成功恢复清 stale AI error。
 
-- `completionContextChars` 不只是“发送上限”，也是 Editor context 读取的成本边界；先按 caret 建有限 scan window，再 `textBetween()`，禁止 materialize 整块后 slice；
-- streaming/non-streaming 由响应 body sniff 确认，不只相信 `Content-Type`；错标为 `text/event-stream` 的普通 JSON 必须正常降级；
-- persistent completion error 结束当前请求即可，不再给后续新 caret/context 设置跨 context 30 秒 cooldown；
-- 相同 context 的成功 cache 命中必须在 prompt/provider/request 构造之前 fast-path；
-- Editor blur / IME composition 必须同时使 context 与 ghost 失效；
-- completion failure 应显示长度受控的真实 Provider 原因；成功恢复后清掉 stale AI error。
+以后收到“长文本不补全”必须先确认文本是刚输入还是预存；预存场景优先检查 context 构建复杂度、focus/caret identity、Provider body 兼容和 stale state。
+
+---
+
+## D022 — 异步结果必须按 revision 收口，重型运行时可拆包但不得复制状态
+
+**状态：Accepted**
+
+### 决定 A：异步 UI 状态受 document version 所有权约束
+
+Repository 的 revision 单调保护只解决“旧正文不能覆盖新正文”，还不够。任何异步 `save(snapshot)` 的成功/失败回调如果要修改顶部保存状态、文档列表或其他用户可见状态，必须先证明当前 document id + revision 仍与该 snapshot 对应。
+
+因此：
+
+- 旧 revision 晚到成功不得把正在编辑的新 revision 标成“已保存”；
+- 旧 revision 晚到失败不得把新 revision 标成“未保存”；
+- 旧 snapshot 不得把文档列表回退；
+- 文档列表更新本身保持 revision 单调。
+
+### 决定 B：显式覆盖继续遵守 Repository 不变量
+
+用户从电脑恢复一个与本地同 ID 的备份并明确选择“覆盖”时，不增加 bypass/force-save API，也不放松 Repository 的旧 revision 拒绝规则。导入层把文档 revision 提升到：
+
+```text
+max(local.revision, backup.revision) + 1
+```
+
+然后继续走正常 `save()`。拒绝覆盖则生成新 id。
+
+同 ID 外部替换必须立即进入当前 Editor；Editor 通过“自身刚产生的 content object identity vs 外部新 content object”区分本地输入和外部替换，本地每次键入不得 stringify 全文或反复 `setContent()`。
+
+### 决定 C：重型运行时允许真实代码分割
+
+TipTap/ProseMirror Editor 可以从 Side Panel shell 中拆为 lazy chunk。lazy wrapper 只负责 `Suspense + ref` 转发，不维护第二份 PromptDocument/Editor 状态。
+
+当前构建从单一约 616.97 kB / gzip 195.41 kB 的主 Side Panel JS，拆为约：
+
+```text
+sidepanel shell   228.57 kB / gzip 73.72 kB
+PromptEditor      388.80 kB / gzip 122.57 kB（async）
+```
+
+这代表首屏同步解析体积显著下降，不代表总 JS 删除了约 63%。`>500KB` warning 因真实拆包自然消失，未修改 warning limit；最终用户体感仍必须由真实 Chrome/Edge 验证。
+
+### 决定 D：不制造无必要的身份字符串和兼容别名
+
+- React 中稳定、不可变的 `AiSettings` 对象 identity 足以作为补全设置失效边界，不再每次 render 拼接包含 URL/model/API Key 的 `completionSettingsKey`；
+- 已退役的 `SelectionContextMenu` 不保留 `SelectionActionBar as SelectionContextMenu` 兼容别名，因为不存在外部 API 兼容需求。
 
 ### 原因
 
-“文本较长”至少包含两种完全不同的场景：
-
-1. 用户正在持续输入，可能涉及 debounce、cadence、IME；
-2. 文本早已存在，用户只是打开/聚焦/移动 caret。
-
-第二种场景没有证据支持“刚刚产生了很多输入事件”。把它归因到 typing request storm 会把排查方向带偏。对已有文本，真正应优先检查的是 context 构建复杂度、focus/caret identity、Provider 响应兼容和 stale 状态。
+单独保证 Storage 不回退，仍可能出现“界面显示已保存但最新内容未保存”“选择覆盖但 Repository 实际拒绝”“同 ID 覆盖成功但 Editor 仍显示旧内容”等假成功。与此同时，长期保留巨型首屏 bundle、全文 stringify 和历史别名会把收口阶段重新拖回复杂实现。
 
 ### 影响
 
-- 以后收到“长文本不补全”反馈必须先确认文本是刚输入还是预存，不能自动套用 D020；
-- 性能测试要包含几十 KB 以上的**预存 block**，验证输出 context 始终受 budget 限制；
-- Provider fixture 要覆盖 SSE 正常流、`text/plain` SSE、`text/event-stream` + JSON 三类响应；
-- 真机验收必须包含“打开已有较长 Prompt → 不继续输入 → 点击旧文本 caret → 等待 ghost”的独立用例。
+后续代码审查必须把**异步回调是否仍拥有当前版本**作为一等检查项；显式覆盖通过生成合法新 revision 表达，而不是绕开约束；性能报告必须区分同步首屏 chunk 与异步/总字节，不能用 code splitting 冒充代码删除。
 
 ---
 
