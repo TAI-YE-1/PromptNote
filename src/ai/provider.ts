@@ -76,7 +76,7 @@ function extractOpenAIContent(value: unknown): string {
   const message = asRecord(choice?.message)
   const content = message?.content
   if (typeof content !== 'string' || !content.trim()) throw new Error('OpenAI-compatible 返回空内容。')
-  return content.trim()
+  return content.trimEnd()
 }
 
 function extractAnthropicContent(value: unknown): string {
@@ -88,8 +88,8 @@ function extractAnthropicContent(value: unknown): string {
     .filter((item): item is Record<string, unknown> => item !== null)
     .filter((item) => item.type === 'text' && typeof item.text === 'string')
     .map((item) => item.text as string)
-  const text = pieces.join('\n').trim()
-  if (!text) throw new Error('Anthropic 返回空内容。')
+  const text = pieces.join('\n').trimEnd()
+  if (!text.trim()) throw new Error('Anthropic 返回空内容。')
   return text
 }
 
@@ -110,7 +110,6 @@ class OpenAICompatibleProvider implements AiProvider {
         body: JSON.stringify({
           model: settings.model,
           temperature: request.action === 'complete' ? 0.1 : 0.2,
-          ...(request.action === 'complete' ? { max_tokens: 120 } : {}),
           messages: [
             { role: 'system', content: systemInstruction(request.action) },
             { role: 'user', content: userPayload(request) },
