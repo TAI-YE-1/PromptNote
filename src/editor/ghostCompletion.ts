@@ -3,32 +3,52 @@ import type { EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import type { EditorCompletionSuggestion } from './completionContext'
 
 export interface GhostCompletionState {
   text: string | null
   position: number | null
+  contextKey: string | null
 }
 
 export const ghostCompletionKey = new PluginKey<GhostCompletionState>('promptnoteGhostCompletion')
 
-function stateFor(text: string | null, position: number | null): GhostCompletionState {
-  if (!text || !text.trim()) return { text: null, position: null }
-  return { text: text.trimEnd(), position }
+function emptyState(): GhostCompletionState {
+  return { text: null, position: null, contextKey: null }
+}
+
+function stateFor(completion: EditorCompletionSuggestion | null): GhostCompletionState {
+  if (!completion?.text || !completion.text.trim()) return emptyState()
+  return {
+    text: completion.text.trimEnd(),
+    position: completion.position,
+    contextKey: completion.contextKey,
+  }
 }
 
 export function createGhostCompletionPlugin(): Plugin<GhostCompletionState> {
   return new Plugin<GhostCompletionState>({
     key: ghostCompletionKey,
     state: {
-      init: () => stateFor(null, null),
+      init: emptyState,
       apply(transaction, previous, _oldState, nextState) {
         const explicit = transaction.getMeta(ghostCompletionKey) as
-          | { text: string | null }
+          | EditorCompletionSuggestion
+          | null
           | undefined
-        if (explicit) {
-          return stateFor(explicit.text, explicit.text ? nextState.selection.head : null)
+        if (explicit !== undefined) {
+          if (!explicit) return emptyState()
+          if (
+            !nextState.selection.empty ||
+            nextState.selection.head !== explicit.position ||
+            explicit.position < 0 ||
+            explicit.position > nextState.doc.content.size
+          ) {
+            return emptyState()
+          }
+          return stateFor(explicit)
         }
-        if (transaction.docChanged || transaction.selectionSet) return stateFor(null, null)
+        if (transaction.docChanged || transaction.selectionSet) return emptyState()
         return previous
       },
     },
@@ -54,20 +74,27 @@ export function createGhostCompletionPlugin(): Plugin<GhostCompletionState> {
               span.textContent = ghost.text
               return span
             },
-            { side: 1, key: 'promptnote-ghost-completion' },
+            { side: 1, key: `promptnote-ghost-completion:${ghost.contextKey ?? ''}` },
           ),
         ])
       },
       handleKeyDown(view, event) {
         const ghost = ghostCompletionKey.getState(view.state)
-        if (!ghost?.text) return false
+        if (
+          !ghost?.text ||
+          ghost.position === null ||
+          !view.state.selection.empty ||
+          view.state.selection.head !== ghost.position
+        ) {
+          return false
+        }
 
         if (event.key === 'Tab') {
           event.preventDefault()
           view.dispatch(
             view.state.tr
-              .insertText(ghost.text, view.state.selection.from, view.state.selection.to)
-              .setMeta(ghostCompletionKey, { text: null })
+              .insertText(ghost.text, ghost.position, ghost.position)
+              .setMeta(ghostCompletionKey, null)
               .scrollIntoView(),
           )
           return true
@@ -92,8 +119,11 @@ export const GhostCompletion = Extension.create({
   },
 })
 
-export function setGhostCompletion(view: EditorView, text: string | null): void {
-  view.dispatch(view.state.tr.setMeta(ghostCompletionKey, { text }))
+export function setGhostCompletion(
+  view: EditorView,
+  completion: EditorCompletionSuggestion | null,
+): void {
+  view.dispatch(view.state.tr.setMeta(ghostCompletionKey, completion))
 }
 
 export function clearGhostCompletion(view: EditorView): void {
