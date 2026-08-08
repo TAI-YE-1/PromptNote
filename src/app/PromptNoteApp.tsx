@@ -65,9 +65,9 @@ export function PromptNoteApp() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  const handleCompletionError = useCallback((message: string) => {
+  const handleCompletionError = useCallback((message: string | null) => {
     setAiError(message)
-    setToast('AI 补全暂不可用，可在 AI 设置中检查连接')
+    if (message) setToast(`AI 补全失败：${shortCompletionError(message)}`)
   }, [])
 
   const completionText = useInlineCompletion({
@@ -598,6 +598,11 @@ function safeFileName(value: string) {
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function shortCompletionError(message: string) {
+  const normalized = message.replace(/\s+/g, ' ').trim()
+  return normalized.length > 96 ? `${normalized.slice(0, 96)}…` : normalized
 }
 
 function saveLabel(state: SaveState) {
