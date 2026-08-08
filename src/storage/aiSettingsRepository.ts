@@ -1,6 +1,16 @@
-import type { AiSettings } from '../ai/types'
+import { normalizeCompletionContextChars, normalizeCompletionDelayMs } from '../ai/completionTuning'
+import type { AiAction, AiInstructionOverrides, AiSettings } from '../ai/types'
 
 const AI_SETTINGS_KEY = 'promptnote.aiSettings.v1'
+const AI_ACTIONS: AiAction[] = [
+  'clarify',
+  'shorten',
+  'split_constraints',
+  'draft_acceptance',
+  'ambiguity',
+  'structure',
+  'complete',
+]
 
 export const defaultAiSettings: AiSettings = {
   enabled: true,
@@ -8,6 +18,7 @@ export const defaultAiSettings: AiSettings = {
   completionEnabled: false,
   completionContextChars: 320,
   completionDelayMs: 300,
+  instructionOverrides: {},
   provider: 'openai-compatible',
   model: '',
   baseUrl: 'https://api.openai.com',
@@ -33,12 +44,9 @@ export class ChromeAiSettingsRepository implements AiSettingsRepository {
       ...stored,
       configured: legacyUnverified ? false : Boolean(stored.configured),
       completionEnabled: legacyUnverified ? false : Boolean(stored.completionEnabled),
-      completionContextChars: isCompletionContextChars(stored.completionContextChars)
-        ? stored.completionContextChars
-        : defaultAiSettings.completionContextChars,
-      completionDelayMs: isCompletionDelayMs(stored.completionDelayMs)
-        ? stored.completionDelayMs
-        : defaultAiSettings.completionDelayMs,
+      completionContextChars: normalizeCompletionContextChars(stored.completionContextChars),
+      completionDelayMs: normalizeCompletionDelayMs(stored.completionDelayMs),
+      instructionOverrides: normalizeInstructionOverrides(stored.instructionOverrides),
     }
   }
 
@@ -47,10 +55,13 @@ export class ChromeAiSettingsRepository implements AiSettingsRepository {
   }
 }
 
-function isCompletionContextChars(value: unknown): value is AiSettings['completionContextChars'] {
-  return value === 160 || value === 320 || value === 640
-}
-
-function isCompletionDelayMs(value: unknown): value is AiSettings['completionDelayMs'] {
-  return value === 150 || value === 300 || value === 600
+function normalizeInstructionOverrides(value: unknown): AiInstructionOverrides {
+  if (!value || typeof value !== 'object') return {}
+  const source = value as Record<string, unknown>
+  const result: AiInstructionOverrides = {}
+  for (const action of AI_ACTIONS) {
+    const instruction = source[action]
+    if (typeof instruction === 'string' && instruction.trim()) result[action] = instruction.slice(0, 4_000)
+  }
+  return result
 }
