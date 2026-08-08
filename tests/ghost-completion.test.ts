@@ -1,6 +1,6 @@
 import { getSchema } from '@tiptap/core'
 import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
-import type { EditorView } from '@tiptap/pm/view'
+import type { DecorationSet, EditorView } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import { describe, expect, it, vi } from 'vitest'
 import { PromptSection } from '../src/editor/promptSection'
@@ -60,7 +60,8 @@ function runGhostKey(harness: ReturnType<typeof createHarness>, event: KeyboardE
 }
 
 function visibleDecorationKey(harness: ReturnType<typeof createHarness>): string | undefined {
-  const decorations = harness.plugin.props.decorations?.call(harness.plugin, harness.state())
+  const source = harness.plugin.props.decorations?.call(harness.plugin, harness.state())
+  const decorations = source as DecorationSet | null | undefined
   const first = decorations?.find()[0]
   return first?.spec.key as string | undefined
 }
