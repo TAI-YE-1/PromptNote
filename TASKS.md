@@ -141,10 +141,11 @@
 - [x] P6-09 新增独立 `completionEnabled` 偏好，默认 false；旧设置自动补 false，不污染 PromptDocument。
 - [x] P6-10 补全只有在 `configured && enabled && completionEnabled` 三条件同时成立时才允许自动请求 Provider。
 - [x] P6-11 实现 ProseMirror ghost completion decoration：不进入正文；Tab 接受、Esc 忽略；doc/selection 变化立即失效。
-- [x] P6-12 补全调度实现约 750ms 防抖、有限 caret 前上下文、旧请求 Abort、短输出上限、失败退避；Provider 支持外部 cancellation。
+- [x] P6-12 补全调度支持可配置 delay/context、当前 block 隔离、旧请求 Abort、streaming-first partial、短输出、短退避与可选 completion model；Provider 支持外部 cancellation 和不支持 streaming 时的兼容降级。
 - [x] P6-13 修改 Provider/Model/Base URL/API Key 后使 configured/补全开关失效；关闭 AI 同时关闭补全。
-- [x] P6-14 增加 completion preference、短请求参数、cancellation、Tab/Esc、stale invalidation、英文前导空格测试。
-- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证灰色续写出现、Tab 接受、Esc 忽略、继续输入会取消/替换旧建议；关闭补全后确认不再自动请求。
+- [x] P6-14 增加 completion preference、流式/降级/model route、Tab/Esc、stale invalidation、英文前导空格、当前 block context 隔离和移动 caret 后拒绝旧 ghost 的测试。
+- [x] P6-16 深排查真实浏览器补全错位/串块问题：context identity 绑定 document generation + block + caret；流式 partial 只可更新原 context；当前语义块不再隐式读取前一块正文；退避窗口内的新 context 不再静默丢弃。
+- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证灰色续写出现、Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；关闭补全后确认不再自动请求。此前真机已发现跨块污染/偶发触发问题，最新 P6-16 修复待复测。
 
 ---
 
@@ -158,8 +159,8 @@
 - [ ] P7-06 检查 Copy / Save 的连续、重复操作与状态一致性；Web Insert 状态链已删除。
 - [ ] P7-07 做最终代码减法审查；已删除 Web Adapter/content script/messages/DOM fixtures/activeTab/scripting/旧 App runtime，待最终浏览器 smoke 后再反查一次。
 - [x] P7-08 反向搜索 Non-goals：无 backend/auth/team/marketplace/cloud-sync/model-playground，Web DOM 注入也已成为明确 Non-goal。
-- [ ] P7-09 README、PRODUCT、UX、ARCHITECTURE、DECISIONS、AGENTS、TASKS 最终实现态收口；当前正在同步 D017，待最终浏览器验收后最后复核一次。
-- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径工作；补全使用防抖、取消、短请求和退避。仍需验证 Side Panel 启动/输入流畅度、补全响应感受；主 bundle 仍需以真实启动数据决定是否 code splitting，不调高 warningLimit 掩盖。
+- [ ] P7-09 README、PRODUCT、UX、ARCHITECTURE、DECISIONS、AGENTS、TASKS 最终实现态收口；当前已同步 block-local/context identity 规则，待最终浏览器验收后最后复核一次。
+- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径工作；补全使用可配置 delay/context、streaming-first、取消、context identity、短退避与可选低延迟模型。仍需验证 Side Panel 启动/输入流畅度及真实 Provider 首 partial 体感；主 bundle 仍需以真实启动数据决定是否 code splitting，不调高 warningLimit 掩盖。
 
 ---
 
@@ -172,7 +173,7 @@
 - [ ] P8-05 在 Edge 完成当前最终构建真实主链 smoke。
 - [ ] P8-06 验证浏览器关闭/重启后的最近 Prompt 恢复。
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链，以及补全开关关闭时无自动请求。
-- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；不再验证 Web Adapter。
+- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；重点包含 block-local、流式 partial、旧 caret 失效和可选 completion model；不再验证 Web Adapter。
 - [x] P8-09 Manifest 权限审查：固定权限仅 `storage` / `sidePanel`；无 `activeTab`、`scripting`、content script。optional host permission 只用于用户配置的 AI Provider origin。
 - [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属；lockfile + `npm ci` + 跨平台许可证 CI 门禁持续有效。
 - [ ] P8-11 生成 V1 release notes / Known Limitations。
@@ -183,11 +184,11 @@
 
 ## 当前状态
 
-当前阶段：**Web Insert 已按 D017 从 V1 完整退役，相关 Adapter、content script、消息协议、DOM fixture、`activeTab/scripting` 权限和 UI 按钮均已删除。正式外部输出统一为 Copy。编辑器新增默认关闭的 opt-in inline completion：只有 AI 已配置成功 + AI 已启用 + completionEnabled 开启时，编辑停顿才会自动请求短补全；ghost text 用 Tab 接受、Esc 忽略，不进入 PromptDocument。代码门禁已通过，仍需当前最终构建的真实 Chrome/Edge、补全、重启恢复和异常降级验收。**
+当前阶段：**Web Insert 已按 D017 从 V1 完整退役，相关 Adapter、content script、消息协议、DOM fixture、`activeTab/scripting` 权限和 UI 按钮均已删除。正式外部输出统一为 Copy。编辑器 opt-in inline completion 已实现流式优先、可配置上下文/延迟/独立补全模型，并完成真实浏览器暴露问题后的 P6-16 深修：补全只读取当前 block，结果绑定原 document/block/caret identity，移动 caret/切块/正文变化后旧 partial 不得重新挂载。代码门禁已通过，最新修复仍需真实 Chrome 复测，再继续 Edge、重启恢复和异常降级验收。**
 
 当前最优先剩余工作：
 
-1. Chrome 真机验证语义块边界 + 可用 Provider 的内联补全（开启/关闭、Tab/Esc、继续输入取消旧补全）；
+1. Chrome 真机复测 P6-16：背景/任务/约束等块互不串上下文，移动 caret/切块后旧流不出现，Tab/Esc 正确；
 2. Edge 当前最终 Manifest smoke + 360px/键盘；
 3. 浏览器重启恢复与 AI 禁用/错误/超时降级；
 4. Copy/Save 重复操作、错误路径和真实性能收口；
