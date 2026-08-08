@@ -12,8 +12,6 @@ import {
   type EditableBlockFormat,
 } from './blockConversion'
 
-const COMPLETION_CONTEXT_LIMIT = 800
-
 export interface EditorSelectionSnapshot {
   text: string
   from: number
@@ -45,6 +43,7 @@ interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
   completionText: string | null
+  completionContextChars: number
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
   onCompletionContext(context: EditorCompletionContext | null): void
@@ -95,6 +94,12 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     setGhostCompletion(editor.view, props.completionText)
   }, [editor, props.completionText])
 
+  useEffect(() => {
+    if (!editor) return
+    completionContextKeyRef.current = null
+    emitCompletionContext(editor)
+  }, [editor, props.completionContextChars])
+
   function publishCompletionContext(context: EditorCompletionContext | null) {
     const key = context ? `${context.position}\u0000${context.beforeText}` : null
     if (completionContextKeyRef.current === key) return
@@ -104,12 +109,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
     const { selection, doc } = currentEditor.state
-    if (!selection.empty || !currentEditor.view.hasFocus()) {
+    if (
+      props.completionContextChars <= 0 ||
+      !selection.empty ||
+      !currentEditor.view.hasFocus()
+    ) {
       publishCompletionContext(null)
       return
     }
 
-    const from = Math.max(0, selection.from - COMPLETION_CONTEXT_LIMIT)
+    const from = Math.max(0, selection.from - props.completionContextChars)
     const beforeText = doc.textBetween(from, selection.from, '\n', '\n').trimEnd()
     if (!beforeText.trim()) {
       publishCompletionContext(null)
