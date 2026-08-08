@@ -35,11 +35,9 @@ export function buildEditorCompletionContext(
   const parent = $from.parent
   if (!parent.isTextblock) return null
 
-  const beforeAll = parent.textBetween(0, $from.parentOffset, '\n', '\n')
-  const afterAll = parent.textBetween($from.parentOffset, parent.content.size, '\n', '\n')
-  if (!(beforeAll + afterAll).trim()) return null
+  const { beforeText, afterText } = readCaretContext(parent, $from.parentOffset, options.maxChars)
+  if (!(beforeText + afterText).trim()) return null
 
-  const { beforeText, afterText } = takeCaretContext(beforeAll, afterAll, options.maxChars)
   const sectionKind =
     parent.type.name === 'promptSection' && isSectionKind(parent.attrs.kind)
       ? parent.attrs.kind
@@ -67,6 +65,22 @@ export function buildEditorCompletionContext(
     afterText,
     sectionKind,
   }
+}
+
+function readCaretContext(
+  parent: { content: { size: number }; textBetween(from: number, to: number, blockSeparator?: string, leafText?: string): string },
+  parentOffset: number,
+  maxChars: number,
+): { beforeText: string; afterText: string } {
+  // ProseMirror offsets and visible text length are identical for ordinary text nodes.
+  // A small bounded overscan keeps hard-break/inline-node separators from starving the
+  // configured text budget without ever materializing the whole existing block first.
+  const scanBudget = Math.max(maxChars, Math.min(maxChars * 2, maxChars + 64))
+  const beforeFrom = Math.max(0, parentOffset - scanBudget)
+  const afterTo = Math.min(parent.content.size, parentOffset + scanBudget)
+  const beforeAll = parent.textBetween(beforeFrom, parentOffset, '\n', '\n')
+  const afterAll = parent.textBetween(parentOffset, afterTo, '\n', '\n')
+  return takeCaretContext(beforeAll, afterAll, maxChars)
 }
 
 function takeCaretContext(
