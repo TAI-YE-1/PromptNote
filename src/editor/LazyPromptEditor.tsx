@@ -13,7 +13,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   ref,
 ) {
   return (
-    <Suspense fallback={<div className="editor-loading" aria-live="polite">正在打开编辑器…</div>}>
+    <Suspense fallback={<div className="inline-status" aria-live="polite">正在打开编辑器…</div>}>
       <LazyPromptEditor {...props} ref={ref} />
     </Suspense>
   )
