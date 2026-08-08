@@ -40,6 +40,18 @@ export function AiAdvancedSettings(props: {
       <div className="ai-advanced__body">
         <div className="ai-advanced__group">
           <div className="ai-advanced__title">补全性能</div>
+          <label className="ai-advanced__field">
+            <span>补全模型（可选）</span>
+            <input
+              value={props.settings.completionModel}
+              maxLength={200}
+              placeholder={props.settings.model ? `留空沿用 ${props.settings.model}` : '留空沿用主 Model'}
+              onChange={(event) =>
+                props.onSettings({ ...props.settings, completionModel: event.target.value })
+              }
+            />
+            <small>建议使用低延迟模型；留空时补全与其他 AI 功能共用主 Model。</small>
+          </label>
           <PresetNumberField
             label="补全上下文"
             value={props.settings.completionContextChars}
