@@ -18,6 +18,7 @@ export const defaultAiSettings: AiSettings = {
   completionEnabled: false,
   completionContextChars: 320,
   completionDelayMs: 300,
+  completionModel: '',
   instructionOverrides: {},
   provider: 'openai-compatible',
   model: '',
@@ -46,6 +47,7 @@ export class ChromeAiSettingsRepository implements AiSettingsRepository {
       completionEnabled: legacyUnverified ? false : Boolean(stored.completionEnabled),
       completionContextChars: normalizeCompletionContextChars(stored.completionContextChars),
       completionDelayMs: normalizeCompletionDelayMs(stored.completionDelayMs),
+      completionModel: typeof stored.completionModel === 'string' ? stored.completionModel.slice(0, 200) : '',
       instructionOverrides: normalizeInstructionOverrides(stored.instructionOverrides),
     }
   }
