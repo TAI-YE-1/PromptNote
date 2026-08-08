@@ -57,6 +57,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
     const requestSequence = ++requestSequenceRef.current
     const timer = window.setTimeout(() => {
       void (async () => {
+        let lastUsablePartial: string | null = null
         try {
           const provider = getAiProvider(input.settings)
           const result = await provider.streamCompletion(
@@ -65,7 +66,9 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
             (partial) => {
               if (controller.signal.aborted || requestSequenceRef.current !== requestSequence) return
               const normalized = normalizeCompletion(partial)
-              if (normalized) setCompletionText(normalized)
+              if (!normalized) return
+              lastUsablePartial = normalized
+              setCompletionText(normalized)
             },
             controller.signal,
           )
@@ -79,6 +82,13 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
           lastErrorRef.current = null
         } catch (error) {
           if (controller.signal.aborted || requestSequenceRef.current !== requestSequence) return
+          if (lastUsablePartial) {
+            cacheCompletion(cacheRef.current, cacheKey, lastUsablePartial)
+            setCompletionText(lastUsablePartial)
+            lastErrorRef.current = null
+            return
+          }
+
           const message = error instanceof Error ? error.message : String(error)
           retryAfterRef.current = Date.now() + COMPLETION_ERROR_BACKOFF_MS
           setCompletionText(null)
