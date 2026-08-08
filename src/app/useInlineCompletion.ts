@@ -3,7 +3,6 @@ import { getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import type { EditorCompletionContext } from '../editor/PromptEditor'
 
-const COMPLETION_DEBOUNCE_MS = 250
 const COMPLETION_ERROR_BACKOFF_MS = 30_000
 const COMPLETION_MIN_CONTEXT = 2
 const COMPLETION_CACHE_SIZE = 8
@@ -79,13 +78,20 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
           }
         }
       })()
-    }, COMPLETION_DEBOUNCE_MS)
+    }, input.settings.completionDelayMs)
 
     return () => {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [contextBeforeText, contextPosition, input.onError, input.settings, ready])
+  }, [
+    contextBeforeText,
+    contextPosition,
+    input.onError,
+    input.settings,
+    input.settings.completionDelayMs,
+    ready,
+  ])
 
   return completionText
 }
