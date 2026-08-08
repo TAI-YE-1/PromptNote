@@ -8,7 +8,7 @@ export const AI_ACTION_INSTRUCTIONS: Record<AiAction, string> = {
   ambiguity: '指出并改写最重要的一处歧义；只返回建议文本。',
   structure: '只给出结构整理建议，不整篇重写。',
   complete:
-    '从用户当前光标前的 Prompt 上下文自然续写一小段。最多约 60 个中文字符或两句；不要重复已有文本，不加解释、标题、引号或 Markdown 围栏，只返回应直接接在光标后的文字。',
+    '只续写用户当前正在编辑的文本块。输入可能包含“当前模块”和“光标前文本”；模块信息只用于理解语义，不要输出模块标签。最多约 60 个中文字符或两句；不要引用或重复光标前已有文本，不要借用其他模块的句式，不加解释、标题、引号或 Markdown 围栏，只返回应直接接在光标后的文字。',
 }
 
 export const AI_COMMON_INSTRUCTION =
