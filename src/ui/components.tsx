@@ -2,6 +2,9 @@ export { AiSheet, aiActionLabels } from './AiSheet'
 export { DocumentSheet } from './DocumentSheet'
 export { LintCard } from './LintCard'
 export { Preview } from './Preview'
-export { SelectionActionBar } from './SelectionActionBar'
+export {
+  SelectionActionBar,
+  SelectionActionBar as SelectionContextMenu,
+} from './SelectionActionBar'
 export { SlashMenu } from './SlashMenu'
 export { SuggestionCard } from './SuggestionCard'
