@@ -1,3 +1,4 @@
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { sectionKindMeta, sectionKinds } from '../prompt/sectionKinds'
 import type { EditableBlockFormat } from '../editor/blockConversion'
 import type { EditorSelectionSnapshot } from '../editor/PromptEditor'
@@ -57,6 +58,6 @@ export function SelectionActionBar(props: {
   )
 }
 
-function keepEditorSelection(event: React.MouseEvent<HTMLButtonElement>) {
+function keepEditorSelection(event: ReactMouseEvent<HTMLButtonElement>) {
   event.preventDefault()
 }
