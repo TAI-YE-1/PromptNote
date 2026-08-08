@@ -117,6 +117,36 @@ describe('AI providers', () => {
     expect(body.stream).toBe(true)
   })
 
+  it('recognizes SSE even when an OpenAI-compatible gateway mislabels its content type', async () => {
+    const settings = { ...openAiSettings, baseUrl: 'https://mislabeled-stream.example.com/v1' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          [
+            'data: {"choices":[{"delta":{"content":"快"}}]}',
+            '',
+            'data: {"choices":[{"delta":{"content":"速"}}]}',
+            '',
+            'data: [DONE]',
+            '',
+          ].join('\n'),
+          { status: 200, headers: { 'Content-Type': 'text/plain' } },
+        ),
+      ),
+    )
+
+    const partials: string[] = []
+    await expect(
+      getAiProvider(settings).streamCompletion(
+        settings,
+        { action: 'complete', content: '继续' },
+        (text) => partials.push(text),
+      ),
+    ).resolves.toBe('快速')
+    expect(partials).toEqual(['快', '快速'])
+  })
+
   it('falls back once when an OpenAI-compatible endpoint rejects streaming', async () => {
     const settings = { ...openAiSettings, baseUrl: 'https://no-stream.example.com/v1' }
     const fetchMock = vi
