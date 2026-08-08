@@ -1,7 +1,5 @@
-import { forwardRef, lazy, Suspense, type ComponentPropsWithoutRef } from 'react'
-import type { PromptEditorHandle } from './PromptEditor'
-
-type PromptEditorProps = ComponentPropsWithoutRef<(typeof import('./PromptEditor'))['PromptEditor']>
+import { forwardRef, lazy, Suspense } from 'react'
+import type { PromptEditorHandle, PromptEditorProps } from './PromptEditor'
 
 const LazyPromptEditor = lazy(async () => {
   const module = await import('./PromptEditor')
