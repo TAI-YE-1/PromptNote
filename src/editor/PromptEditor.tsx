@@ -81,7 +81,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       emitCompletionContext(current)
       emitSelectionSnapshot(current)
     },
-    onBlur: () => publishCompletionContext(null),
+    onBlur: ({ editor: current }) => invalidateCompletion(current),
   })
 
   useEffect(() => {
@@ -91,10 +91,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       emitUpdate: false,
       errorOnInvalidContent: true,
     })
-    setGhostCompletion(editor.view, null)
+    invalidateCompletion(editor)
     props.onSelectionChange(null)
-    completionContextKeyRef.current = null
-    props.onCompletionContext(null)
   }, [editor, props.documentId])
 
   useEffect(() => {
@@ -113,8 +111,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   useEffect(() => {
     if (!editor) return
-    completionContextKeyRef.current = null
-    setGhostCompletion(editor.view, null)
+    invalidateCompletion(editor)
     emitCompletionContext(editor)
   }, [props.completionContextChars, editor])
 
@@ -125,9 +122,14 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     props.onCompletionContext(context)
   }
 
+  function invalidateCompletion(currentEditor: NonNullable<typeof editor>) {
+    setGhostCompletion(currentEditor.view, null)
+    publishCompletionContext(null)
+  }
+
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
     if (!currentEditor.view.hasFocus() || currentEditor.view.composing) {
-      publishCompletionContext(null)
+      invalidateCompletion(currentEditor)
       return
     }
 
