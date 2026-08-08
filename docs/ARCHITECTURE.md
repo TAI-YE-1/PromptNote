@@ -46,6 +46,7 @@ Extension Preferences
 ├─ completionEnabled
 ├─ completionContextChars
 ├─ completionDelayMs
+├─ completionModel
 ├─ instructionOverrides
 ├─ Provider
 ├─ Model
@@ -133,7 +134,7 @@ settings.configured
 `storage/` 是本地持久化唯一入口。
 
 - `PromptRepository`：PromptDocument；
-- AI settings repository：Provider、credential、AI 总开关、补全开关、补全调优数值和每动作指令覆盖等扩展偏好。
+- AI settings repository：Provider、credential、AI 总开关、补全开关、补全调优数值、补全模型和每动作指令覆盖等扩展偏好。
 
 禁止正文同时写 localStorage / IndexedDB / Chrome Storage 多份副本；禁止保存 Markdown/XML 派生副本。
 
@@ -156,7 +157,7 @@ AI 有两类调用：
 
 Suggestion 必须带来源 revision；过期 suggestion 不得应用。
 
-内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。
+内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。补全可以配置独立 `completionModel`；为空时沿用主 `Model`，非空时只有 `complete` action 使用该模型，其他 AI 动作保持主模型。
 
 `ai/instructions.ts` 是内置 AI 动作指令的唯一权威。每个 action 可以在 Extension Preferences 中保存一个局部 override；空 override 使用默认。公共行为约束仍由代码统一附加，避免每个 Provider 维护另一套 system prompt。
 
@@ -178,7 +179,7 @@ AND completionEnabled = true
 
 默认 `completionEnabled=false`。修改 Provider / Model / Base URL / API Key 后，连接状态和补全开关必须失效，避免对未经重新确认的端点自动发请求。
 
-补全上下文和触发延迟属于行为偏好，不属于 Provider 身份；改变它们或 action instruction override 不要求重新验证连接。
+补全上下文、触发延迟、补全模型和 action instruction override 属于行为偏好，不属于 Provider 身份；改变它们不要求重新验证主连接。
 
 ### 5.2 热路径
 
@@ -187,10 +188,12 @@ AND completionEnabled = true
 - caret 前只发送 `completionContextChars` 指定的有限上下文；默认 320 字符；快捷预设 160 / 320 / 640，也允许 16–2000 的自定义整数；
 - 编辑停顿 `completionDelayMs` 后才请求；默认 300ms；快捷预设 150 / 300 / 600ms，也允许 50–3000ms 的自定义整数；
 - preset 只是 UI 快捷选择，持久状态只保存最终整数，禁止维护第二套 preset/customValue 业务状态；
-- 继续输入/移动 caret 时取消旧请求；
+- OpenAI-compatible 与 Anthropic 补全均优先使用流式响应，第一批有效文本到达后立即更新 ghost，不等待完整响应结束；
+- 流式端点明确不支持 streaming 时自动降级为普通 completion，并在当前扩展会话中记住该端点，避免每次重复探测；
+- 继续输入/移动 caret 时取消旧请求；额外使用 request sequence guard，防止已经过期的回调覆盖新上下文；
 - 相同上下文允许短期小容量复用，避免无意义重复请求；
 - Provider 请求保持短 continuation；
-- 失败后短暂退避，避免连续失败造成请求风暴；
+- 完全失败只做约 3 秒短退避，不再让一次错误造成 30 秒“假失效”；如果流已经返回可用 partial 后才发生连接中断，保留已到达的 partial；
 - 过期结果不得显示；
 - ghost text 不触发 autosave / Compiler / revision。
 
@@ -198,7 +201,7 @@ AND completionEnabled = true
 
 Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 
-- `Tab` → 把 ghost 插入当前 transaction，随后清除；
+- `Tab` → 把当前已显示的 ghost 插入 transaction，随后清除；流仍在进行时也允许接受当前 partial，正文变化后旧流立即取消；
 - `Esc` → 只清除 decoration；
 - docChanged / selectionSet → 自动清除 stale ghost；
 - 保留有意义的前导空格，避免英文/代码续写拼接错误。
@@ -215,6 +218,7 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 - completionEnabled；
 - completionContextChars；
 - completionDelayMs；
+- completionModel；
 - instructionOverrides；
 - Provider；
 - Model；
@@ -229,6 +233,7 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 - AI suggestions；
 - 当前 selection；
 - ghost completion；
+- 当前流式补全 request sequence / partial；
 - UI 打开/关闭状态；
 - “自定义”输入编辑中的临时文本。
 
@@ -246,7 +251,8 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 - ghost decoration 变化触发正文保存；
 - 每次键入立即发补全请求；
 - 多个过期补全请求并发堆积；
-- 明明配置了短上下文却仍向 Provider 发送更长上下文。
+- 明明配置了短上下文却仍向 Provider 发送更长上下文；
+- 为等待完整补全文本而阻塞首批 ghost 展示。
 
 AI 配置保存和正文 autosave 是不同语义，不得共享 revision 或对象。
 
@@ -273,7 +279,7 @@ sidePanel
 
 - AI 未配置 → 显式 AI 动作进入设置；核心编辑继续可用；
 - AI Provider 失败 → 显示真实错误；
-- 补全失败 → 清除 ghost、短暂退避、编辑继续可用；
+- 补全完全失败 → 清除 ghost、短暂退避、编辑继续可用；已有可用 stream partial 时优先保留 partial；
 - Storage 保存失败 → 明确显示未保存；
 - 未知 PromptDocument schemaVersion → fail-closed；
 - Copy 失败 → 明确提示从 Preview 手动复制。
@@ -288,6 +294,7 @@ V1 优先覆盖：
 - PromptSection / Slash Menu / block conversion；
 - Repository 与 AI preferences；
 - Provider HTTP / transport / timeout / cancellation；
+- OpenAI-compatible / Anthropic streaming partial、非流式兼容降级和 dedicated completion model 路由；
 - AI action instruction override 与默认公共约束组合；
 - 自定义补全参数持久化、非法历史值回退；
 - Suggestion 接受/忽略/revision guard；
