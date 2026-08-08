@@ -12,9 +12,9 @@ export function SelectionContextMenu(props: {
 }) {
   const [open, setOpen] = useState(false)
   const { rect } = props.selection
-  const left = clamp(rect.left + rect.width + 12, 18, Math.max(18, rect.containerWidth - 18))
-  const placeBelow = rect.top < 42
-  const top = placeBelow ? rect.top + rect.height + 8 : rect.top - 8
+  const left = clamp(rect.left + rect.width + 8, 8, Math.max(8, rect.containerWidth - 36))
+  const placeBelow = rect.top < 46
+  const top = placeBelow ? rect.top + rect.height + 6 : Math.max(8, rect.top - 34)
   const currentLabel =
     props.selection.blockFormat === 'paragraph'
       ? '普通段落'
