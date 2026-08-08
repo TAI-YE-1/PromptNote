@@ -29,7 +29,7 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - completion 可配置上下文/延迟/独立模型，支持 streaming-first、旧请求取消、独立网络 cadence、IME suppression 和 transient recovery；
 - 预存长文本补全按局部 caret context 读取，不为了发送有限上下文 materialize 整个已有 block；
 - Provider 流式兼容以实际 response body 为准，可处理 `text/plain` SSE 和误标成 `text/event-stream` 的普通 JSON；
-- TipTap/ProseMirror Editor 已从 Side Panel shell 真实拆成 lazy chunk；
+- 根级 Runtime Error Boundary：运行时异常应显示真实错误与“重新打开”，不得再次无信息整页白屏；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 **Web Insert 已从 V1 删除。** PromptNote 不再向 ChatGPT/Claude/Gemini 等网页输入框注入内容，也没有 Web Adapter/content script/page bridge。外部交付统一使用 Copy。
@@ -186,29 +186,24 @@ AND 编辑器内联补全已开启
 - completion settings 直接用不可变对象 identity，不构造 credential identity string；
 - idle debounce 与 network cadence 分离，IME composition 不请求；
 - streaming partial 约每 48ms 合并刷新；
-- AI Settings / Document Sheet 按需加载；
-- **TipTap/ProseMirror PromptEditor 也已真实拆成 async chunk。**
+- AI Settings / Document Sheet 仍按需加载；
+- **PromptEditor 当前恢复为同步打包。**
 
-最新静态构建中，原单一：
+2026-08-08 的真实 Chrome 反馈显示：把 TipTap/ProseMirror `PromptEditor` 拆成运行时 `React.lazy + dynamic import()` 后，Side Panel 会先短暂正常显示约 0.1 秒，随后整页白屏。CI/typecheck/build 均无法捕获这个浏览器运行时回归。因此该拆包已立即撤销。
 
-```text
-sidepanel 616.97 kB / gzip 195.41 kB
-```
-
-已拆为约：
+最新静态构建重新回到单主包约：
 
 ```text
-sidepanel shell   228.57 kB / gzip 73.72 kB
-PromptEditor      388.80 kB / gzip 122.57 kB（async）
+sidepanel 618.05 kB / gzip 195.78 kB
 ```
 
-同步主 chunk 体积因此下降约 63%，原 `>500KB` Vite warning 通过真实 code splitting 自然消失，**没有调整 warning limit**。这不表示总 JavaScript 同比例减少；Editor chunk 仍会在 shell 后加载。最终启动速度、首次编辑和输入体感必须继续由真实 Chrome/Edge 验收。
+`>500KB` Vite warning 重新出现并明确保留。**不得通过调整 `chunkSizeWarningLimit` 掩盖；也不得在没有真实 Chrome/Edge 验证方案前重新引入 PromptEditor runtime lazy split。** 性能优化继续优先从真实热路径、依赖与可验证启动瓶颈入手。
 
 ## 当前建议的真实浏览器 smoke
 
 更新构建后优先验证：
 
-1. Side Panel 打开后 Editor lazy chunk 正常出现并可立即输入；
+1. Side Panel 打开后保持稳定，不再出现“正常约 0.1 秒 → 白屏”；若仍有运行时异常，应显示 `PromptNote 运行失败` 和真实错误，而不是纯白；
 2. 快速连续输入约 5～10 秒，最终“已保存”只对应最新正文；
 3. 保存一份电脑 JSON 备份，继续修改正文，再恢复同 ID 备份并选择“覆盖”，确认 Editor 立即换回备份正文；
 4. 关闭/重开 Side Panel 或浏览器后，确认覆盖内容仍在；
