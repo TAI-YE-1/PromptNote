@@ -62,6 +62,8 @@ D017 已明确退役 Web Insert。不得重新加入 `activeTab`、`scripting`�
 
 D018 已明确退役文字旁微型 `•••` 选区入口。不得重新用 `window.getSelection()`、viewport rect、`coordsAtPos` 浮动坐标或另一套 DOM selection 状态恢复它；选区操作入口固定为 Side Panel 主 actionbar 上方的稳定 SelectionActionBar。
 
+D020 已明确把 completion idle debounce 与真实 Provider cadence 分开。不得通过继续缩短 debounce、隐藏错误 toast 或堆第二套缓存来“提高补全灵敏度”；先审查 IME composition、network cadence、stale request、Retry-After 和 transient/persistent error classification。
+
 ## 3. 真实项目优先
 
 涉及以下内容必须读取仓库真实定义，不得猜测：
@@ -73,7 +75,7 @@ D018 已明确退役文字旁微型 `•••` 选区入口。不得重新用 `
 - 依赖版本；
 - 测试命令与 CI 结果；
 - Provider 请求；
-- TipTap/ProseMirror transaction 行为。
+- TipTap/ProseMirror transaction / composition 行为。
 
 未执行的验证不得描述为已通过。
 
@@ -146,9 +148,13 @@ TipTap、Slash Menu、语义块、编辑命令、selection、ghost completion de
 
 选区业务状态只能从 ProseMirror EditorState 派生：selected text、from/to、single-block format。不得把 DOM selection 或屏幕坐标当第二状态源。跨块 selection 的 block format 为 `null`，禁止类型转换。
 
+Editor 在 `view.composing=true` 时必须撤销 completion context，不得把中文/日文输入法未提交的中间态发给 App。
+
 ### `app/`
 
 组合应用状态和 UI。`useInlineCompletion` 只负责补全请求调度，不保存正文。
+
+补全调度只能消费 Editor 已发布的稳定 context；新 context 必须取消旧 request、旧等待和旧 retry。请求 cadence / retry 数值必须从 `ai/completionTuning.ts` 读取，不在 Hook 里另建平行常量集。
 
 ### `storage/`
 
@@ -159,6 +165,8 @@ TipTap、Slash Menu、语义块、编辑命令、selection、ghost completion de
 Provider、Suggestion、Lint 与错误归一化。
 
 普通 AI 编辑结果必须先返回 Suggestion/Finding；不得直接修改 PromptDocument。
+
+Provider 网络错误必须保留足以调度的结构信息，至少能区分 transient/persistent；429 `Retry-After`、HTTP status 与可读错误 message 不得在 Adapter 层被丢掉。JSON error body 不直接整坨展示给用户。
 
 ### `extension/`
 
@@ -191,17 +199,21 @@ settings.configured
 - 修改 Provider / Model / Base URL / API Key 后 configured 和 completionEnabled 必须失效；
 - 关闭 AI 总开关必须停止补全；
 - 输入/移动 caret 后旧请求必须取消或其结果必须丢弃；
-- 请求必须防抖，不得每次键入立即调用 Provider；
+- IME composition 期间不得生成 completion context 或发 Provider 请求；
+- `completionDelayMs` 只是用户停顿 debounce，不得直接作为真实请求频率上限；
+- 真实 Provider 请求必须另有最小 cadence，较长句子中的多个自然停顿不能形成请求风暴；
 - 只发送当前 text block 内、由 `completionContextChars` 限制的 caret 前后局部上下文，不借补全静默长期上传完整文档；
 - `completionContextChars` 必须显式贯穿 Editor，并进入 request identity；禁止 UI 显示小值而 Editor 静默回退更大值；
 - 使用短输出上限；
-- 失败后应短退避，禁止请求风暴；
+- transient 429/5xx/timeout/transport 应在同一 context 内有限次指数退避自动恢复，并尊重 `Retry-After`；
+- persistent auth/config/quota error 不得无限重试；
+- 单次 transient failure 不应立即弹通用“补全不可用”；不能用隐藏错误代替实际重试；
 - ghost text 不写 PromptDocument、不触发 autosave/Compiler/revision；
 - `Tab` 接受，`Esc` 忽略；
-- doc/selection/context budget 变化必须清除 stale ghost；
+- doc/selection/context budget/composition 变化必须清除 stale ghost；
 - 必须保留有意义的前导空格，兼容英文/代码续写；
 - streaming partial 可以在很短窗口合并 UI 更新，但不得等待完整回复后才显示；
-- streaming capability cache 必须至少区分 Provider、endpoint 与实际 completion model；
+- streaming capability cache 必须至少区分 Provider、endpoint 与实际 completion model，并有容量上限；
 - SSE parser 需要容忍合法 keep-alive/comment 行和错误 Content-Type。
 
 不要为了“更智能”自动接受补全、自动生成整篇 Prompt 或把 ghost 保存下来。
@@ -229,7 +241,9 @@ Suggestion：
 - 是否每次键入执行当前 UI 不需要的派生计算；
 - 是否重复读取整个 Storage 或启动时重复读取相同 key；
 - 是否重复注册 listener；
-- 是否产生可取消却仍并发堆积的 AI 请求；
+- 是否把每个用户停顿映射成一个真实 AI 网络请求；
+- 是否在 IME composition 中产生无价值请求；
+- 是否产生可取消却仍并发堆积的 AI 请求/重试；
 - 是否每个 streaming token 都触发根组件 render；
 - 是否把 decoration 变化误当正文变化；
 - 是否首屏同步加载只有打开 Sheet 才需要的 UI；
@@ -273,6 +287,8 @@ sidePanel
 - cancellation；
 - 当前 block 的 caret 前/后 context 和配置 budget；
 - streaming partial / fallback / SSE keepalive；
+- request cadence：首次 debounce、最小网络间隔、backoff/Retry-After；
+- Provider transient/persistent 429/5xx/error body 分类；
 - Tab accept；
 - Esc dismiss；
 - doc change stale invalidation；
@@ -282,7 +298,7 @@ sidePanel
 
 Storage 至少覆盖：并发保存、revision 单调性、启动 current/documents 批量读取。
 
-最终仍必须有真实 Chrome/Edge 浏览器证据，fixture/单测不能冒充 E2E。
+最终仍必须有真实 Chrome/Edge 浏览器证据，fixture/单测不能冒充 E2E；中文 IME 下连续输入约 40–100 字、多个自然停顿的补全稳定性属于当前重点真机证据。
 
 ## 13. P0.5 原型规则
 
