@@ -141,7 +141,19 @@ AI 设置至少包含：
 - 测试连接；
 - 保存配置。
 
-Provider、模型、credential 与补全偏好属于 Extension Preferences，不属于 PromptDocument。
+高级设置可折叠提供：
+
+- 补全上下文快捷预设：`短 160 / 中 320 / 长 640 / 自定义`，默认 320；
+- 补全触发延迟快捷预设：`快 150ms / 平衡 300ms / 稳 600ms / 自定义`，默认 300ms；
+- 自定义上下文允许 16–2000 字符；
+- 自定义触发延迟允许 50–3000ms；
+- 每个 AI 动作的指令模板覆盖；留空即恢复该动作的内置默认。
+
+预设只用于快速选择，持久化的是最终数值本身，不保存第二套 preset/customValue 状态。修改补全性能参数或 AI 指令模板不应使已验证 Provider 连接失效；只有 Provider、Model、Base URL、API Key 等连接身份发生变化时才需要重新验证。
+
+PromptNote 保留一层公共 AI 行为约束；用户自定义的是单个功能的任务指令，不自动移除公共约束。
+
+Provider、模型、credential、补全偏好、补全性能参数与 AI 指令覆盖都属于 Extension Preferences，不属于 PromptDocument。
 
 ### 3.5 内容发送范围必须可理解
 
@@ -149,7 +161,7 @@ Provider、模型、credential 与补全偏好属于 Extension Preferences，不
 
 全局动作若需要完整 Prompt，入口必须明确表达。
 
-内联补全只发送当前 caret 前的有限文本上下文，不能借补全能力静默扩大为全文长期上传。
+内联补全只发送当前 caret 前、按用户设置截取的有限文本上下文，不能借补全能力静默扩大为全文长期上传。
 
 ### 3.6 无 AI 也能完整使用
 
