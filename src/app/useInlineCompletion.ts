@@ -46,10 +46,18 @@ export function useInlineCompletion(
 
   useEffect(() => {
     setCompletion(null)
-    if (!ready || !context || blockContextLength(context) < COMPLETION_MIN_BLOCK_CONTEXT) return
+    if (!ready || !context) return
 
     const contextSnapshot = context
-    const requestKey = contextSnapshot.key
+    const requestContext = limitCaretContext(contextSnapshot, input.settings.completionContextChars)
+    if (blockContextLength(requestContext) < COMPLETION_MIN_BLOCK_CONTEXT) return
+
+    const requestKey = [
+      contextSnapshot.key,
+      requestContext.beforeText,
+      requestContext.afterText,
+      input.settings.completionContextChars,
+    ].join('\u0000')
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
       contextKey: contextSnapshot.key,
@@ -75,7 +83,7 @@ export function useInlineCompletion(
             input.settings,
             {
               action: 'complete',
-              content: completionPrompt(contextSnapshot),
+              content: completionPrompt(requestContext),
             },
             (partial) => {
               if (
@@ -85,7 +93,7 @@ export function useInlineCompletion(
               ) {
                 return
               }
-              const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
+              const normalized = normalizeCompletion(partial, requestContext.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
               setCompletion(makeSuggestion(normalized))
@@ -100,7 +108,7 @@ export function useInlineCompletion(
             return
           }
 
-          const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
+          const normalized = normalizeCompletion(result, requestContext.beforeText)
           if (!normalized) return
 
           cacheCompletion(cacheRef.current, requestKey, normalized)
@@ -139,6 +147,35 @@ export function useInlineCompletion(
   }, [context, input.onError, input.settings, ready])
 
   return completion
+}
+
+function limitCaretContext(
+  context: EditorCompletionContext,
+  maxChars: number,
+): EditorCompletionContext {
+  const beforeAll = context.beforeText
+  const afterAll = context.afterText
+  if (beforeAll.length + afterAll.length <= maxChars) return context
+
+  if (!afterAll) return { ...context, beforeText: beforeAll.slice(-maxChars) }
+  if (!beforeAll) return { ...context, afterText: afterAll.slice(0, maxChars) }
+
+  const beforeTarget = Math.ceil(maxChars * 0.65)
+  const afterTarget = maxChars - beforeTarget
+  let beforeText = beforeAll.slice(-beforeTarget)
+  let afterText = afterAll.slice(0, afterTarget)
+  let remaining = maxChars - beforeText.length - afterText.length
+
+  if (remaining > 0 && beforeText.length < beforeAll.length) {
+    const extra = beforeAll.slice(-Math.min(beforeAll.length, beforeText.length + remaining))
+    remaining -= extra.length - beforeText.length
+    beforeText = extra
+  }
+  if (remaining > 0 && afterText.length < afterAll.length) {
+    afterText = afterAll.slice(0, afterText.length + remaining)
+  }
+
+  return { ...context, beforeText, afterText }
 }
 
 function blockContextLength(context: EditorCompletionContext): number {
