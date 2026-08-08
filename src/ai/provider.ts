@@ -3,6 +3,8 @@ import type { AiProvider, AiRequest, AiSettings } from './types'
 
 export const AI_REQUEST_TIMEOUT_MS = 30_000
 
+const nonStreamingEndpoints = new Set<string>()
+
 function trimBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
 }
@@ -39,9 +41,16 @@ async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Pr
 
 async function readJson(response: Response): Promise<unknown> {
   const text = await response.text()
-  if (!response.ok) {
-    throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+  if (!response.ok) throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    throw new Error('AI 返回了无法解析的 JSON。')
   }
+}
+
+async function readSuccessfulJson(response: Response): Promise<unknown> {
+  const text = await response.text()
   try {
     return JSON.parse(text) as unknown
   } catch {
@@ -78,6 +87,83 @@ function extractAnthropicContent(value: unknown): string {
   return text
 }
 
+function completionBody(settings: AiSettings, request: AiRequest, stream: boolean) {
+  return JSON.stringify({
+    model: settings.model,
+    temperature: 0.1,
+    stream,
+    messages: [
+      { role: 'system', content: buildSystemInstruction(settings, request.action) },
+      { role: 'user', content: userPayload(request) },
+    ],
+  })
+}
+
+function anthropicBody(settings: AiSettings, request: AiRequest, stream: boolean) {
+  return JSON.stringify({
+    model: settings.model,
+    max_tokens: request.action === 'complete' ? 120 : 800,
+    temperature: request.action === 'complete' ? 0.1 : 0.2,
+    stream,
+    system: buildSystemInstruction(settings, request.action),
+    messages: [{ role: 'user', content: userPayload(request) }],
+  })
+}
+
+function isEventStream(response: Response): boolean {
+  return (response.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
+}
+
+function isUnsupportedStreaming(status: number, text: string): boolean {
+  return [400, 404, 405, 415, 422].includes(status) && /stream|streaming|sse/i.test(text)
+}
+
+async function readSse(response: Response, onData: (data: string) => void): Promise<void> {
+  if (!response.body) throw new Error('AI 流式响应缺少可读取的 body。')
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const consumeEvent = (event: string) => {
+    for (const rawLine of event.split('\n')) {
+      const line = rawLine.replace(/\r$/, '')
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trimStart()
+      if (data) onData(data)
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    buffer = buffer.replace(/\r\n/g, '\n')
+
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary >= 0) {
+      consumeEvent(buffer.slice(0, boundary))
+      buffer = buffer.slice(boundary + 2)
+      boundary = buffer.indexOf('\n\n')
+    }
+  }
+
+  buffer += decoder.decode()
+  if (buffer.trim()) consumeEvent(buffer)
+}
+
+async function fallbackCompletion(
+  provider: AiProvider,
+  settings: AiSettings,
+  request: AiRequest,
+  onPartial: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const text = await provider.generate(settings, request, signal)
+  onPartial(text)
+  return text
+}
+
 class OpenAICompatibleProvider implements AiProvider {
   async testConnection(settings: AiSettings): Promise<void> {
     await this.generate(settings, { action: 'shorten', content: '测试连接。' })
@@ -105,6 +191,69 @@ class OpenAICompatibleProvider implements AiProvider {
     )
     return extractOpenAIContent(await readJson(response))
   }
+
+  async streamCompletion(
+    settings: AiSettings,
+    request: AiRequest,
+    onPartial: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const endpoint = apiEndpoint(settings.baseUrl, '/v1/chat/completions')
+    const streamKey = `openai-compatible:${endpoint}`
+    if (nonStreamingEndpoints.has(streamKey)) {
+      return fallbackCompletion(this, settings, request, onPartial, signal)
+    }
+
+    const response = await fetchAi(
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${settings.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: completionBody(settings, request, true),
+      },
+      signal,
+    )
+
+    if (!response.ok) {
+      const text = await response.text()
+      if (isUnsupportedStreaming(response.status, text)) {
+        nonStreamingEndpoints.add(streamKey)
+        return fallbackCompletion(this, settings, request, onPartial, signal)
+      }
+      throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+    }
+
+    if (!isEventStream(response)) {
+      const text = extractOpenAIContent(await readSuccessfulJson(response))
+      onPartial(text)
+      return text
+    }
+
+    let accumulated = ''
+    await readSse(response, (data) => {
+      if (data === '[DONE]') return
+      let root: Record<string, unknown> | null = null
+      try {
+        root = asRecord(JSON.parse(data) as unknown)
+      } catch {
+        return
+      }
+      const choices = root?.choices
+      if (!Array.isArray(choices) || !choices[0]) return
+      const choice = asRecord(choices[0])
+      const delta = asRecord(choice?.delta)
+      const content = delta?.content
+      if (typeof content !== 'string' || !content) return
+      accumulated += content
+      onPartial(accumulated)
+    })
+
+    if (!accumulated.trim()) throw new Error('OpenAI-compatible 流式补全返回空内容。')
+    return accumulated.trimEnd()
+  }
 }
 
 class AnthropicProvider implements AiProvider {
@@ -122,17 +271,81 @@ class AnthropicProvider implements AiProvider {
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: settings.model,
-          max_tokens: request.action === 'complete' ? 120 : 800,
-          temperature: request.action === 'complete' ? 0.1 : 0.2,
-          system: buildSystemInstruction(settings, request.action),
-          messages: [{ role: 'user', content: userPayload(request) }],
-        }),
+        body: anthropicBody(settings, request, false),
       },
       signal,
     )
     return extractAnthropicContent(await readJson(response))
+  }
+
+  async streamCompletion(
+    settings: AiSettings,
+    request: AiRequest,
+    onPartial: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const endpoint = apiEndpoint(settings.baseUrl, '/v1/messages')
+    const streamKey = `anthropic:${endpoint}`
+    if (nonStreamingEndpoints.has(streamKey)) {
+      return fallbackCompletion(this, settings, request, onPartial, signal)
+    }
+
+    const response = await fetchAi(
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: anthropicBody(settings, request, true),
+      },
+      signal,
+    )
+
+    if (!response.ok) {
+      const text = await response.text()
+      if (isUnsupportedStreaming(response.status, text)) {
+        nonStreamingEndpoints.add(streamKey)
+        return fallbackCompletion(this, settings, request, onPartial, signal)
+      }
+      throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+    }
+
+    if (!isEventStream(response)) {
+      const text = extractAnthropicContent(await readSuccessfulJson(response))
+      onPartial(text)
+      return text
+    }
+
+    let accumulated = ''
+    await readSse(response, (data) => {
+      let root: Record<string, unknown> | null = null
+      try {
+        root = asRecord(JSON.parse(data) as unknown)
+      } catch {
+        return
+      }
+
+      if (root?.type === 'content_block_start') {
+        const block = asRecord(root.content_block)
+        if (block?.type === 'text' && typeof block.text === 'string' && block.text) {
+          accumulated += block.text
+          onPartial(accumulated)
+        }
+        return
+      }
+
+      if (root?.type !== 'content_block_delta') return
+      const delta = asRecord(root.delta)
+      if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || !delta.text) return
+      accumulated += delta.text
+      onPartial(accumulated)
+    })
+
+    if (!accumulated.trim()) throw new Error('Anthropic 流式补全返回空内容。')
+    return accumulated.trimEnd()
   }
 }
 
