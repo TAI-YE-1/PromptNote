@@ -145,7 +145,8 @@
 - [x] P6-13 修改 Provider/Model/Base URL/API Key 后使 configured/补全开关失效；关闭 AI 同时关闭补全。
 - [x] P6-14 增加 completion preference、流式/降级/model route、Tab/Esc、stale invalidation、英文前导空格、当前 block context 隔离和移动 caret 后拒绝旧 ghost 的测试。
 - [x] P6-16 深排查真实浏览器补全错位/串块问题：context identity 绑定 document generation + block + caret；流式 partial 只可更新原 context；当前语义块不再隐式读取前一块正文；退避窗口内的新 context 不再静默丢弃。
-- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证灰色续写出现、Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；关闭补全后确认不再自动请求。此前真机已发现跨块污染/偶发触发问题，最新 P6-16 修复待复测。
+- [x] P6-17 深排查真机“只在部分 caret 触发 / 只显示首批两三个字”：补全上下文改为当前 block 的 caret 前后双向窗口并支持块首/块中/单字符；用户设置的 context 数值真正限制 Provider payload；流式 ghost decoration key 随 partial 文本更新，禁止 ProseMirror 复用首批 widget DOM；补全指令显式使用 `<光标>` 并要求非空、有用续写。
+- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证块首/块中/块尾均能产生合理灰色续写，流式文字持续增长而非停在首批两三个字，Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；关闭补全后确认不再自动请求。此前真机暴露的问题已进入 P6-16/P6-17，最新构建待复测。
 
 ---
 
@@ -153,7 +154,7 @@
 
 - [x] P7-01 完成轻量文档切换/列表/搜索/新建/删除入口，不扩成 Prompt 管理后台。
 - [x] P7-02 完成最近文档恢复逻辑。
-- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；当前语义块边界已增强，需最终构建确认。
+- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；选区命令菜单与本地检查结果已改为 viewport-safe 浮层，需最新构建真机确认不裁剪、不被底部 actionbar 遮挡。
 - [ ] P7-04 检查键盘可达性和关键操作可发现性；重点含 Slash、Tab 接受 ghost、Esc 忽略 ghost/关闭顶层临时 UI。
 - [ ] P7-05 完整审查错误路径无假成功、无静默失败；当前重点为 Storage、Copy、AI suggestion、inline completion Provider 失败/退避。
 - [ ] P7-06 检查 Copy / Save 的连续、重复操作与状态一致性；Web Insert 状态链已删除。
@@ -173,7 +174,7 @@
 - [ ] P8-05 在 Edge 完成当前最终构建真实主链 smoke。
 - [ ] P8-06 验证浏览器关闭/重启后的最近 Prompt 恢复。
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链，以及补全开关关闭时无自动请求。
-- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；重点包含 block-local、流式 partial、旧 caret 失效和可选 completion model；不再验证 Web Adapter。
+- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；重点包含 block-local、任意 caret、流式 partial 持续更新、旧 caret 失效和可选 completion model；不再验证 Web Adapter。
 - [x] P8-09 Manifest 权限审查：固定权限仅 `storage` / `sidePanel`；无 `activeTab`、`scripting`、content script。optional host permission 只用于用户配置的 AI Provider origin。
 - [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属；lockfile + `npm ci` + 跨平台许可证 CI 门禁持续有效。
 - [ ] P8-11 生成 V1 release notes / Known Limitations。
@@ -184,12 +185,12 @@
 
 ## 当前状态
 
-当前阶段：**Web Insert 已按 D017 从 V1 完整退役，相关 Adapter、content script、消息协议、DOM fixture、`activeTab/scripting` 权限和 UI 按钮均已删除。正式外部输出统一为 Copy。编辑器 opt-in inline completion 已实现流式优先、可配置上下文/延迟/独立补全模型，并完成真实浏览器暴露问题后的 P6-16 深修：补全只读取当前 block，结果绑定原 document/block/caret identity，移动 caret/切块/正文变化后旧 partial 不得重新挂载。代码门禁已通过，最新修复仍需真实 Chrome 复测，再继续 Edge、重启恢复和异常降级验收。**
+当前阶段：**Web Insert 已按 D017 从 V1 完整退役，相关 Adapter、content script、消息协议、DOM fixture、`activeTab/scripting` 权限和 UI 按钮均已删除。正式外部输出统一为 Copy。编辑器 opt-in inline completion 已完成 P6-16/P6-17 深修：当前 block 隔离、caret 前后双向上下文、document/block/caret identity、流式 partial DOM 持续刷新、可配置上下文/延迟/独立补全模型；选区命令与本地检查结果改为 viewport-safe transient panels。代码门禁已通过，最新修复仍需真实 Chrome 复测，再继续 Edge、重启恢复和异常降级验收。**
 
 当前最优先剩余工作：
 
-1. Chrome 真机复测 P6-16：背景/任务/约束等块互不串上下文，移动 caret/切块后旧流不出现，Tab/Esc 正确；
-2. Edge 当前最终 Manifest smoke + 360px/键盘；
-3. 浏览器重启恢复与 AI 禁用/错误/超时降级；
-4. Copy/Save 重复操作、错误路径和真实性能收口；
-5. 最终代码减法、release notes、Known Limitations 与文档最后复核。
+1. Chrome 真机复测 P6-17：同一长块的块首/块中/块尾、单字符块均能触发；流式 ghost 不再只停在最初两三个字；移动 caret/切块后旧流不出现；
+2. 真机确认选区命令菜单不再越出 Side Panel，本地“检查”结果始终位于 actionbar 上方可见；
+3. Edge 当前最终 Manifest smoke + 360px/键盘；
+4. 浏览器重启恢复与 AI 禁用/错误/超时降级；
+5. Copy/Save 重复操作、错误路径、真实性能收口、最终代码减法、release notes 与 Known Limitations。
