@@ -66,6 +66,62 @@ describe('AI providers', () => {
     expect(body).not.toHaveProperty('max_completion_tokens')
   })
 
+  it('surfaces OpenAI-compatible streamed completion as soon as partial text arrives', async () => {
+    const settings = { ...openAiSettings, baseUrl: 'https://stream.example.com/v1' }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        [
+          'data: {"choices":[{"delta":{"content":"你"}}]}',
+          '',
+          'data: {"choices":[{"delta":{"content":"好"}}]}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const partials: string[] = []
+    const result = await getAiProvider(settings).streamCompletion(
+      settings,
+      { action: 'complete', content: '你' },
+      (text) => partials.push(text),
+    )
+
+    expect(result).toBe('你好')
+    expect(partials).toEqual(['你', '你好'])
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>
+    expect(body.stream).toBe(true)
+  })
+
+  it('falls back once when an OpenAI-compatible endpoint rejects streaming', async () => {
+    const settings = { ...openAiSettings, baseUrl: 'https://no-stream.example.com/v1' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('stream parameter unsupported', { status: 400 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ choices: [{ message: { content: '兼容补全' } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const partials: string[] = []
+    await expect(
+      getAiProvider(settings).streamCompletion(
+        settings,
+        { action: 'complete', content: '继续' },
+        (text) => partials.push(text),
+      ),
+    ).resolves.toBe('兼容补全')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(partials).toEqual(['兼容补全'])
+  })
+
   it('uses a per-action instruction override without replacing the common guardrails', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ choices: [{ message: { content: '完成' } }] }), {
@@ -107,6 +163,42 @@ describe('AI providers', () => {
         content: '任务内容',
       }),
     ).resolves.toBe('验收标准建议')
+  })
+
+  it('streams Anthropic text deltas incrementally', async () => {
+    const settings = { ...anthropicSettings, baseUrl: 'https://stream.anthropic.test' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          [
+            'event: content_block_start',
+            'data: {"type":"content_block_start","content_block":{"type":"text","text":""}}',
+            '',
+            'event: content_block_delta',
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"继续"}}',
+            '',
+            'event: content_block_delta',
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"写"}}',
+            '',
+            'event: message_stop',
+            'data: {"type":"message_stop"}',
+            '',
+          ].join('\n'),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+      ),
+    )
+
+    const partials: string[] = []
+    await expect(
+      getAiProvider(settings).streamCompletion(
+        settings,
+        { action: 'complete', content: '请' },
+        (text) => partials.push(text),
+      ),
+    ).resolves.toBe('继续写')
+    expect(partials).toEqual(['继续', '继续写'])
   })
 
   it('surfaces provider HTTP failures instead of returning fake success', async () => {
