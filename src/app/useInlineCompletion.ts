@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { computeCompletionStartDelayMs } from '../ai/completionTuning'
+import {
+  COMPLETION_PERSISTENT_FAILURE_BACKOFF_MS,
+  COMPLETION_TRANSIENT_AUTO_RETRY_LIMIT,
+  computeCompletionStartDelayMs,
+  computeCompletionTransientRetryDelayMs,
+} from '../ai/completionTuning'
 import { AiRequestError, getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import { sectionKindMeta } from '../prompt/sectionKinds'
@@ -12,10 +17,6 @@ const COMPLETION_CACHE_SIZE = 8
 const COMPLETION_MAX_CHARS = 240
 const COMPLETION_OVERLAP_MAX = 32
 const PARTIAL_RENDER_INTERVAL_MS = 48
-const TRANSIENT_BACKOFF_BASE_MS = 1_500
-const TRANSIENT_BACKOFF_MAX_MS = 12_000
-const PERSISTENT_FAILURE_BACKOFF_MS = 30_000
-const TRANSIENT_AUTO_RETRY_LIMIT = 3
 
 interface InlineCompletionInput {
   settings: AiSettings
@@ -163,25 +164,21 @@ export function useInlineCompletion(
           const message = error instanceof Error ? error.message : String(error)
           if (!(error instanceof AiRequestError) || !error.transient) {
             transientFailureCountRef.current = 0
-            retryAtRef.current = Date.now() + PERSISTENT_FAILURE_BACKOFF_MS
+            retryAtRef.current = Date.now() + COMPLETION_PERSISTENT_FAILURE_BACKOFF_MS
             reportCompletionError(message)
             return
           }
 
           const failures = transientFailureCountRef.current + 1
           transientFailureCountRef.current = failures
-          const exponentialBackoff = Math.min(
-            TRANSIENT_BACKOFF_BASE_MS * 2 ** (failures - 1),
-            TRANSIENT_BACKOFF_MAX_MS,
-          )
-          retryAtRef.current = Date.now() + Math.max(exponentialBackoff, error.retryAfterMs ?? 0)
-          if (failures >= TRANSIENT_AUTO_RETRY_LIMIT) {
+          const retryDelay = computeCompletionTransientRetryDelayMs(failures, error.retryAfterMs)
+          retryAtRef.current = Date.now() + retryDelay
+          if (failures >= COMPLETION_TRANSIENT_AUTO_RETRY_LIMIT) {
             reportCompletionError(message)
             return
           }
 
-          const retryWait = Math.max(0, retryAtRef.current - Date.now())
-          if (!(await waitForRetry(retryWait, controller.signal))) return
+          if (!(await waitForRetry(retryDelay, controller.signal))) return
         }
       }
     }
