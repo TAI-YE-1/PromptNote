@@ -29,10 +29,12 @@ describe('ChromeAiSettingsRepository', () => {
     installChromeStorageMock()
   })
 
-  it('defaults inline completion to off when no AI settings exist', async () => {
+  it('defaults inline completion to off with balanced tuning when no AI settings exist', async () => {
     const repository = new ChromeAiSettingsRepository()
     await expect(repository.load()).resolves.toEqual(defaultAiSettings)
     expect(defaultAiSettings.completionEnabled).toBe(false)
+    expect(defaultAiSettings.completionContextChars).toBe(320)
+    expect(defaultAiSettings.completionDelayMs).toBe(300)
   })
 
   it('requires re-verification for settings saved before completion existed', async () => {
@@ -51,14 +53,57 @@ describe('ChromeAiSettingsRepository', () => {
 
     expect(loaded.configured).toBe(false)
     expect(loaded.completionEnabled).toBe(false)
+    expect(loaded.completionContextChars).toBe(320)
+    expect(loaded.completionDelayMs).toBe(300)
+    expect(loaded.instructionOverrides).toEqual({})
   })
 
-  it('stores verified AI preferences separately from PromptDocument content', async () => {
+  it('keeps verified settings while adding tuning defaults to a recent completion config', async () => {
+    store.set('promptnote.aiSettings.v1', {
+      enabled: true,
+      configured: true,
+      completionEnabled: true,
+      provider: 'openai-compatible',
+      model: 'current-model',
+      baseUrl: 'https://example.com',
+      apiKey: 'secret',
+      scope: 'selection',
+    })
+
+    const loaded = await new ChromeAiSettingsRepository().load()
+    expect(loaded.configured).toBe(true)
+    expect(loaded.completionEnabled).toBe(true)
+    expect(loaded.completionContextChars).toBe(320)
+    expect(loaded.completionDelayMs).toBe(300)
+  })
+
+  it('falls back from invalid persisted tuning values without losing connection state', async () => {
+    store.set('promptnote.aiSettings.v1', {
+      ...defaultAiSettings,
+      configured: true,
+      completionEnabled: true,
+      completionContextChars: 999_999,
+      completionDelayMs: 0,
+    })
+
+    const loaded = await new ChromeAiSettingsRepository().load()
+    expect(loaded.configured).toBe(true)
+    expect(loaded.completionContextChars).toBe(320)
+    expect(loaded.completionDelayMs).toBe(300)
+  })
+
+  it('stores custom completion tuning and action instructions separately from PromptDocument content', async () => {
     const repository = new ChromeAiSettingsRepository()
     const settings: AiSettings = {
       enabled: true,
       configured: true,
       completionEnabled: true,
+      completionContextChars: 96,
+      completionDelayMs: 80,
+      instructionOverrides: {
+        complete: '只补全一个短语。',
+        shorten: '压缩到一半长度。',
+      },
       provider: 'openai-compatible',
       model: 'test-model',
       baseUrl: 'https://example.com',
