@@ -63,8 +63,10 @@ Extension Preferences
 src/
 ├─ app/
 │  ├─ PromptNoteApp.tsx
+│  ├─ importDocument.ts
 │  └─ useInlineCompletion.ts
 ├─ editor/
+│  ├─ LazyPromptEditor.tsx   # TipTap/ProseMirror 运行时按需加载边界
 │  ├─ PromptEditor.tsx
 │  ├─ promptSection.ts
 │  ├─ completionContext.ts
@@ -102,7 +104,7 @@ src/
 └─ main.tsx
 ```
 
-文件拆分按真实职责，不为“架构感”制造空 wrapper；`components.tsx` 只保留稳定聚合入口，避免再次退化成巨型 UI 文件。已经被替代的 `SelectionContextMenu`、viewport rect 定位和独立 floating-panel stylesheet 不得保留为平行旧链。
+文件拆分按真实职责，不为“架构感”制造空 wrapper；`components.tsx` 只保留稳定聚合入口，避免再次退化成巨型 UI 文件。已经被替代的 `SelectionContextMenu`、viewport rect 定位和独立 floating-panel stylesheet 不得以别名或兼容导出的形式残留为平行旧链。
 
 ## 4. 依赖方向
 
@@ -120,15 +122,17 @@ Editor 不直接读写 Storage，也不直接调用 Provider。`completionContex
 
 补全 context 必须至少绑定：document id、editor document generation、当前 block 起点、caret position、用户当前 `completionContextChars`、当前 block 的光标前/后文本和 section kind。AI 返回结果不得在到达时重新读取“当前 selection”决定位置。
 
-**已有长文本不能放大 context 构建成本。** `completionContext.ts` 必须先按 caret + `completionContextChars` 建立有限 ProseMirror scan window，再调用 `textBetween()`；禁止先 `textBetween(0, parentOffset)` / `textBetween(parentOffset, parent.content.size)` materialize 整个现有 block 后再 slice。小幅 bounded overscan 只用于兼容 hard-break/inline node separator，不改变最终字符预算。
+**已有长文本不能放大 context 构建成本。** `completionContext.ts` 必须先按 caret + `completionContextChars` 建立有限 ProseMirror scan window，再调用 `textBetween()`；禁止先 materialize 整个现有 block 后再 slice。小幅 bounded overscan 只用于兼容 hard-break/inline node separator，不改变最终字符预算。
 
-**IME composition 与 focus 都是 Editor 层的稳定性边界。** 当 ProseMirror `view.composing=true` 或 Editor 失焦时，Editor 必须同时发布 `null` completion context 并清除 ghost decoration。不能只清 context、留下已经失效的 ghost。composition 完成/focus 恢复后再按当前真实 caret 重建 context。
+**IME composition 与 focus 都是 Editor 层的稳定性边界。** 当 ProseMirror `view.composing=true` 或 Editor 失焦时，Editor 必须同时发布 `null` completion context 并清除 ghost decoration。composition 完成/focus 恢复后再按当前真实 caret 重建 context。
+
+**Editor 必须区分自身产生的正文与外部替换。** `PromptEditor` 在 `onUpdate` 产生的 JSON 对象作为当前已应用 content identity；App 把同一个 content 对象装入新的 PromptDocument 时，Editor 用 O(1) identity 判断这是自身输入，不执行整份 `setContent()`。导入备份等外部操作即使保持相同 document id，只要 content 对象改变，Editor 就必须执行一次受控 `setContent()`、增加 editor generation，并清除 selection/completion transient state。禁止为了区分两者在每次键入时 `JSON.stringify` 整份文档。
 
 `selectionSnapshot.ts` 只从 ProseMirror EditorState 产生选区快照。选区文本、from/to 与单块类型以 ProseMirror selection 为唯一权威；不得重新读取 `window.getSelection()`、`getBoundingClientRect()` 或维护 viewport rect 作为业务状态。跨块选区可以用于文本 AI 动作，但 block type 为 `null`，禁止类型转换。
 
 ### 4.3 App 层
 
-`app/PromptNoteApp.tsx` 负责组合 UI 与应用状态；`useInlineCompletion.ts` 只负责补全请求调度。
+`app/PromptNoteApp.tsx` 负责组合 UI 与应用状态；`importDocument.ts` 只负责导入冲突的纯 revision/id 解析；`useInlineCompletion.ts` 只负责补全请求调度。
 
 补全调度必须同时检查：
 
@@ -144,11 +148,15 @@ settings.configured
 
 `ai/completionTuning.ts` 是补全 context/delay/cadence/retry policy 的唯一数值权威。`useInlineCompletion.ts` 不得再平行维护另一套 request interval、退避基数、最大退避或重试次数常量。
 
-相同 context 的小容量 cache 是纯派生加速。cache hit 必须在 prompt string、Provider adapter、AbortController 和真实 request 调度之前 fast-path；命中时不得先 `setCompletion(null)` 再恢复同一个 ghost，避免无意义 React render/视觉闪烁。
+`AiSettings` 由 React state 以不可变对象替换。补全缓存/请求重置直接依赖稳定 settings 对象 identity；不得为了 Hook identity 每次 render 拼接 Provider、URL、模型、credential 等复合字符串，更不得把 API Key 放入临时 identity string。
 
-补全 error state 是双向状态：Hook 报告真实错误，成功 partial/final/cache hit 后报告 recovery；App 必须清掉已经失效的 `aiError`。用户可见 toast 使用经过长度限制的真实原因，不用永久通用“检查连接”掩盖 Provider 错误。
+相同 context 的小容量 cache 是纯派生加速。cache hit 必须在 prompt string、Provider adapter、AbortController 和真实 request 调度之前 fast-path；命中时不得先 `setCompletion(null)` 再恢复同一个 ghost。
 
-Streaming partial 可以在短时间窗口内合并 UI 更新，当前实现以约 48ms 为上限合并连续 partial，避免每个 token 都触发根 React 树 render；最终结果、错误和 `Tab` 接受仍必须立即收口，不能为了减少 render 等待完整回复才显示。
+补全 error state 是双向状态：Hook 报告真实错误，成功 partial/final/cache hit 后报告 recovery；App 必须清掉已经失效的 `aiError`。用户可见 toast 使用经过长度限制的真实原因。
+
+Streaming partial 可以在短时间窗口内合并 UI 更新，当前实现以约 48ms 为上限合并连续 partial，避免每个 token 都触发根 React 树 render。
+
+**异步保存结果也必须带版本语义。** Repository 完成某个 document snapshot 的 `save()` 后，App 只有在当前 document id + revision 仍与该 snapshot 完全相同时，才允许把顶部状态置为“已保存”。同一文档已有更高 revision 时，旧 save 的晚到成功/失败都不得回退 save badge 或文档列表。文档列表更新必须保持 revision 单调，并使用线性插入更新而不是每次 autosave 重新全量排序。
 
 ### 4.4 Storage 层
 
@@ -160,6 +168,8 @@ Streaming partial 可以在短时间窗口内合并 UI 更新，当前实现以�
 禁止正文同时写 localStorage / IndexedDB / Chrome Storage 多份副本；禁止保存 Markdown/XML 派生副本。
 
 同一 PromptDocument 的持久 revision 必须单调：Repository 收到更旧 revision 时不得覆盖已经持久化的更新 revision。启动恢复应优先批量读取 documents + current id，避免为了恢复当前文档反复进行 Storage round-trip。
+
+用户明确对同 ID 备份选择“覆盖”时，不能削弱 Repository 的 revision 防回退。导入解析必须先把新文档 revision 提升到 `max(local.revision, backup.revision) + 1`，再走正常 `save()`；拒绝覆盖则生成新 id。这样“显式覆盖”仍遵守同一个持久化不变量，而不是建立 bypass 写路径。
 
 ### 4.5 Compiler 层
 
@@ -180,23 +190,30 @@ AI 有两类调用：
 
 Suggestion 必须带来源 revision；过期 suggestion 不得应用。
 
-内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。补全可以配置独立 `completionModel`；为空时沿用主 `Model`，非空时只有 `complete` action 使用该模型，其他 AI 动作保持主模型。OpenAI-compatible / Anthropic 补全优先流式显示首批可用文本；不支持 streaming 的模型/端点组合可回退非流式，但不得伪造流式成功。
+内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。补全可以配置独立 `completionModel`；为空时沿用主 `Model`。OpenAI-compatible / Anthropic 补全优先流式显示首批可用文本；不支持 streaming 的模型/端点组合可回退非流式，但不得伪造流式成功。
 
 Provider 网络错误必须归一化为可判断的错误类型。当前 `AiRequestError` 至少携带 HTTP status、`transient` 与可选 `retryAfterMs`：短时 429、408/409/425、5xx、timeout/transport 可作为临时错误；认证、参数、配置及可识别的额度/配额耗尽属于持久错误。Provider 返回 JSON error body 时优先提取可读 message，错误正文必须有长度上限。
 
-Streaming body detection 以**实际 payload**为权威，不以 `Content-Type` 作为真相源：先 probe body，`data:`/`event:`/comment 进入 SSE；首个有效非空内容以 `{`/`[` 开头则按普通 JSON/text 处理。这样既兼容 `text/plain` SSE，也兼容错误标成 `text/event-stream` 的普通 JSON。不能因为响应头错误把有效补全变成“流式返回空内容”。
+Streaming body detection 以**实际 payload**为权威，不以 `Content-Type` 作为真相源：先 probe body，`data:`/`event:`/comment 进入 SSE；首个有效非空内容以 `{`/`[` 开头则按普通 JSON/text 处理。这样既兼容 `text/plain` SSE，也兼容错误标成 `text/event-stream` 的普通 JSON。
 
-Streaming capability cache 必须至少区分 provider + endpoint + 实际 completion model，不能因为某个模型拒绝 `stream=true` 就把同一网关的所有模型永久降级；该会话缓存本身也必须有容量上限。
+Streaming capability cache 必须至少区分 provider + endpoint + 实际 completion model，且有容量上限。
 
-`ai/instructions.ts` 是内置 AI 动作指令的唯一权威。每个 action 可以在 Extension Preferences 中保存一个局部 override；空 override 使用默认。公共行为约束仍由代码统一附加，避免每个 Provider 维护另一套 system prompt。
+`ai/instructions.ts` 是内置 AI 动作指令的唯一权威。每个 action 可以在 Extension Preferences 中保存一个局部 override；空 override 使用默认。公共行为约束仍由代码统一附加。
 
 ### 4.7 Prompt Lint
 
 本地 deterministic lint 不依赖 AI。AI semantic lint 只有用户显式触发时调用。
 
-### 4.8 Optional UI chunk
+### 4.8 Lazy runtime boundaries
 
-AI 设置 Sheet 和本地 Prompt 管理 Sheet 不属于首屏编辑必须代码，可以通过 `React.lazy`/dynamic import 按用户打开时加载。Lazy boundary 只改变模块加载时机，不得复制 AI settings、Prompt list 或当前文档状态。
+AI 设置 Sheet、本地 Prompt 管理 Sheet 和 TipTap/ProseMirror 编辑器运行时都允许通过 `React.lazy`/dynamic import 拆分。
+
+- Sheet 只在用户打开时加载；
+- Editor chunk 在 Side Panel shell/应用状态加载后异步获取；
+- lazy boundary 只改变代码加载时机，不复制 AI settings、Prompt list、PromptDocument、save state 或 Editor 业务状态；
+- Editor wrapper 只负责 `Suspense + ref` 转发，不创建第二 Editor 实现。
+
+当前真实构建由原单一 `sidepanel` 约 616.97 kB（gzip 195.41 kB）拆为约 228.57 kB（gzip 73.72 kB）的同步 shell 与约 388.80 kB（gzip 122.57 kB）的异步 PromptEditor chunk。该变化表示**首屏同步解析体积下降**，不等同于总 JavaScript 删除 63%。Vite `>500KB` warning 因真实拆包自然消失，未修改 warning limit；最终用户体感仍需真实 Chrome/Edge 验收。
 
 ## 5. 内联补全架构
 
@@ -210,19 +227,19 @@ AND AI 总开关开启
 AND completionEnabled = true
 ```
 
-默认 `completionEnabled=false`。修改 Provider / Model / Base URL / API Key 后，连接状态和补全开关必须失效，避免对未经重新确认的端点自动发请求。
+默认 `completionEnabled=false`。修改 Provider / Model / Base URL / API Key 后，连接状态和补全开关必须失效。
 
 补全上下文、触发延迟、补全模型和 action instruction override 属于行为偏好，不属于 Provider 身份；改变它们不要求重新验证主连接。
 
 ### 5.2 Context 隔离与请求身份
 
-补全默认只读取**当前正在编辑的 text block**。如果当前 block 是 `promptSection`，可以把 section kind/中文模块标签作为语义提示发送给模型，但不得把前一个 Goal / Background / Task / Constraint / Output Format 等 block 的正文通过 `doc.textBetween(...)` 静默拼入当前补全。
+补全默认只读取**当前正在编辑的 text block**。如果当前 block 是 `promptSection`，可以把 section kind/中文模块标签作为语义提示发送给模型，但不得把前一个语义 block 正文静默拼入当前补全。
 
-`completionContextChars` 是当前 block 内以 caret 为中心的最大上下文预算，不是“向前跨多个块取 N 字”。Editor 必须显式接收该配置，禁止内部静默回退到更大的默认值。Context identity 必须记录实际 context budget，设置变化后旧 context 不得继续发送。
+`completionContextChars` 是当前 block 内以 caret 为中心的最大上下文预算，不是“向前跨多个块取 N 字”。Editor 必须显式接收该配置。Context identity 必须记录实际 context budget。
 
-现有 block 的**总长度不属于 request identity 需要 materialize 的输入**。只有 bounded scan 后得到的 `beforeText/afterText` 进入 identity；因此打开已经很长的旧 Prompt、把 caret 放到其中，context 构建成本不会随整个 block 字符数线性增长。
+现有 block 的总长度不属于 request identity 需要 materialize 的输入。只有 bounded scan 后得到的 `beforeText/afterText` 进入 identity。
 
-每个 context 生成不可复用的身份键，至少包含：
+每个 context 身份键至少包含：
 
 ```text
 documentId
@@ -235,29 +252,28 @@ beforeText
 afterText
 ```
 
-流式响应到达时必须再次校验 identity。用户继续输入、移动 caret、切换 block、切换文档、正文在其他位置发生变化、修改 context budget、进入 IME composition 或 Editor blur 后，旧请求/旧 ghost/旧 retry 都必须失效。
+流式响应到达时必须再次校验 identity。用户继续输入、移动 caret、切换 block、切换文档、正文其他位置变化、修改 context budget、进入 IME composition 或 Editor blur 后，旧请求/旧 ghost/旧 retry 都必须失效。
 
 ### 5.3 热路径
 
 当前实现原则：
 
-- 只读取和发送 `completionContextChars` 附近的当前 block 有限上下文；默认 320 字符；快捷预设 160 / 320 / 640，也允许 16–2000 的自定义整数；
-- caret 在块首/块中/块尾都允许利用当前块 before/after 双向上下文形成请求；
-- 编辑停顿 `completionDelayMs` 后才允许启动候选请求；默认 300ms；快捷预设 150 / 300 / 600ms，也允许 50–3000ms 的自定义整数；
-- **用户停顿防抖与真实网络 cadence 分开治理**：网络请求开始时间还受独立最小间隔约束，避免较长句子中多个自然停顿形成请求风暴；该规则是通用稳定性措施，不作为“已有长文本失败”的唯一归因；
-- IME composition 期间没有 completion context，因此不会产生中间组词请求；
-- preset 只是 UI 快捷选择，持久状态只保存最终整数，禁止维护第二套 preset/customValue 业务状态；
-- OpenAI-compatible 与 Anthropic 补全均优先使用流式响应，第一批有效文本到达后尽快更新 ghost，不等待完整响应结束；
-- 连续 streaming partial 可以合并到短渲染窗口，避免 token 粒度根组件 render；
-- 流式模型/端点明确不支持 streaming 时自动降级为普通 completion，并按 provider + endpoint + completion model 记住能力，避免跨模型错误降级和每次重复探测；
+- 只读取和发送 `completionContextChars` 附近的当前 block 有限上下文；默认 320 字符；快捷预设 160 / 320 / 640，也允许 16–2000 自定义；
+- caret 在块首/块中/块尾都允许利用当前块 before/after 双向上下文；
+- 编辑停顿 `completionDelayMs` 后才允许启动候选请求；默认 300ms；
+- 用户停顿防抖与真实网络 cadence 分开治理；
+- IME composition 期间没有 completion context；
+- preset 只是 UI 快捷选择，持久状态只保存最终整数；
+- OpenAI-compatible 与 Anthropic 补全优先流式响应；
+- 连续 streaming partial 合并到短渲染窗口；
+- 不支持 streaming 时按 provider + endpoint + completion model 降级并缓存能力；
 - streaming/non-streaming 由 body sniff 确认，不能只信 header；
-- 继续输入/移动 caret 时取消旧请求；额外使用 request sequence + context identity guard，防止已经过期的回调覆盖新上下文；
-- 相同、仍有效的 context 允许短期小容量复用；cache hit 直接恢复，不构造 request/provider；
+- 新 context 取消旧 request/retry；
+- 相同、仍有效 context 可短期小容量复用；cache hit 直接恢复，不构造 request/provider；
 - Provider 请求保持短 continuation；
-- 临时 Provider 错误在原 context 仍有效时使用有限次指数退避自动恢复，并优先尊重 Provider `Retry-After`；达到自动重试上限才升级为用户可见错误；
-- 持久错误不进行无止境自动重试，也**不再设置跨 context 的 30 秒 persistent cooldown**；当前请求停止并显示真实错误，新 caret/context 可独立重新尝试；
-- 如果流已经返回可用 partial 后才发生连接中断，保留已到达且仍属于当前 identity 的 partial；
-- 退避窗口内产生的新 context 会取消旧 context 的等待/重试，并由新 context 按统一 cadence 重新调度；
+- transient failure 有限指数退避并尊重 `Retry-After`；
+- persistent failure 不无限重试，也不设置跨 context 的人为 cooldown；
+- 已有 usable partial 后再失败可保留当前有效 partial；
 - 过期结果不得显示；
 - ghost text 不触发 autosave / Compiler / revision。
 
@@ -265,14 +281,14 @@ afterText
 
 Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 
-- ghost state 保存原请求的 caret position/context key，不使用结果到达时的 selection 重新定位；
-- streaming partial 的 widget identity 必须随可见文本变化，避免 ProseMirror 复用第一批两三个字的旧 DOM；
-- `Tab` → 只有当前 selection 仍与 ghost position 完全一致时才插入，随后清除；流仍在进行时也允许接受当前 partial，正文变化后旧流立即取消；
-- `Esc` → 只清除 decoration；
-- docChanged / selectionSet → 自动清除 stale ghost；
-- Editor blur / composing → 通过同一个 invalidation 边界同时清 ghost + completion context；focus/composition 结束后按当前真实 caret 重新建立；
-- 保留有意义的前导空格，避免英文/代码续写拼接错误；
-- 对模型重复输出的明显多字符前缀可做有限 overlap 去重，但不得激进删除单字符正常续写。
+- ghost state 保存原请求 caret position/context key；
+- streaming partial 的 widget identity 随可见文本变化；
+- `Tab` 仅在当前 selection 与 ghost position 完全一致时插入；
+- `Esc` 只清 decoration；
+- docChanged / selectionSet 清 stale ghost；
+- Editor blur / composing 通过同一 invalidation 边界同时清 ghost + context；
+- 保留有意义前导空格；
+- 仅做有限多字符 overlap 去重。
 
 ## 6. 选区与 transient UI 状态
 
@@ -284,7 +300,7 @@ from / to
 single-block format | null
 ```
 
-不保存 viewport rect，不依赖 DOM selection。只要 ProseMirror selection 非空，选区操作条即可稳定存在；操作条采用固定在主 actionbar 上方的 Side Panel 内布局，不再把小按钮锚在文字旁。
+不保存 viewport rect，不依赖 DOM selection。只要 ProseMirror selection 非空，`SelectionActionBar` 即可稳定存在；不再保留 `SelectionContextMenu` 兼容别名。
 
 跨块 selection 的 `blockFormat=null`；允许局部 AI 文本动作，但类型转换必须禁用。
 
@@ -293,8 +309,6 @@ single-block format | null
 ```text
 AI busy > suggestion > lint > selection action bar
 ```
-
-低优先级状态可以保留，但 UI 不得在同一底部空间叠放多个 fixed panel。
 
 ## 7. 状态源
 
@@ -327,8 +341,8 @@ AI busy > suggestion > lint > selection action bar
 - 当前流式补全 request sequence / partial；
 - completion request cadence / retry deadline / transient failure count；
 - 当前 completion error / recovery 状态；
-- UI 打开/关闭状态；
-- “自定义”输入编辑中的临时文本。
+- 当前异步 save snapshot 的 document id + revision 语义；
+- UI 打开/关闭状态。
 
 临时状态不得反向成为正文源。
 
@@ -340,33 +354,30 @@ AI busy > suggestion > lint > selection action bar
 
 - 每次键入后重新读取全部 Storage；
 - 恢复当前文档时重复读取同一 Storage key；
-- 更旧 revision 覆盖已经持久化的新 revision；
+- 更旧 revision 覆盖持久化新 revision，或其晚到 callback 回退 UI save state/list；
+- 每次 autosave 对文档列表做全量 sort；
+- 同 ID 外部替换无法同步到 Editor；
+- 为区分外部内容而每次键入 stringify 整份文档；
 - Preview 关闭时仍编译 Preview；
 - Lint 关闭时仍重跑 Lint；
 - ghost decoration 变化触发正文保存；
-- streaming 每个 token 都触发根 React 树 render；
+- streaming 每个 token 触发根 React 树 render；
 - 为局部 context 先 materialize 整个已有长 block；
-- cache hit 时先清 ghost、构造 request/provider 再恢复同一结果；
+- 每次 render 拼接包含 credential 的 completion settings key；
+- cache hit 时仍构造 request/provider；
 - 每个编辑停顿都直接发网络请求；
 - IME composition 中间态触发补全；
-- 多个过期补全请求或重试并发堆积；
-- 短时 Provider 抖动立即升级成全局不可用提示；
-- 持久错误给后续全新 context 人为添加 30 秒延迟；
-- 明明配置了短上下文却仍向 Provider 发送更长上下文；
-- 为当前 block 补全隐式读取前一个语义块；
-- 把旧流式 partial/ghost 留在失焦或 composing 的 Editor 上；
-- 为等待完整补全文本而阻塞首批 ghost 展示；
-- 首屏同步加载只有打开设置/文档管理才使用的大块 UI。
+- 多个过期补全请求/重试堆积；
+- 短时 Provider 抖动立即升级为全局不可用；
+- 持久错误给后续全新 context 人为添加 cooldown；
+- 把旧 partial/ghost 留在失焦/composing Editor；
+- 首屏同步加载可拆分的大型 Editor/Sheet 运行时代码。
 
 AI 配置保存和正文 autosave 是不同语义，不得共享 revision 或对象。
 
 ## 9. Extension 边界与权限
 
-Background 只负责：
-
-- 用户点击扩展图标时打开 Side Panel。
-
-不注入网页、不监听页面正文、不传递 Prompt 内容。
+Background 只负责用户点击扩展图标时打开 Side Panel。
 
 Manifest 固定权限只允许：
 
@@ -375,23 +386,24 @@ storage
 sidePanel
 ```
 
-`optional_host_permissions` 仅用于用户配置的 AI Provider Base URL 网络请求。不得重新引入 `activeTab`、`scripting`、Content Script 或网页 host 权限来做 Prompt DOM 写入，除非未来 PRODUCT/DECISIONS 明确重新改变范围。
+`optional_host_permissions` 仅用于用户配置的 AI Provider Base URL 网络请求。不得重新引入 `activeTab`、`scripting`、Content Script 或网页 host 权限来做 Prompt DOM 写入。
 
 ## 10. 错误处理
 
-原则：真实失败、明确降级、临时错误先恢复。
+原则：真实失败、明确降级、临时错误先恢复、异步状态不越权。
 
 - AI 未配置 → 显式 AI 动作进入设置；核心编辑继续可用；
-- AI Provider 持久失败 → 显示经过归一化且长度受控的真实错误，不只显示通用“检查连接”；
-- 补全短时 429 / 5xx / timeout / transport → 原 context 仍有效时有限次自动退避重试，单次失败不弹通用“不可用”；
-- 补全认证、配置、额度耗尽等持久失败 → 不无限重试，当前 request 停止；新 context 不继承人为 persistent cooldown；
-- 补全成功 partial/final/cache hit → 清除已经失效的 completion AI error；
-- 补全流已产生有效 partial 后再失败 → 优先保留仍属于当前 identity 的 partial；
-- Storage 保存失败 → 明确显示未保存；
+- AI Provider 持久失败 → 显示归一化且长度受控真实错误；
+- 补全 transient failure → 原 context 有效时有限退避重试；
+- 补全 persistent failure → 不无限重试，新 context 不继承人为 cooldown；
+- 补全成功 → 清失效 completion error；
+- Storage 最新 revision 保存失败 → 明确显示未保存；
+- Storage 旧 revision 的晚到失败 → 不得把已经继续编辑的新 revision 标成失败；
+- 同 ID 显式导入覆盖 → 先 rebase revision 再正常保存，不伪造成功；
 - 未知 PromptDocument schemaVersion → fail-closed；
 - Copy 失败 → 明确提示从 Preview 手动复制。
 
-禁止静默异常、假成功、无限重试和 stale error。
+禁止静默异常、假成功、无限重试和 stale error/state。
 
 ## 11. 测试边界
 
@@ -400,19 +412,21 @@ V1 优先覆盖：
 - Schema / Compiler；
 - PromptSection / Slash Menu / block conversion；
 - Repository、revision 单调性、启动批量读取与 AI preferences；
+- 同 ID 导入冲突：覆盖时 revision rebase，拒绝覆盖时新 id；
+- Editor 同 ID 外部 content replacement 与本地输入不重灌；
 - Provider HTTP / transport / timeout / cancellation；
-- Provider transient/persistent error classification、429 `Retry-After`、JSON error message 归一化；
-- OpenAI-compatible / Anthropic streaming partial、SSE keepalive、`text/plain` SSE、**错误标为 `text/event-stream` 的普通 JSON**、非流式兼容降级和 dedicated completion model 路由；
-- AI action instruction override 与默认公共约束组合；
-- 自定义补全参数持久化、非法历史值回退；
-- Completion cadence：首次 debounce、真实请求最小间隔、Provider backoff 优先级与指数退避；
-- Suggestion 接受/忽略/revision guard；
-- Selection snapshot：只依赖 ProseMirror state、空 caret 不显示操作、跨块类型不可转换；
-- Completion context：当前 block 隔离、caret before/after、context budget、section kind、document generation/block/caret identity，以及**超大既有 block 的 bounded context**；
-- Ghost completion：默认偏好关闭、Tab 接受、Esc 忽略、doc change 失效、前导空格、移动 caret 后拒绝旧 completion、streaming widget 持续刷新；
-- Chrome / Edge 真实 Side Panel 主链，包含“打开已有较长 Prompt 后把 caret 放入旧文本”的补全 smoke；IME 长句输入另作为通用稳定性 smoke，不与旧文本问题混为一个根因。
+- Provider transient/persistent error classification、Retry-After、JSON error message；
+- streaming partial、SSE keepalive、错误 Content-Type、非流式降级、completion model；
+- AI instruction override；
+- completion 参数持久化；
+- completion cadence/backoff；
+- Suggestion revision guard；
+- Selection snapshot；
+- Completion context bounded scan；
+- Ghost completion；
+- Chrome / Edge 真实主链，并增加 Editor lazy chunk 首次加载、快速连续编辑 save badge、同 ID 备份覆盖立即刷新 Editor 的 smoke。
 
-Web Adapter、ChatGPT DOM fixture、contenteditable 插入 fixture 已随 Web Insert 退役删除，不保留测试旧链。
+Web Adapter 等退役链不保留测试。
 
 ## 12. 架构变更规则
 
@@ -424,7 +438,7 @@ Web Adapter、ChatGPT DOM fixture、contenteditable 插入 fixture 已随 Web In
 - 改变 AI credential / Provider 存储边界；
 - 改变内联补全自动调用条件或从 block-local 改为跨 block 上下文；
 - 重新引入第三方网页 DOM 注入；
-- 重新引入依赖 DOM selection/viewport rect 的选区操作业务状态；
+- 重新引入 DOM selection/viewport rect 业务状态；
 - 引入新的框架级依赖；
 - 跨模块职责迁移。
 
