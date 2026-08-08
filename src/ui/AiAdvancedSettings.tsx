@@ -119,10 +119,21 @@ function PresetNumberField(props: {
 }) {
   const valueIsPreset = props.presets.includes(props.value)
   const [customMode, setCustomMode] = useState(!valueIsPreset)
+  const [customText, setCustomText] = useState(String(props.value))
 
   useEffect(() => {
+    setCustomText(String(props.value))
     if (!customMode && !props.presets.includes(props.value)) setCustomMode(true)
   }, [customMode, props.presets, props.value])
+
+  function commitCustomValue() {
+    const next = Number(customText)
+    if (Number.isInteger(next) && next >= props.min && next <= props.max) {
+      props.onChange(next)
+      return
+    }
+    setCustomText(String(props.value))
+  }
 
   return (
     <div className="ai-advanced__field">
@@ -134,10 +145,13 @@ function PresetNumberField(props: {
           onChange={(event) => {
             if (event.target.value === 'custom') {
               setCustomMode(true)
+              setCustomText(String(props.value))
               return
             }
+            const next = Number(event.target.value)
             setCustomMode(false)
-            props.onChange(Number(event.target.value))
+            setCustomText(String(next))
+            props.onChange(next)
           }}
         >
           {props.presets.map((preset) => (
@@ -152,10 +166,11 @@ function PresetNumberField(props: {
               min={props.min}
               max={props.max}
               step={1}
-              value={props.value}
-              onChange={(event) => {
-                const next = Number(event.target.value)
-                if (Number.isInteger(next)) props.onChange(next)
+              value={customText}
+              onChange={(event) => setCustomText(event.target.value)}
+              onBlur={commitCustomValue}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur()
               }}
             />
             <span>{props.unit}</span>
