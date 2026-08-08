@@ -59,6 +59,12 @@ function runGhostKey(harness: ReturnType<typeof createHarness>, event: KeyboardE
   return handler.call(harness.plugin, harness.view, event)
 }
 
+function visibleDecorationKey(harness: ReturnType<typeof createHarness>): string | undefined {
+  const decorations = harness.plugin.props.decorations?.call(harness.plugin, harness.state())
+  const first = decorations?.find()[0]
+  return first?.spec.key as string | undefined
+}
+
 describe('ghost completion', () => {
   it('accepts the visible completion with Tab and makes it real document text', () => {
     const harness = createHarness('目标')
@@ -72,6 +78,20 @@ describe('ghost completion', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(harness.state().doc.textContent).toBe('目标：完成权限重构')
     expect(getGhostCompletion(harness.state())?.text).toBeNull()
+  })
+
+  it('refreshes the decoration identity as streaming partial text grows', () => {
+    const harness = createHarness('背景')
+    showCompletion(harness.view, completion(harness.view, '请将'))
+    const firstKey = visibleDecorationKey(harness)
+
+    showCompletion(harness.view, completion(harness.view, '请将目标写得更明确'))
+    const secondKey = visibleDecorationKey(harness)
+
+    expect(getGhostCompletion(harness.state())?.text).toBe('请将目标写得更明确')
+    expect(firstKey).toBeTruthy()
+    expect(secondKey).toBeTruthy()
+    expect(secondKey).not.toBe(firstKey)
   })
 
   it('preserves meaningful leading whitespace when accepting an English completion', () => {
