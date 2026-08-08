@@ -22,14 +22,16 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - Plain Text / Markdown / XML Compiler 与只读 Preview；
 - 本地 deterministic Prompt lint；
 - OpenAI-compatible / Anthropic Provider；
-- 选区 AI：改清楚、缩短、拆成约束；
+- 选中文字后固定显示的选区工具条：改清楚、缩短、拆约束、更多 AI、文本类型；
 - 全局 AI：歧义检查、验收标准、结构建议；
 - source revision 过期建议保护；
 - 独立 opt-in 的编辑器内联补全：灰色 ghost text、Tab 接受、Esc 忽略；
-- completion 防抖、旧请求取消、短请求与失败退避；
+- completion 可配置上下文/延迟/独立补全模型，支持 streaming-first、旧请求取消、短退避；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 **Web Insert 已从 V1 删除。** PromptNote 不再向 ChatGPT/Claude/Gemini 等网页输入框注入内容，也没有 Web Adapter/content script/page bridge。外部交付统一使用 Copy。
+
+文字旁的浮动 `•••` 选区入口也已退役。真实窄 Side Panel 测试证明它容易受 selection/focus/viewport 影响；正式交互改为底部 actionbar 上方的稳定 SelectionActionBar。
 
 V1 尚未标记完成；最终 Chrome / Edge、真实 AI 补全、浏览器重启恢复、异常降级和发布文档仍以 `TASKS.md` 为准。
 
@@ -77,11 +79,23 @@ AI 自定义 Base URL 使用 optional host permission，按实际 Provider origi
 1. 打开 PromptNote Side Panel；
 2. 自然书写 Prompt；
 3. 使用 `/` 插入目标、背景、任务、约束、示例、输出格式、验收标准等语义块；
-4. 可选使用 selection/global AI suggestion；
-5. 可选开启 IDE 风格内联补全；
-6. 使用本地 Prompt Check，必要时显式调用 AI 深度检查；
-7. 编译/预览 Plain Text、Markdown、XML；
-8. Copy 到目标 AI 工具。
+4. 可选选中文字并从稳定工具条直接使用局部 AI / 类型转换；
+5. 可选使用 global AI suggestion；
+6. 可选开启 IDE 风格内联补全；
+7. 使用本地 Prompt Check，必要时显式调用 AI 深度检查；
+8. 编译/预览 Plain Text、Markdown、XML；
+9. Copy 到目标 AI 工具。
+
+## 选区操作
+
+选中文字后，PromptNote 不再尝试把微型按钮贴在文字旁。主操作栏上方会显示稳定工具条：
+
+```text
+已选 N 字    类型 [当前类型]
+改清楚   缩短   拆约束   更多 AI
+```
+
+选区状态以 ProseMirror 为唯一权威。跨多个文本块选择时仍可做文本 AI 动作，但“类型转换”会禁用；不会再用浏览器 DOM selection 或屏幕坐标维护另一份选区状态。
 
 ## 内联补全
 
@@ -99,12 +113,16 @@ AND 编辑器内联补全已开启
 
 开启后：
 
-- 光标停顿约 750ms 后可出现灰色 ghost text；
+- 光标停顿到用户配置的触发延迟后，可出现灰色 ghost text；默认 300ms，可选 150/300/600ms 或自定义 50–3000ms；
+- 当前块上下文默认 320 字符，可选 160/320/640 或自定义 16–2000；实际值从设置显式贯穿 Editor；
+- caret 位于块首、块中、块尾时都使用当前 text block 的局部 before/after 上下文，不跨语义块拼正文；
+- Provider 支持 streaming 时，首批有效文本尽快显示；连续 partial 在短窗口合并 UI 刷新，避免每个 token 重渲染整页；
+- 可单独指定低延迟“补全模型”，留空沿用主 Model；
 - `Tab` 接受；
 - `Esc` 忽略；
-- 继续输入或移动光标会使旧补全失效；
+- 继续输入、移动光标、切块或改变 context budget 会使旧补全失效；
 - 过期请求会取消；
-- Provider 失败后会退避，不连续刷请求；
+- Provider 失败后短退避，不连续刷请求；
 - ghost text 不属于 PromptDocument，不自动保存、不进入 Compiler；
 - 只有接受后才成为真实正文。
 
@@ -116,7 +134,7 @@ AND 编辑器内联补全已开启
 - `chrome.storage.local` 不是加密保险库；
 - 普通 selection/global AI 动作只有用户显式触发时才发送内容；
 - 只有用户额外开启补全后，编辑停顿才会自动请求短 continuation；
-- 补全只使用 caret 前有限上下文；
+- 补全只使用当前 text block 内、受用户 context budget 限制的局部上下文；
 - AI 未配置、关闭或失败不影响编辑、保存、本地 lint、Compiler、Preview、Copy；
 - AI Provider 网络错误和 30 秒超时不会伪装成功。
 
@@ -137,13 +155,16 @@ Preview 可以显式选择 Plain / Markdown / XML，并复制当前格式。
 默认编辑热路径避免无意义工作：
 
 - 450ms autosave 后用已知 PromptDocument 增量更新文档列表，不整库重读；
+- Repository 恢复当前文档时批量读取 documents/current id，并拒绝旧 revision 覆盖新 revision；
 - 检查关闭时不每次键入运行 lint；
 - Preview 关闭时不每次键入编译；
 - ghost decoration 不触发正文保存；
-- completion 采用 750ms 防抖、Abort 旧请求、短 token 上限和失败退避；
+- completion 防抖、Abort 旧请求、短退避；streaming partial 约每 48ms 合并 UI 刷新；
+- streaming capability 按 Provider + endpoint + completion model 隔离，并兼容 SSE keep-alive；
+- AI Settings 与本地 Prompt Sheet 只有打开时才 lazy-load；
 - 不存在网页 bridge/content script 常驻开销。
 
-TipTap / React 主 Side Panel bundle 仍有约 600KB 级 minified chunk 的已知优化空间；不通过调高 Vite warning limit 掩盖。是否 code splitting 以真实启动性能为准。
+AI / Document Sheet 已拆为独立按需 chunk；TipTap / React 主编辑器 chunk 仍有 `>500KB` 构建 warning。PromptNote 不通过调高 Vite warning limit 掩盖它，是否进一步拆 TipTap 以真实启动性能为准。
 
 ## V1 明确不做
 
