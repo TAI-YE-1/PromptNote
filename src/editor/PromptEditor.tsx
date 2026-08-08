@@ -28,13 +28,13 @@ export interface PromptEditorHandle {
   replaceRange(from: number, to: number, text: string): void
   appendSection(kind: SectionKind, text: string): void
   convertSelectedBlock(format: EditableBlockFormat): void
+  showCompletion(completion: EditorCompletionSuggestion | null): void
   focus(): void
 }
 
 interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
-  completionText: EditorCompletionSuggestion | null
   completionContextChars: number
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
@@ -99,22 +99,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   useEffect(() => {
     if (!editor) return
-    const completion = props.completionText
-    const selection = editor.state.selection
-    const isCurrent =
-      completion !== null &&
-      completion.documentId === props.documentId &&
-      completion.contextKey === completionContextKeyRef.current &&
-      selection.empty &&
-      selection.head === completion.position &&
-      editor.view.hasFocus()
-
-    setGhostCompletion(editor.view, isCurrent ? completion : null)
-  }, [editor, props.completionText, props.documentId])
-
-  useEffect(() => {
-    if (!editor) return
     completionContextKeyRef.current = null
+    setGhostCompletion(editor.view, null)
     emitCompletionContext(editor)
   }, [props.completionContextChars, editor])
 
@@ -178,6 +164,21 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           .run()
       },
       convertSelectedBlock,
+      showCompletion(completion) {
+        if (!editor) return
+        if (!completion) {
+          setGhostCompletion(editor.view, null)
+          return
+        }
+        const selection = editor.state.selection
+        const isCurrent =
+          completion.documentId === documentIdRef.current &&
+          completion.contextKey === completionContextKeyRef.current &&
+          selection.empty &&
+          selection.head === completion.position &&
+          editor.view.hasFocus()
+        setGhostCompletion(editor.view, isCurrent ? completion : null)
+      },
       focus() {
         editor?.commands.focus()
       },
