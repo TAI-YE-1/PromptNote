@@ -12,13 +12,19 @@
 
 .editor-scroll > .inline-status {
   position: fixed;
-  z-index: 41;
+  z-index: 43;
   left: 50%;
   bottom: 74px;
   margin: 0;
   transform: translateX(-50%);
   white-space: nowrap;
   box-shadow: 0 8px 24px rgba(35, 74, 58, .1);
+}
+
+body:has(.inline-status) .suggestion-card,
+body:has(.inline-status) .lint-card--floating,
+body:has(.suggestion-card) .lint-card--floating {
+  display: none;
 }
 
 .sheet-search {
