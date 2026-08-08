@@ -16,7 +16,7 @@ const PARTIAL_RENDER_INTERVAL_MS = 48
 const TRANSIENT_BACKOFF_BASE_MS = 1_500
 const TRANSIENT_BACKOFF_MAX_MS = 12_000
 const PERSISTENT_FAILURE_BACKOFF_MS = 30_000
-const TRANSIENT_REPORT_AFTER = 3
+const TRANSIENT_AUTO_RETRY_LIMIT = 3
 
 interface InlineCompletionInput {
   settings: AiSettings
@@ -56,10 +56,12 @@ export function useInlineCompletion(
     setCompletion(null)
     if (!ready || !context) return
     if (context.contextChars !== settings.completionContextChars) return
-    if (blockContextLength(context) < COMPLETION_MIN_BLOCK_CONTEXT) return
+    if (!hasBlockContext(context)) return
 
     const contextSnapshot = context
     const requestKey = contextSnapshot.key
+    const requestContent = completionPrompt(contextSnapshot)
+    const provider = getAiProvider(settings)
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
       contextKey: contextSnapshot.key,
@@ -110,18 +112,14 @@ export function useInlineCompletion(
       }, PARTIAL_RENDER_INTERVAL_MS)
     }
 
-    const timer = window.setTimeout(() => {
-      void (async () => {
+    const runRequest = async () => {
+      while (isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) {
         let lastUsablePartial: string | null = null
         lastRequestStartedAtRef.current = Date.now()
         try {
-          const provider = getAiProvider(settings)
           const result = await provider.streamCompletion(
             settings,
-            {
-              action: 'complete',
-              content: completionPrompt(contextSnapshot),
-            },
+            { action: 'complete', content: requestContent },
             (partial) => {
               if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
@@ -141,6 +139,7 @@ export function useInlineCompletion(
           pendingPartial = normalized
           flushPartial()
           cacheCompletion(cacheRef.current, requestKey, normalized)
+          return
         } catch (error) {
           if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
           if (lastUsablePartial) {
@@ -153,26 +152,39 @@ export function useInlineCompletion(
 
           setCompletion(null)
           const message = error instanceof Error ? error.message : String(error)
-          if (error instanceof AiRequestError && error.transient) {
-            const failures = transientFailureCountRef.current + 1
-            transientFailureCountRef.current = failures
-            const exponentialBackoff = Math.min(
-              TRANSIENT_BACKOFF_BASE_MS * 2 ** (failures - 1),
-              TRANSIENT_BACKOFF_MAX_MS,
-            )
-            retryAtRef.current = Date.now() + Math.max(exponentialBackoff, error.retryAfterMs ?? 0)
-            if (failures < TRANSIENT_REPORT_AFTER) return
-          } else {
+          if (!(error instanceof AiRequestError) || !error.transient) {
             transientFailureCountRef.current = 0
             retryAtRef.current = Date.now() + PERSISTENT_FAILURE_BACKOFF_MS
+            reportCompletionError(message)
+            return
           }
 
-          if (lastReportedErrorRef.current !== message) {
-            lastReportedErrorRef.current = message
-            input.onError(message)
+          const failures = transientFailureCountRef.current + 1
+          transientFailureCountRef.current = failures
+          const exponentialBackoff = Math.min(
+            TRANSIENT_BACKOFF_BASE_MS * 2 ** (failures - 1),
+            TRANSIENT_BACKOFF_MAX_MS,
+          )
+          retryAtRef.current = Date.now() + Math.max(exponentialBackoff, error.retryAfterMs ?? 0)
+          if (failures >= TRANSIENT_AUTO_RETRY_LIMIT) {
+            reportCompletionError(message)
+            return
           }
+
+          const retryWait = Math.max(0, retryAtRef.current - Date.now())
+          if (!(await waitForRetry(retryWait, controller.signal))) return
         }
-      })()
+      }
+    }
+
+    const reportCompletionError = (message: string) => {
+      if (lastReportedErrorRef.current === message) return
+      lastReportedErrorRef.current = message
+      input.onError(message)
+    }
+
+    const timer = window.setTimeout(() => {
+      void runRequest()
     }, startDelay)
 
     return () => {
@@ -195,8 +207,23 @@ function isCurrentRequest(
   return !controller.signal.aborted && sequenceRef.current === sequence && contextKeyRef.current === contextKey
 }
 
-function blockContextLength(context: EditorCompletionContext): number {
-  return (context.beforeText + context.afterText).trim().length
+function waitForRetry(delayMs: number, signal: AbortSignal): Promise<boolean> {
+  if (delayMs <= 0) return Promise.resolve(!signal.aborted)
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      window.clearTimeout(timer)
+      resolve(false)
+    }
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(!signal.aborted)
+    }, delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+function hasBlockContext(context: EditorCompletionContext): boolean {
+  return Boolean(context.beforeText.trim() || context.afterText.trim())
 }
 
 function completionPrompt(context: EditorCompletionContext): string {
