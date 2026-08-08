@@ -11,12 +11,16 @@ function promptSection(kind: string, text: string) {
   return schema.nodes.promptSection.create({ kind }, text ? schema.text(text) : undefined)
 }
 
-function stateWithCaretInSecondBlock(firstText: string, secondText: string) {
+function stateWithCaretInSecondBlock(
+  firstText: string,
+  secondText: string,
+  caretOffset = secondText.length,
+) {
   const first = promptSection('output_format', firstText)
   const second = promptSection('context', secondText)
   const doc = schema.nodes.doc.create(null, [first, second])
   const secondContentStart = first.nodeSize + 1
-  const caret = secondContentStart + second.content.size
+  const caret = secondContentStart + caretOffset
   return EditorState.create({
     schema,
     doc,
@@ -38,8 +42,50 @@ describe('editor completion context', () => {
     })
 
     expect(context?.beforeText).toBe('你是')
+    expect(context?.afterText).toBe('')
     expect(context?.sectionKind).toBe('context')
     expect(context?.beforeText).not.toContain('结构化思考')
+  })
+
+  it('supports a caret at the start of a non-empty block using text after the caret', () => {
+    const state = stateWithCaretInSecondBlock('前文', '你是一位结构化思考专家', 0)
+    const context = buildEditorCompletionContext(state, {
+      documentId: 'doc-1',
+      documentVersion: 1,
+      maxChars: 320,
+    })
+
+    expect(context?.beforeText).toBe('')
+    expect(context?.afterText).toBe('你是一位结构化思考专家')
+  })
+
+  it('supports a one-character block instead of requiring two characters before the caret', () => {
+    const state = stateWithCaretInSecondBlock('前文', '我')
+    const context = buildEditorCompletionContext(state, {
+      documentId: 'doc-1',
+      documentVersion: 1,
+      maxChars: 320,
+    })
+
+    expect(context?.beforeText).toBe('我')
+    expect(context?.afterText).toBe('')
+  })
+
+  it('captures both sides of a caret in the middle of a long block', () => {
+    const text = '你是一位擅长结构化思考的专家，请帮我优化以下描述。我的原文如下：你'
+    const caretOffset = text.indexOf('专家') + 1
+    const state = stateWithCaretInSecondBlock('完全不同的前块', text, caretOffset)
+    const context = buildEditorCompletionContext(state, {
+      documentId: 'doc-1',
+      documentVersion: 3,
+      maxChars: 40,
+    })
+
+    expect(context).not.toBeNull()
+    expect(context?.beforeText.length).toBeGreaterThan(0)
+    expect(context?.afterText.length).toBeGreaterThan(0)
+    expect((context?.beforeText.length ?? 0) + (context?.afterText.length ?? 0)).toBeLessThanOrEqual(40)
+    expect(`${context?.beforeText}${context?.afterText}`).not.toContain('完全不同的前块')
   })
 
   it('changes request identity when document generation changes even if caret text is unchanged', () => {
@@ -56,6 +102,7 @@ describe('editor completion context', () => {
     })
 
     expect(first?.beforeText).toBe(second?.beforeText)
+    expect(first?.afterText).toBe(second?.afterText)
     expect(first?.position).toBe(second?.position)
     expect(first?.key).not.toBe(second?.key)
   })
