@@ -59,7 +59,7 @@ export function useInlineCompletion(
 
     const contextSnapshot = context
     const requestKey = contextSnapshot.key
-    const requestContent = completionPrompt(contextSnapshot)
+    const request = { action: 'complete' as const, content: completionPrompt(contextSnapshot) }
     const provider = getAiProvider(settings)
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
@@ -75,6 +75,10 @@ export function useInlineCompletion(
 
     const controller = new AbortController()
     const requestSequence = ++requestSequenceRef.current
+    const isCurrent = () =>
+      !controller.signal.aborted &&
+      requestSequenceRef.current === requestSequence &&
+      currentContextKeyRef.current === contextSnapshot.key
     const now = Date.now()
     const startDelay = computeCompletionStartDelayMs({
       configuredDelayMs: settings.completionDelayMs,
@@ -118,15 +122,15 @@ export function useInlineCompletion(
     }
 
     const runRequest = async () => {
-      while (isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) {
+      while (isCurrent()) {
         let lastUsablePartial: string | null = null
         lastRequestStartedAtRef.current = Date.now()
         try {
           const result = await provider.streamCompletion(
             settings,
-            { action: 'complete', content: requestContent },
+            request,
             (partial) => {
-              if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
+              if (!isCurrent()) return
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
@@ -135,7 +139,7 @@ export function useInlineCompletion(
             },
             controller.signal,
           )
-          if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
+          if (!isCurrent()) return
 
           const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
@@ -146,7 +150,7 @@ export function useInlineCompletion(
           cacheCompletion(cacheRef.current, requestKey, normalized)
           return
         } catch (error) {
-          if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
+          if (!isCurrent()) return
           if (lastUsablePartial) {
             markRecovered()
             pendingPartial = lastUsablePartial
@@ -194,16 +198,6 @@ export function useInlineCompletion(
   }, [context, input.onError, ready, settingsKey])
 
   return completion
-}
-
-function isCurrentRequest(
-  controller: AbortController,
-  sequenceRef: { current: number },
-  sequence: number,
-  contextKeyRef: { current: string | null },
-  contextKey: string,
-): boolean {
-  return !controller.signal.aborted && sequenceRef.current === sequence && contextKeyRef.current === contextKey
 }
 
 function waitForRetry(delayMs: number, signal: AbortSignal): Promise<boolean> {
