@@ -19,6 +19,7 @@ export interface AiSettings {
   completionEnabled: boolean
   completionContextChars: CompletionContextChars
   completionDelayMs: CompletionDelayMs
+  completionModel: string
   instructionOverrides: AiInstructionOverrides
   provider: AiProviderId
   model: string
