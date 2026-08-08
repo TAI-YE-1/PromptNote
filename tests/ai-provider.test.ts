@@ -6,6 +6,9 @@ const openAiSettings: AiSettings = {
   enabled: true,
   configured: true,
   completionEnabled: true,
+  completionContextChars: 320,
+  completionDelayMs: 300,
+  instructionOverrides: {},
   provider: 'openai-compatible',
   model: 'test-model',
   baseUrl: 'https://example.com/v1',
@@ -61,6 +64,30 @@ describe('AI providers', () => {
     expect(body.temperature).toBe(0.1)
     expect(body).not.toHaveProperty('max_tokens')
     expect(body).not.toHaveProperty('max_completion_tokens')
+  })
+
+  it('uses a per-action instruction override without replacing the common guardrails', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '完成' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const settings: AiSettings = {
+      ...openAiSettings,
+      instructionOverrides: { complete: '只补全一个非常短的短语。' },
+    }
+    await getAiProvider(settings).generate(settings, { action: 'complete', content: '你是' })
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    const body = JSON.parse(String(init?.body)) as {
+      messages?: Array<{ role?: string; content?: string }>
+    }
+    const system = body.messages?.find((message) => message.role === 'system')?.content ?? ''
+    expect(system).toContain('保持用户原意')
+    expect(system).toContain('只补全一个非常短的短语。')
   })
 
   it('extracts Anthropic text responses', async () => {
