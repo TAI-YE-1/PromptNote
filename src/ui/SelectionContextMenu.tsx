@@ -12,7 +12,7 @@ export function SelectionContextMenu(props: {
 }) {
   const [open, setOpen] = useState(false)
   const { rect } = props.selection
-  const left = clamp(rect.left + rect.width + 8, 8, Math.max(8, rect.containerWidth - 36))
+  const left = clamp(rect.left + 8, 8, Math.max(8, rect.containerWidth - 36))
   const placeBelow = rect.top < 46
   const top = placeBelow ? rect.top + rect.height + 6 : Math.max(8, rect.top - 34)
   const currentLabel =
@@ -24,19 +24,23 @@ export function SelectionContextMenu(props: {
     <div
       className={`selection-context selection-context--viewport selection-context--${placeBelow ? 'below' : 'above'}`}
       style={{ left, top }}
-      onMouseDown={(event) => event.stopPropagation()}
     >
       <button
         className="selection-context__trigger"
         aria-label="文本操作"
         aria-expanded={open}
         title="文本操作"
+        onMouseDown={(event) => {
+          // Keep the ProseMirror selection alive until the click handler runs.
+          event.preventDefault()
+          event.stopPropagation()
+        }}
         onClick={() => setOpen((value) => !value)}
       >
         <span aria-hidden>•••</span>
       </button>
       {open && (
-        <div className="selection-context__menu">
+        <div className="selection-context__menu" onMouseDown={(event) => event.stopPropagation()}>
           <div className="selection-context__section-label">AI 辅助</div>
           <div className="selection-context__actions">
             <button onClick={() => props.onAction('clarify')}>改清楚</button>
