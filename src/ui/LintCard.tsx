@@ -1,5 +1,4 @@
 import type { PromptLintFinding } from '../ai/types'
-import './floatingPanels.css'
 
 export function LintCard(props: {
   findings: PromptLintFinding[]
