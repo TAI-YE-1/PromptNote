@@ -8,6 +8,7 @@ const openAiSettings: AiSettings = {
   completionEnabled: true,
   completionContextChars: 320,
   completionDelayMs: 300,
+  completionModel: '',
   instructionOverrides: {},
   provider: 'openai-compatible',
   model: 'test-model',
@@ -62,8 +63,28 @@ describe('AI providers', () => {
     const init = fetchMock.mock.calls[0]?.[1]
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>
     expect(body.temperature).toBe(0.1)
+    expect(body.model).toBe('test-model')
     expect(body).not.toHaveProperty('max_tokens')
     expect(body).not.toHaveProperty('max_completion_tokens')
+  })
+
+  it('uses the optional fast model only for completion requests', async () => {
+    const settings: AiSettings = { ...openAiSettings, completionModel: 'fast-model' }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '完成' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+    await getAiProvider(settings).generate(settings, { action: 'clarify', content: '说清楚' })
+
+    const completionBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>
+    const clarifyBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as Record<string, unknown>
+    expect(completionBody.model).toBe('fast-model')
+    expect(clarifyBody.model).toBe('test-model')
   })
 
   it('surfaces OpenAI-compatible streamed completion as soon as partial text arrives', async () => {
