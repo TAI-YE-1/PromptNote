@@ -53,20 +53,27 @@ export function useInlineCompletion(
   }, [input.onError, settingsKey])
 
   useEffect(() => {
-    setCompletion(null)
-    if (!ready || !context) return
-    if (context.contextChars !== settings.completionContextChars) return
+    if (!ready || !context || context.contextChars !== settings.completionContextChars) {
+      setCompletion(null)
+      return
+    }
 
     const contextSnapshot = context
     const requestKey = contextSnapshot.key
-    const request = { action: 'complete' as const, content: completionPrompt(contextSnapshot) }
-    const provider = getAiProvider(settings)
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
       contextKey: contextSnapshot.key,
       documentId: contextSnapshot.documentId,
       position: contextSnapshot.position,
     })
+    const markCompletionRecovered = () => {
+      transientFailureCountRef.current = 0
+      retryAtRef.current = 0
+      if (!lastReportedErrorRef.current) return
+      lastReportedErrorRef.current = null
+      input.onError(null)
+    }
+
     const cached = cacheRef.current.get(requestKey)
     if (cached) {
       markCompletionRecovered()
@@ -74,6 +81,9 @@ export function useInlineCompletion(
       return
     }
 
+    setCompletion(null)
+    const request = { action: 'complete' as const, content: completionPrompt(contextSnapshot) }
+    const provider = getAiProvider(settings)
     const controller = new AbortController()
     const requestSequence = ++requestSequenceRef.current
     const isCurrent = () =>
@@ -90,14 +100,6 @@ export function useInlineCompletion(
     let renderTimer: number | null = null
     let pendingPartial: string | null = null
     let lastRendered: string | null = null
-
-    function markCompletionRecovered() {
-      transientFailureCountRef.current = 0
-      retryAtRef.current = 0
-      if (!lastReportedErrorRef.current) return
-      lastReportedErrorRef.current = null
-      input.onError(null)
-    }
 
     const flushPartial = () => {
       if (renderTimer !== null) {
