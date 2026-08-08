@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  COMPLETION_PERSISTENT_FAILURE_BACKOFF_MS,
   COMPLETION_TRANSIENT_AUTO_RETRY_LIMIT,
   computeCompletionStartDelayMs,
   computeCompletionTransientRetryDelayMs,
@@ -164,7 +163,7 @@ export function useInlineCompletion(
           const message = error instanceof Error ? error.message : String(error)
           if (!(error instanceof AiRequestError) || !error.transient) {
             transientFailureCountRef.current = 0
-            retryAtRef.current = Date.now() + COMPLETION_PERSISTENT_FAILURE_BACKOFF_MS
+            retryAtRef.current = 0
             reportCompletionError(message)
             return
           }
