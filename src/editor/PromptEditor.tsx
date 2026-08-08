@@ -202,9 +202,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return
 
-    const rootRect = rootRef.current?.getBoundingClientRect()
-    if (!rootRect) return
-
     const rect = selection.getRangeAt(0).getBoundingClientRect()
     props.onSelectionChange({
       text: editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n'),
@@ -212,11 +209,11 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       to: editor.state.selection.to,
       blockFormat: activeBlock.format,
       rect: {
-        left: rect.left - rootRect.left,
-        top: rect.top - rootRect.top,
+        left: rect.left,
+        top: rect.top,
         width: rect.width,
         height: rect.height,
-        containerWidth: rootRect.width,
+        containerWidth: window.innerWidth,
       },
     })
   }
