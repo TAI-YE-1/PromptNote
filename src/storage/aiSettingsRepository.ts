@@ -6,6 +6,8 @@ export const defaultAiSettings: AiSettings = {
   enabled: true,
   configured: false,
   completionEnabled: false,
+  completionContextChars: 320,
+  completionDelayMs: 300,
   provider: 'openai-compatible',
   model: '',
   baseUrl: 'https://api.openai.com',
@@ -31,10 +33,24 @@ export class ChromeAiSettingsRepository implements AiSettingsRepository {
       ...stored,
       configured: legacyUnverified ? false : Boolean(stored.configured),
       completionEnabled: legacyUnverified ? false : Boolean(stored.completionEnabled),
+      completionContextChars: isCompletionContextChars(stored.completionContextChars)
+        ? stored.completionContextChars
+        : defaultAiSettings.completionContextChars,
+      completionDelayMs: isCompletionDelayMs(stored.completionDelayMs)
+        ? stored.completionDelayMs
+        : defaultAiSettings.completionDelayMs,
     }
   }
 
   async save(settings: AiSettings): Promise<void> {
     await chrome.storage.local.set({ [AI_SETTINGS_KEY]: settings })
   }
+}
+
+function isCompletionContextChars(value: unknown): value is AiSettings['completionContextChars'] {
+  return value === 160 || value === 320 || value === 640
+}
+
+function isCompletionDelayMs(value: unknown): value is AiSettings['completionDelayMs'] {
+  return value === 150 || value === 300 || value === 600
 }
