@@ -1,3 +1,4 @@
+import { buildSystemInstruction } from './instructions'
 import type { AiProvider, AiRequest, AiSettings } from './types'
 
 export const AI_REQUEST_TIMEOUT_MS = 30_000
@@ -9,22 +10,6 @@ function trimBaseUrl(value: string): string {
 function apiEndpoint(baseUrl: string, path: `/v1/${string}`): string {
   const base = trimBaseUrl(baseUrl)
   return base.endsWith('/v1') ? `${base}${path.slice(3)}` : `${base}${path}`
-}
-
-function systemInstruction(action: AiRequest['action']): string {
-  const common =
-    '你是 PromptNote 的局部 Prompt 辅助器。保持用户原意，不扩写无关内容，不改变事实，不接管整篇 Prompt。只返回建议正文，不要解释你的过程。'
-  const actions: Record<AiRequest['action'], string> = {
-    clarify: '把选中文字改得更明确、可执行。',
-    shorten: '在不丢失约束和事实的前提下缩短选中文字。',
-    split_constraints: '把选中文字拆成清晰、可执行的约束条目。',
-    draft_acceptance: '根据给定 Prompt 生成简洁、可验证的验收标准。',
-    ambiguity: '指出并改写最重要的一处歧义；只返回建议文本。',
-    structure: '只给出结构整理建议，不整篇重写。',
-    complete:
-      '从用户当前光标前的 Prompt 上下文自然续写一小段。最多约 60 个中文字符或两句；不要重复已有文本，不加解释、标题、引号或 Markdown 围栏，只返回应直接接在光标后的文字。',
-  }
-  return `${common}\n${actions[action]}`
 }
 
 function userPayload(request: AiRequest): string {
@@ -111,7 +96,7 @@ class OpenAICompatibleProvider implements AiProvider {
           model: settings.model,
           temperature: request.action === 'complete' ? 0.1 : 0.2,
           messages: [
-            { role: 'system', content: systemInstruction(request.action) },
+            { role: 'system', content: buildSystemInstruction(settings, request.action) },
             { role: 'user', content: userPayload(request) },
           ],
         }),
@@ -141,7 +126,7 @@ class AnthropicProvider implements AiProvider {
           model: settings.model,
           max_tokens: request.action === 'complete' ? 120 : 800,
           temperature: request.action === 'complete' ? 0.1 : 0.2,
-          system: systemInstruction(request.action),
+          system: buildSystemInstruction(settings, request.action),
           messages: [{ role: 'user', content: userPayload(request) }],
         }),
       },
