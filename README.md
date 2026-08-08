@@ -27,6 +27,8 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - source revision 过期建议保护；
 - 独立 opt-in 的编辑器内联补全：灰色 ghost text、Tab 接受、Esc 忽略；
 - completion 可配置上下文/延迟/独立补全模型，支持 streaming-first、旧请求取消、独立网络 cadence、IME composition 抑制和 transient error 自动恢复；
+- **预存长文本补全已按局部 caret context 收口**：不会为了发送有限上下文先 materialize 整个已有 block；
+- Provider 流式兼容以实际 response body 为准，可处理 `text/plain` SSE，也可处理误标成 `text/event-stream` 的普通 JSON；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 **Web Insert 已从 V1 删除。** PromptNote 不再向 ChatGPT/Claude/Gemini 等网页输入框注入内容，也没有 Web Adapter/content script/page bridge。外部交付统一使用 Copy。
@@ -114,32 +116,49 @@ AND 编辑器内联补全已开启
 开启后：
 
 - 光标停顿到用户配置的触发延迟后，可出现灰色 ghost text；默认 300ms，可选 150/300/600ms 或自定义 50–3000ms；
-- “停顿多久”只决定何时具备请求资格，真实 Provider 请求另有独立最小间隔，避免较长句子中多个自然停顿形成请求风暴；
-- 中文、日文等输入法仍在组词/composition 时不会触发补全，输入法提交稳定正文后才重新建立 context；
-- 当前块上下文默认 320 字符，可选 160/320/640 或自定义 16–2000；实际值从设置显式贯穿 Editor；
+- **之前已经写好的文本也可以补全**：把 caret 放到旧文本的块首、块中或块尾即可，能力不依赖“刚刚是否输入过”；
+- 当前块上下文默认 320 字符，可选 160/320/640 或自定义 16–2000；该值同时限制发送内容和 Editor 从已有 block 读取的局部范围，不会先读取整块再截断；
 - caret 位于块首、块中、块尾时都使用当前 text block 的局部 before/after 上下文，不跨语义块拼正文；
+- “停顿多久”只决定何时具备请求资格，真实 Provider 请求另有独立最小间隔，避免**持续输入**场景中多个自然停顿形成请求风暴；这与“预存长文本聚焦失败”是两条不同诊断链；
+- 中文、日文等输入法仍在组词/composition 时不会触发补全，输入法提交稳定正文后才重新建立 context；失焦/composition 时已有 ghost 也会一起失效；
 - Provider 支持 streaming 时，首批有效文本尽快显示；连续 partial 在短窗口合并 UI 刷新，避免每个 token 重渲染整页；
+- Provider streaming/non-streaming 由**实际 body**识别，不只相信 `Content-Type`；兼容网关把普通 JSON 错标成 `text/event-stream` 时仍会正常降级；
 - 可单独指定低延迟“补全模型”，留空沿用主 Model；
 - `Tab` 接受；
 - `Esc` 忽略；
 - 继续输入、移动光标、切块或改变 context budget 会使旧补全和旧 retry 失效；
 - 短时 429、5xx、timeout 或网络抖动会在原 caret/context 仍有效时有限次自动退避恢复，并尊重 Provider 的 `Retry-After`；
-- 单次短时错误不会立即弹“AI 补全暂不可用”；连续自动恢复失败后才升级提示；
-- 认证、配置、额度/配额耗尽等持久错误不会无限重试，会保留真实错误供 AI 设置检查；
+- 单次短时错误不会立即弹通用“AI 补全暂不可用”；连续自动恢复失败后才升级提示；
+- 真正失败时 toast 会直接显示经过长度限制的 Provider 原因；后续补全恢复成功后，旧 AI error 会被清除；
+- 认证、配置、额度/配额耗尽等持久错误不会无限重试，也不会再给下一处全新的 caret/context 人为追加 30 秒等待；
+- 相同成功 context 再次命中短缓存时直接恢复 ghost，不先清空再重新构造 Provider 请求；
 - ghost text 不属于 PromptDocument，不自动保存、不进入 Compiler；
 - 只有接受后才成为真实正文。
 
 修改 Provider / Model / Base URL / API Key 会使原连接状态和补全开关失效，需要重新确认配置。
+
+### 预存长文本复测方式
+
+要验证“已有较长文本是否能补全”，请不要继续输入来制造新变量：
+
+1. 打开一个已经存在较长正文的 Prompt；
+2. 开启 AI 与“编辑器内联补全”；
+3. **不要输入新文字**；
+4. 分别点击旧文本块首、块中、块尾放置 caret；
+5. 等待灰色 ghost；
+6. 若失败，记录底部 `AI 补全失败：...` 后面的真实原因。
+
+这条用例与“中文 IME 连续输入 40～100 字”的持续输入稳定性测试分开验证。
 
 ## AI 与隐私边界
 
 - API Key 与 PromptDocument 分离，保存在扩展本地设置；
 - `chrome.storage.local` 不是加密保险库；
 - 普通 selection/global AI 动作只有用户显式触发时才发送内容；
-- 只有用户额外开启补全后，编辑停顿且不处于 IME composition 时才可能自动请求短 continuation；
-- 补全只使用当前 text block 内、受用户 context budget 限制的局部上下文；
+- 只有用户额外开启补全后，稳定 caret 才可能自动请求短 continuation；
+- 补全只读取和发送当前 text block 内、受用户 context budget 限制的局部上下文；
 - AI 未配置、关闭或失败不影响编辑、保存、本地 lint、Compiler、Preview、Copy；
-- AI Provider 网络错误和 30 秒超时不会伪装成功。
+- AI Provider 网络错误和 30 秒请求超时不会伪装成功。
 
 ## Copy 与 Preview
 
@@ -162,10 +181,12 @@ Preview 可以显式选择 Plain / Markdown / XML，并复制当前格式。
 - 检查关闭时不每次键入运行 lint；
 - Preview 关闭时不每次键入编译；
 - ghost decoration 不触发正文保存；
+- **预存长 block 的 completion context 先按 caret/context budget 限窗，再 `textBetween()`，不 materialize 整块；**
+- completion cache hit 在 prompt/provider/request 构造之前直接返回，避免同一 ghost 闪烁和无意义对象创建；
 - completion 的 idle debounce 与真实网络 cadence 分离；IME composition 不请求；旧 request/retry 可取消；
-- transient Provider failure 使用有限指数退避，persistent failure 不无限重试；
+- transient Provider failure 使用有限指数退避，persistent failure 不无限重试且不跨 context 施加 30 秒 cooldown；
 - streaming partial 约每 48ms 合并 UI 刷新；
-- streaming capability 按 Provider + endpoint + completion model 隔离且缓存有界，并兼容 SSE keep-alive；
+- streaming capability 按 Provider + endpoint + completion model 隔离且缓存有界；stream body sniff 兼容错误 Content-Type；
 - AI Settings 与本地 Prompt Sheet 只有打开时才 lazy-load；
 - 不存在网页 bridge/content script 常驻开销。
 
