@@ -31,7 +31,7 @@ export interface PromptEditorHandle {
   focus(): void
 }
 
-interface PromptEditorProps {
+export interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
   completionText: EditorCompletionSuggestion | null
