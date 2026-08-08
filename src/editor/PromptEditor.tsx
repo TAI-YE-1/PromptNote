@@ -12,7 +12,7 @@ import {
   type EditableBlockFormat,
 } from './blockConversion'
 
-const COMPLETION_CONTEXT_LIMIT = 2_000
+const COMPLETION_CONTEXT_LIMIT = 800
 
 export interface EditorSelectionSnapshot {
   text: string
@@ -56,6 +56,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const completionContextKeyRef = useRef<string | null>(null)
   const editor = useEditor({
     extensions: [StarterKit, PromptSection, GhostCompletion],
     content: props.content as JSONContent,
@@ -85,6 +86,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     })
     setGhostCompletion(editor.view, null)
     props.onSelectionChange(null)
+    completionContextKeyRef.current = null
     props.onCompletionContext(null)
   }, [editor, props.documentId])
 
@@ -93,21 +95,28 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     setGhostCompletion(editor.view, props.completionText)
   }, [editor, props.completionText])
 
+  function publishCompletionContext(context: EditorCompletionContext | null) {
+    const key = context ? `${context.position}\u0000${context.beforeText}` : null
+    if (completionContextKeyRef.current === key) return
+    completionContextKeyRef.current = key
+    props.onCompletionContext(context)
+  }
+
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
     const { selection, doc } = currentEditor.state
     if (!selection.empty || !currentEditor.view.hasFocus()) {
-      props.onCompletionContext(null)
+      publishCompletionContext(null)
       return
     }
 
     const from = Math.max(0, selection.from - COMPLETION_CONTEXT_LIMIT)
     const beforeText = doc.textBetween(from, selection.from, '\n', '\n').trimEnd()
     if (!beforeText.trim()) {
-      props.onCompletionContext(null)
+      publishCompletionContext(null)
       return
     }
 
-    props.onCompletionContext({ position: selection.from, beforeText })
+    publishCompletionContext({ position: selection.from, beforeText })
   }
 
   function convertSelectedBlock(format: EditableBlockFormat) {
