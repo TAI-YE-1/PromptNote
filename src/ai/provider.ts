@@ -21,6 +21,10 @@ function modelForRequest(settings: AiSettings, request: AiRequest): string {
   return settings.model
 }
 
+function streamingCapabilityKey(provider: string, endpoint: string, settings: AiSettings, request: AiRequest): string {
+  return `${provider}:${endpoint}:${modelForRequest(settings, request)}`
+}
+
 function userPayload(request: AiRequest): string {
   if (!request.surroundingContext) return request.content
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
@@ -174,7 +178,7 @@ async function readStreamingOrText(
       probe += chunk
       const normalizedProbe = probe.replace(/\r\n/g, '\n')
       const trimmed = normalizedProbe.trimStart()
-      if (/^(?:data|event):/.test(trimmed)) {
+      if (/^(?::|data:|event:)/.test(trimmed)) {
         sse = true
         buffer = consumeCompleteSseEvents(normalizedProbe, onData)
         probe = ''
@@ -244,7 +248,7 @@ class OpenAICompatibleProvider implements AiProvider {
     signal?: AbortSignal,
   ): Promise<string> {
     const endpoint = apiEndpoint(settings.baseUrl, '/v1/chat/completions')
-    const streamKey = `openai-compatible:${endpoint}`
+    const streamKey = streamingCapabilityKey('openai-compatible', endpoint, settings, request)
     if (nonStreamingEndpoints.has(streamKey)) {
       return fallbackCompletion(this, settings, request, onPartial, signal)
     }
@@ -331,7 +335,7 @@ class AnthropicProvider implements AiProvider {
     signal?: AbortSignal,
   ): Promise<string> {
     const endpoint = apiEndpoint(settings.baseUrl, '/v1/messages')
-    const streamKey = `anthropic:${endpoint}`
+    const streamKey = streamingCapabilityKey('anthropic', endpoint, settings, request)
     if (nonStreamingEndpoints.has(streamKey)) {
       return fallbackCompletion(this, settings, request, onPartial, signal)
     }
