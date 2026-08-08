@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   COMPLETION_REQUEST_MIN_INTERVAL_MS,
+  COMPLETION_TRANSIENT_BACKOFF_MAX_MS,
   computeCompletionStartDelayMs,
+  computeCompletionTransientRetryDelayMs,
 } from '../src/ai/completionTuning'
 
 describe('completion request cadence', () => {
@@ -36,5 +38,22 @@ describe('completion request cadence', () => {
         nowMs: 10_000,
       }),
     ).toBe(2_500)
+  })
+})
+
+describe('completion transient retry tuning', () => {
+  it('backs off progressively for consecutive transient failures', () => {
+    expect(computeCompletionTransientRetryDelayMs(1, null)).toBe(1_500)
+    expect(computeCompletionTransientRetryDelayMs(2, null)).toBe(3_000)
+    expect(computeCompletionTransientRetryDelayMs(3, null)).toBe(6_000)
+  })
+
+  it('honors a longer provider Retry-After value', () => {
+    expect(computeCompletionTransientRetryDelayMs(1, 8_000)).toBe(8_000)
+  })
+
+  it('caps local exponential backoff without overriding a provider Retry-After', () => {
+    expect(computeCompletionTransientRetryDelayMs(20, null)).toBe(COMPLETION_TRANSIENT_BACKOFF_MAX_MS)
+    expect(computeCompletionTransientRetryDelayMs(20, 20_000)).toBe(20_000)
   })
 })
