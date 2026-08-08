@@ -35,6 +35,7 @@ describe('ChromeAiSettingsRepository', () => {
     expect(defaultAiSettings.completionEnabled).toBe(false)
     expect(defaultAiSettings.completionContextChars).toBe(320)
     expect(defaultAiSettings.completionDelayMs).toBe(300)
+    expect(defaultAiSettings.completionModel).toBe('')
   })
 
   it('requires re-verification for settings saved before completion existed', async () => {
@@ -55,6 +56,7 @@ describe('ChromeAiSettingsRepository', () => {
     expect(loaded.completionEnabled).toBe(false)
     expect(loaded.completionContextChars).toBe(320)
     expect(loaded.completionDelayMs).toBe(300)
+    expect(loaded.completionModel).toBe('')
     expect(loaded.instructionOverrides).toEqual({})
   })
 
@@ -75,6 +77,7 @@ describe('ChromeAiSettingsRepository', () => {
     expect(loaded.completionEnabled).toBe(true)
     expect(loaded.completionContextChars).toBe(320)
     expect(loaded.completionDelayMs).toBe(300)
+    expect(loaded.completionModel).toBe('')
   })
 
   it('falls back from invalid persisted tuning values without losing connection state', async () => {
@@ -92,7 +95,7 @@ describe('ChromeAiSettingsRepository', () => {
     expect(loaded.completionDelayMs).toBe(300)
   })
 
-  it('stores custom completion tuning and action instructions separately from PromptDocument content', async () => {
+  it('stores custom completion tuning, model and action instructions separately from PromptDocument content', async () => {
     const repository = new ChromeAiSettingsRepository()
     const settings: AiSettings = {
       enabled: true,
@@ -100,6 +103,7 @@ describe('ChromeAiSettingsRepository', () => {
       completionEnabled: true,
       completionContextChars: 96,
       completionDelayMs: 80,
+      completionModel: 'fast-completion-model',
       instructionOverrides: {
         complete: '只补全一个短语。',
         shorten: '压缩到一半长度。',
