@@ -9,29 +9,19 @@ import {
   type EditorCompletionContext,
   type EditorCompletionSuggestion,
 } from './completionContext'
+import {
+  buildEditorSelectionSnapshot,
+  type EditorSelectionSnapshot,
+} from './selectionSnapshot'
 import type { PromptNodeJSON } from '../prompt/schema'
 import type { SectionKind } from '../prompt/sectionKinds'
 import {
   createBlockConversionTransaction,
-  getActiveBlockFormat,
   type EditableBlockFormat,
 } from './blockConversion'
 
 export type { EditorCompletionContext } from './completionContext'
-
-export interface EditorSelectionSnapshot {
-  text: string
-  from: number
-  to: number
-  blockFormat: EditableBlockFormat
-  rect: {
-    left: number
-    top: number
-    width: number
-    height: number
-    containerWidth: number
-  }
-}
+export type { EditorSelectionSnapshot } from './selectionSnapshot'
 
 export interface PromptEditorHandle {
   insertSection(kind: SectionKind, text?: string): void
@@ -165,33 +155,19 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   }
 
   function emitSelectionSnapshot(currentEditor: NonNullable<typeof editor>) {
-    const { selection } = currentEditor.state
-    if (!currentEditor.view.hasFocus() || selection.empty) {
-      props.onSelectionChange(null)
-      return
-    }
-
-    const activeBlock = getActiveBlockFormat(currentEditor.state)
-    if (!activeBlock) {
+    if (!currentEditor.view.hasFocus()) {
       props.onSelectionChange(null)
       return
     }
 
     try {
-      const anchor = currentEditor.view.coordsAtPos(selection.to)
-      props.onSelectionChange({
-        text: currentEditor.state.doc.textBetween(selection.from, selection.to, '\n'),
-        from: selection.from,
-        to: selection.to,
-        blockFormat: activeBlock.format,
-        rect: {
-          left: anchor.right,
-          top: anchor.top,
-          width: 0,
-          height: Math.max(18, anchor.bottom - anchor.top),
-          containerWidth: window.innerWidth,
-        },
-      })
+      props.onSelectionChange(
+        buildEditorSelectionSnapshot(
+          currentEditor.state,
+          (position) => currentEditor.view.coordsAtPos(position),
+          window.innerWidth,
+        ),
+      )
     } catch {
       props.onSelectionChange(null)
     }
