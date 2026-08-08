@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { COMPLETION_CONTEXT_MAX } from '../ai/completionTuning'
 import { PromptSection } from './promptSection'
 import { GhostCompletion, setGhostCompletion } from './ghostCompletion'
 import type { PromptNodeJSON } from '../prompt/schema'
@@ -43,7 +44,7 @@ interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
   completionText: string | null
-  completionContextChars: number
+  completionContextChars?: number
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
   onCompletionContext(context: EditorCompletionContext | null): void
@@ -56,6 +57,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const completionContextKeyRef = useRef<string | null>(null)
+  const completionContextChars = props.completionContextChars ?? COMPLETION_CONTEXT_MAX
   const editor = useEditor({
     extensions: [StarterKit, PromptSection, GhostCompletion],
     content: props.content as JSONContent,
@@ -98,7 +100,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     if (!editor) return
     completionContextKeyRef.current = null
     emitCompletionContext(editor)
-  }, [editor, props.completionContextChars])
+  }, [completionContextChars, editor])
 
   function publishCompletionContext(context: EditorCompletionContext | null) {
     const key = context ? `${context.position}\u0000${context.beforeText}` : null
@@ -109,16 +111,12 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
     const { selection, doc } = currentEditor.state
-    if (
-      props.completionContextChars <= 0 ||
-      !selection.empty ||
-      !currentEditor.view.hasFocus()
-    ) {
+    if (completionContextChars <= 0 || !selection.empty || !currentEditor.view.hasFocus()) {
       publishCompletionContext(null)
       return
     }
 
-    const from = Math.max(0, selection.from - props.completionContextChars)
+    const from = Math.max(0, selection.from - completionContextChars)
     const beforeText = doc.textBetween(from, selection.from, '\n', '\n').trimEnd()
     if (!beforeText.trim()) {
       publishCompletionContext(null)
