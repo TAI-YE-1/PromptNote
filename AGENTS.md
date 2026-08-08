@@ -62,7 +62,9 @@ D017 已明确退役 Web Insert。不得重新加入 `activeTab`、`scripting`�
 
 D018 已明确退役文字旁微型 `•••` 选区入口。不得重新用 `window.getSelection()`、viewport rect、`coordsAtPos` 浮动坐标或另一套 DOM selection 状态恢复它；选区操作入口固定为 Side Panel 主 actionbar 上方的稳定 SelectionActionBar。
 
-D020 已明确把 completion idle debounce 与真实 Provider cadence 分开。不得通过继续缩短 debounce、隐藏错误 toast 或堆第二套缓存来“提高补全灵敏度”；先审查 IME composition、network cadence、stale request、Retry-After 和 transient/persistent error classification。
+D020 已明确把 completion idle debounce 与真实 Provider cadence 分开。不得通过继续缩短 debounce、隐藏错误 toast 或堆第二套缓存来“提高补全灵敏度”；持续输入场景先审查 IME composition、network cadence、stale request、Retry-After 和 transient/persistent error classification。
+
+**D021 明确区分“刚输入的长文本”和“早已存在的长文本”。** 用户已经说明文本是预存内容时，禁止自动把问题归因到 typing request storm / IME。应先审查：context 读取复杂度 → caret/focus identity → Provider 实际响应 body → stale error / cache / ghost 生命周期。
 
 ## 3. 真实项目优先
 
@@ -74,8 +76,10 @@ D020 已明确把 completion idle debounce 与真实 Provider cadence 分开。�
 - Chrome API；
 - 依赖版本；
 - 测试命令与 CI 结果；
-- Provider 请求；
-- TipTap/ProseMirror transaction / composition 行为。
+- Provider 请求与真实响应格式；
+- TipTap/ProseMirror transaction / focus / composition 行为。
+
+用户提供的关键事实属于诊断前提。例如用户明确说“这段文字以前就写好了”，后续分析必须以预存文本场景为前提，不得继续沿“刚连续输入很多字”的假设执行。
 
 未执行的验证不得描述为已通过。
 
@@ -148,13 +152,19 @@ TipTap、Slash Menu、语义块、编辑命令、selection、ghost completion de
 
 选区业务状态只能从 ProseMirror EditorState 派生：selected text、from/to、single-block format。不得把 DOM selection 或屏幕坐标当第二状态源。跨块 selection 的 block format 为 `null`，禁止类型转换。
 
-Editor 在 `view.composing=true` 时必须撤销 completion context，不得把中文/日文输入法未提交的中间态发给 App。
+`completionContextChars` 同时约束发送上下文和 Editor **读取成本**。对已经很长的 block，必须先根据 caret 建 bounded scan window，再 `textBetween()`；禁止整块 materialize 后再 slice。
+
+Editor 在 `view.composing=true` 或失焦时必须同时撤销 completion context 并清 ghost，不得留下与当前 focus/context 不一致的 decoration。
 
 ### `app/`
 
 组合应用状态和 UI。`useInlineCompletion` 只负责补全请求调度，不保存正文。
 
 补全调度只能消费 Editor 已发布的稳定 context；新 context 必须取消旧 request、旧等待和旧 retry。请求 cadence / retry 数值必须从 `ai/completionTuning.ts` 读取，不在 Hook 里另建平行常量集。
+
+同一 context 的 cache hit 必须在 prompt/provider/request 构造之前 fast-path；不得先清空同一 ghost 再恢复，制造无意义 render 和视觉闪烁。
+
+completion error 必须能向 App 双向报告 error/recovery。成功 partial/final/cache hit 后清除 stale `aiError`；失败 toast 显示经过长度限制的真实 Provider 原因，而不是长期只显示通用“检查连接”。
 
 ### `storage/`
 
@@ -167,6 +177,8 @@ Provider、Suggestion、Lint 与错误归一化。
 普通 AI 编辑结果必须先返回 Suggestion/Finding；不得直接修改 PromptDocument。
 
 Provider 网络错误必须保留足以调度的结构信息，至少能区分 transient/persistent；429 `Retry-After`、HTTP status 与可读错误 message 不得在 Adapter 层被丢掉。JSON error body 不直接整坨展示给用户。
+
+Streaming/non-streaming 以真实 body 形态为权威，不只相信 `Content-Type`。必须同时支持 `text/plain` 实际 SSE，以及 `text/event-stream` 实际普通 JSON。Header 错误不能把有效补全误判成“流式返回空内容”。
 
 ### `extension/`
 
@@ -202,21 +214,44 @@ settings.configured
 - IME composition 期间不得生成 completion context 或发 Provider 请求；
 - `completionDelayMs` 只是用户停顿 debounce，不得直接作为真实请求频率上限；
 - 真实 Provider 请求必须另有最小 cadence，较长句子中的多个自然停顿不能形成请求风暴；
-- 只发送当前 text block 内、由 `completionContextChars` 限制的 caret 前后局部上下文，不借补全静默长期上传完整文档；
+- 只读取并发送当前 text block 内、由 `completionContextChars` 限制的 caret 前后局部上下文；不能为了发送有限 context 先扫描/materialize 整个预存 block；
 - `completionContextChars` 必须显式贯穿 Editor，并进入 request identity；禁止 UI 显示小值而 Editor 静默回退更大值；
 - 使用短输出上限；
 - transient 429/5xx/timeout/transport 应在同一 context 内有限次指数退避自动恢复，并尊重 `Retry-After`；
-- persistent auth/config/quota error 不得无限重试；
+- persistent auth/config/quota error 不得无限重试，也不得给后续全新的 caret/context 强加额外 30 秒 cooldown；
 - 单次 transient failure 不应立即弹通用“补全不可用”；不能用隐藏错误代替实际重试；
+- 实际失败必须展示有用且长度受控的 Provider 原因；成功恢复必须清理 stale completion error；
 - ghost text 不写 PromptDocument、不触发 autosave/Compiler/revision；
 - `Tab` 接受，`Esc` 忽略；
-- doc/selection/context budget/composition 变化必须清除 stale ghost；
+- doc/selection/context budget/focus/composition 变化必须同时使 stale context/ghost 失效；
 - 必须保留有意义的前导空格，兼容英文/代码续写；
 - streaming partial 可以在很短窗口合并 UI 更新，但不得等待完整回复后才显示；
 - streaming capability cache 必须至少区分 Provider、endpoint 与实际 completion model，并有容量上限；
-- SSE parser 需要容忍合法 keep-alive/comment 行和错误 Content-Type。
+- stream parser 必须从 body sniff SSE/JSON，容忍合法 keep-alive/comment 和错误 Content-Type；
+- 相同成功 context 的小容量 cache 命中应直接恢复 ghost，不构造无意义的新 Provider request。
 
 不要为了“更智能”自动接受补全、自动生成整篇 Prompt 或把 ghost 保存下来。
+
+### 8.1 “长文本不补全”的诊断顺序
+
+用户反馈“长文本不补全”时先确认是哪一种：
+
+```text
+A. 刚刚持续输入形成的长文本
+B. 之前已经存在、现在只是打开/聚焦/移动 caret 的长文本
+```
+
+A 类优先看 D020：IME、debounce、network cadence、Abort、Retry-After、短时限流。
+
+B 类优先看 D021：
+
+1. `completionContext.ts` 是否整块 `textBetween()` 后再 slice；
+2. focus/caret/document generation/context identity 是否稳定；
+3. Provider 返回体实际是 SSE 还是 JSON，header 是否误标；
+4. 是否存在上一次失败遗留的 cooldown / stale error / stale ghost；
+5. 相同 context cache hit 是否真正 fast-path。
+
+没有证据时不得把 B 类写成“因为用户刚才停顿很多次导致请求风暴”。
 
 ## 9. AI Assistance 规则
 
@@ -241,6 +276,8 @@ Suggestion：
 - 是否每次键入执行当前 UI 不需要的派生计算；
 - 是否重复读取整个 Storage 或启动时重复读取相同 key；
 - 是否重复注册 listener；
+- 是否为了局部补全先 materialize 整个已有长 block；
+- 是否 cache hit 仍先清空/重建 request/provider；
 - 是否把每个用户停顿映射成一个真实 AI 网络请求；
 - 是否在 IME composition 中产生无价值请求；
 - 是否产生可取消却仍并发堆积的 AI 请求/重试；
@@ -248,7 +285,7 @@ Suggestion：
 - 是否把 decoration 变化误当正文变化；
 - 是否首屏同步加载只有打开 Sheet 才需要的 UI；
 - 是否让更旧 revision 覆盖更新 revision；
-- 是否用提高 bundle warning threshold、隐藏日志、延长 loading 掩盖问题。
+- 是否用提高 bundle warning threshold、隐藏真实错误、延长 loading/cooldown 掩盖问题。
 
 优化以真实热路径和可验证收益为依据；不要为了“优化”引入复杂缓存或第二状态源。
 
@@ -286,19 +323,21 @@ sidePanel
 - Provider short request；
 - cancellation；
 - 当前 block 的 caret 前/后 context 和配置 budget；
+- **超大预存 block 的 bounded context 构建**；
 - streaming partial / fallback / SSE keepalive；
+- `text/plain` SSE 与 `text/event-stream` + 普通 JSON 双向错误 header 兼容；
 - request cadence：首次 debounce、最小网络间隔、backoff/Retry-After；
 - Provider transient/persistent 429/5xx/error body 分类；
 - Tab accept；
 - Esc dismiss；
-- doc change stale invalidation；
+- doc/focus/composition change stale invalidation；
 - 前导空格。
 
 选区至少覆盖：ProseMirror 非空 selection 可派生 snapshot；纯 caret 不显示操作；不得用浏览器 DOM selection fixture 冒充业务状态。
 
 Storage 至少覆盖：并发保存、revision 单调性、启动 current/documents 批量读取。
 
-最终仍必须有真实 Chrome/Edge 浏览器证据，fixture/单测不能冒充 E2E；中文 IME 下连续输入约 40–100 字、多个自然停顿的补全稳定性属于当前重点真机证据。
+最终仍必须有真实 Chrome/Edge 浏览器证据，fixture/单测不能冒充 E2E。当前新增一条独立真机用例：**打开已经存在的较长 Prompt，不继续输入，直接把 caret 放到旧文本块首/中/尾并等待补全**；如果失败，记录新的真实错误 toast。中文 IME 连续输入稳定性继续作为另一条独立用例，不与预存文本问题混为同一个根因。
 
 ## 13. P0.5 原型规则
 
