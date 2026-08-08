@@ -126,7 +126,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   }
 
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
-    if (!currentEditor.view.hasFocus()) {
+    if (!currentEditor.view.hasFocus() || currentEditor.view.composing) {
       publishCompletionContext(null)
       return
     }
