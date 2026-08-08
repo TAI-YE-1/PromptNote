@@ -344,7 +344,7 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 ## D020 — 内联补全将“用户停顿”与“网络请求”分开治理
 
-**状态：Accepted**
+**状态：Accepted，适用于持续输入稳定性；已有文本问题由 D021 单独定义**
 
 ### 决定
 
@@ -359,14 +359,47 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 ### 原因
 
-较长中文句子包含自然停顿和输入法 composition。如果把“300ms 没打字”直接映射为新的网络请求，会在正常写作过程中制造请求风暴；即使浏览器随后 Abort，远端 Provider 也不一定已经停止处理这些请求。结果表现为文本越长越容易出现 429/5xx，用户看到的却只是笼统“补全不可用”。
+在**持续输入**场景中，较长中文句子可能包含自然停顿和输入法 composition。如果把“300ms 没打字”直接映射为新的网络请求，会制造无意义请求甚至触发 Provider 限流。该风险是真实的通用稳定性问题，但**不能据此推断“一个早已存在的较长文本块聚焦后失败”就是输入风暴/IME 导致**。
 
 ### 影响
 
 - `ai/completionTuning.ts` 成为 completion delay、request cadence、retry policy 的唯一数值权威；
 - Provider 错误必须能区分 transient/persistent，并保留 HTTP status / Retry-After 等必要元数据；
 - 不允许用“把 debounce 调大”代替 cadence 治理，也不允许用“隐藏 toast”代替真正的自动恢复；
-- Chrome 真机验收必须包含中文 IME 连续输入约 40–100 字、多个自然停顿后的补全稳定性。
+- Chrome 真机验收仍包含中文 IME 连续输入稳定性，但它与已有文本补全验收分开记录。
+
+---
+
+## D021 — 已有长文本补全按局部 context 成本运行，不把输入历史当诊断依据
+
+**状态：Accepted**
+
+### 决定
+
+当用户把 caret 放到**之前已经存在**的较长 Prompt block 中时，补全链只允许基于当前 caret 的局部 context 工作。实现和诊断遵守：
+
+- `completionContextChars` 不只是“发送上限”，也是 Editor context 读取的成本边界；先按 caret 建有限 scan window，再 `textBetween()`，禁止 materialize 整块后 slice；
+- streaming/non-streaming 由响应 body sniff 确认，不只相信 `Content-Type`；错标为 `text/event-stream` 的普通 JSON 必须正常降级；
+- persistent completion error 结束当前请求即可，不再给后续新 caret/context 设置跨 context 30 秒 cooldown；
+- 相同 context 的成功 cache 命中必须在 prompt/provider/request 构造之前 fast-path；
+- Editor blur / IME composition 必须同时使 context 与 ghost 失效；
+- completion failure 应显示长度受控的真实 Provider 原因；成功恢复后清掉 stale AI error。
+
+### 原因
+
+“文本较长”至少包含两种完全不同的场景：
+
+1. 用户正在持续输入，可能涉及 debounce、cadence、IME；
+2. 文本早已存在，用户只是打开/聚焦/移动 caret。
+
+第二种场景没有证据支持“刚刚产生了很多输入事件”。把它归因到 typing request storm 会把排查方向带偏。对已有文本，真正应优先检查的是 context 构建复杂度、focus/caret identity、Provider 响应兼容和 stale 状态。
+
+### 影响
+
+- 以后收到“长文本不补全”反馈必须先确认文本是刚输入还是预存，不能自动套用 D020；
+- 性能测试要包含几十 KB 以上的**预存 block**，验证输出 context 始终受 budget 限制；
+- Provider fixture 要覆盖 SSE 正常流、`text/plain` SSE、`text/event-stream` + JSON 三类响应；
+- 真机验收必须包含“打开已有较长 Prompt → 不继续输入 → 点击旧文本 caret → 等待 ghost”的独立用例。
 
 ---
 
