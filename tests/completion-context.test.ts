@@ -88,6 +88,21 @@ describe('editor completion context', () => {
     expect(`${context?.beforeText}${context?.afterText}`).not.toContain('完全不同的前块')
   })
 
+  it('honors a small configured context budget at the end of a long block', () => {
+    const text = '这是一个很长的当前模块文本，用来验证用户把补全上下文调小以后，编辑器不会偷偷回退到内部的大上下文上限。'
+    const state = stateWithCaretInSecondBlock('前块不能泄漏', text)
+    const context = buildEditorCompletionContext(state, {
+      documentId: 'doc-1',
+      documentVersion: 4,
+      maxChars: 16,
+    })
+
+    expect(context).not.toBeNull()
+    expect(context?.afterText).toBe('')
+    expect(context?.beforeText.length).toBeLessThanOrEqual(16)
+    expect(context?.beforeText).toBe(text.slice(-16))
+  })
+
   it('changes request identity when document generation changes even if caret text is unchanged', () => {
     const state = stateWithCaretInSecondBlock('前文', '相同文本')
     const first = buildEditorCompletionContext(state, {
