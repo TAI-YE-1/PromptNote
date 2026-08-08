@@ -5,7 +5,7 @@ import type { EditorCompletionContext } from '../editor/PromptEditor'
 
 const COMPLETION_DEBOUNCE_MS = 750
 const COMPLETION_ERROR_BACKOFF_MS = 30_000
-const COMPLETION_MIN_CONTEXT = 8
+const COMPLETION_MIN_CONTEXT = 2
 
 interface InlineCompletionInput {
   settings: AiSettings
@@ -39,13 +39,14 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
       return
     }
 
+    const context = input.context.beforeText
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
           const result = await getAiProvider(input.settings).generate(
             input.settings,
-            { action: 'complete', content: input.context?.beforeText ?? '' },
+            { action: 'complete', content: context },
             controller.signal,
           )
           if (controller.signal.aborted) return
@@ -74,7 +75,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
 }
 
 function normalizeCompletion(value: string): string | null {
-  const text = value.replace(/\r\n/g, '\n').trim()
-  if (!text) return null
+  const text = value.replace(/\r\n/g, '\n').trimEnd()
+  if (!text.trim()) return null
   return text.slice(0, 240)
 }
