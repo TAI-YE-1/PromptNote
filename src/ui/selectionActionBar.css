@@ -14,6 +14,12 @@
   backdrop-filter: blur(10px);
 }
 
+body:has(.lint-card--floating) .selection-actionbar,
+body:has(.suggestion-card) .selection-actionbar,
+body:has(.inline-status) .selection-actionbar {
+  display: none;
+}
+
 .selection-actionbar__meta {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
