@@ -22,7 +22,7 @@
 - [x] P0-03 建立 `docs/UX.md`，固定编辑、Slash Menu、AI suggestion、Compiler 与 Copy 主链。
 - [x] P0-04 建立 `docs/PROMPT-DOCUMENT-CONTRACT.md`，固定唯一内容源与 Schema 边界。
 - [x] P0-05 建立 `docs/ARCHITECTURE.md`，固定模块职责、依赖方向和状态边界。
-- [x] P0-06 建立 `docs/DECISIONS.md`，记录关键产品/架构决策；D017 退役 Web Insert，D018 固定稳定选区工具条，D019 固定 V1 收口性能原则，D020 固定补全 debounce/cadence/IME/错误恢复边界。
+- [x] P0-06 建立 `docs/DECISIONS.md`，记录关键产品/架构决策；D017 退役 Web Insert，D018 固定稳定选区工具条，D019 固定 V1 收口性能原则，D020 固定持续输入的 debounce/cadence/IME/错误恢复边界，D021 固定预存长文本的 bounded context / Provider body / stale-state 诊断边界。
 - [x] P0-07 建立 `TASKS.md` 唯一任务账本。
 - [x] P0-08 建立 `AGENTS.md` AI 开发协作规则。
 
@@ -151,8 +151,9 @@
 - [x] P6-17 深排查真机“只在部分 caret 触发 / 只显示首批两三个字”：补全上下文改为当前 block 的 caret 前后双向窗口并支持块首/块中/单字符；流式 ghost decoration key 随 partial 文本更新，禁止 ProseMirror 复用首批 widget DOM；补全指令显式使用 `<光标>` 并要求非空、有用续写。
 - [x] P6-18 深排查“最长块不补全”：AI 设置中的 `completionContextChars` 改为 PromptEditor 必填契约并显式贯穿；context budget 纳入 request identity；新增小上下文预算长块测试。
 - [x] P6-19 收口流式渲染热路径：连续 partial 约 48ms 合并刷新，避免 token 粒度根 React render；Editor 已完成一次 context 截取后 Hook 不再维护第二套裁剪实现。
-- [x] P6-20 修复“约 40～100 字中文连续输入后补全弹不可用”：D020 将 idle debounce 与真实请求 cadence 分离；网络请求设独立最小间隔；IME composition 不发布 context；短时 429/5xx/timeout/transport 在原 context 有效时有限次自动退避恢复并尊重 Retry-After；持久认证/配置/额度错误仍明确提示；补齐 cadence/backoff/error classification 测试。
-- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证块首/块中/块尾均能产生合理灰色续写，用户配置的小上下文真实生效，流式文字持续增长而非停在首批两三个字，Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；**新增验证：中文 IME 连续输入约 40～100 字并包含多个自然停顿，不应因请求风暴弹“补全不可用”**；关闭补全后确认不再自动请求。最新 P6-16～P6-20 构建待复测。
+- [x] P6-20 **持续输入稳定性加固，不作为“早已存在的长文本”截图根因：** D020 将 idle debounce 与真实请求 cadence 分离；网络请求设独立最小间隔；IME composition 不发布 context；短时 429/5xx/timeout/transport 在原 context 有效时有限次自动退避恢复并尊重 Retry-After；持久认证/配置/额度错误仍明确提示；补齐 cadence/backoff/error classification 测试。
+- [x] P6-21 **预存长文本补全链根修：** 用户确认截图中的较长内容是之前已经存在、不是刚连续输入。按 D021 重查并完成：`completionContext.ts` 先按 caret + context budget 限窗再 `textBetween()`，不再整块 materialize 后 slice；Provider streaming 以 body sniff 为权威，兼容 `text/event-stream` + 普通 JSON；删除 persistent error 对后续新 context 的 30 秒 cooldown；completion error/recovery 双向同步并展示长度受控真实原因；blur/composition 同时清 context + ghost；成功 cache hit 在 request/provider 构造前 fast-path。新增超大预存 block 与错标 JSON fixture。
+- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证块首/块中/块尾均能产生合理灰色续写，用户配置的小上下文真实生效，流式文字持续增长而非停在首批两三个字，Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；**独立验证 A：打开已经存在的较长 Prompt，不继续输入，直接在旧文本块首/中/尾点击 caret 并等待 ghost；若失败记录新的真实错误 toast。独立验证 B：中文 IME 连续输入约 40～100 字并包含多个自然停顿，不应形成请求风暴。**关闭补全后确认不再自动请求。最新 P6-16～P6-21 构建待复测。
 
 ---
 
@@ -162,17 +163,19 @@
 - [x] P7-02 完成最近文档恢复逻辑。
 - [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；D018 已彻底删除不稳定的文字旁 `•••` / viewport rect 交互，改为 actionbar 上方固定选区工具条；检查结果与 suggestion 同属 transient surface，需最新构建真机确认稳定可见、可点击、不遮挡。
 - [ ] P7-04 检查键盘可达性和关键操作可发现性；重点含 Slash、Tab 接受 ghost、Esc 忽略 ghost/关闭顶层临时 UI、稳定选区工具条键鼠交互。
-- [ ] P7-05 完整审查错误路径无假成功、无静默失败；当前重点为 Storage、Copy、AI suggestion、inline completion Provider 失败/退避。
+- [ ] P7-05 完整审查错误路径无假成功、无静默失败；当前重点为 Storage、Copy、AI suggestion、inline completion Provider 失败/退避/恢复后的 stale error。
 - [ ] P7-06 检查 Copy / Save 的连续、重复操作与状态一致性；Web Insert 状态链已删除，Repository 已增加 revision 单调写保护。
-- [ ] P7-07 做最终代码减法审查；已删除旧 SelectionContextMenu、viewport rect/coords/scroll 定位、旧 selection CSS、重复 completion context 裁剪、冗余 floatingPanels stylesheet；本轮再删除失效的 completion 长度阈值、重复 request identity helper、重复 OpenAI request body、Hook 内平行 retry 常量与重复 request 构造；待最新浏览器 smoke 后最后反查一次。
+- [ ] P7-07 做最终代码减法审查；已删除旧 SelectionContextMenu、viewport rect/coords/scroll 定位、旧 selection CSS、重复 completion context 裁剪、冗余 floatingPanels stylesheet；后续又删除失效 completion 长度阈值、重复 request identity helper、重复 OpenAI request body、Hook 内平行 retry 常量、重复 request 构造；本轮继续删除 header-only stream 判定、persistent 30 秒 cross-context cooldown、冗余 `hasBlockContext` 二次判定，并收拢 ghost invalidation；待最新浏览器 smoke 后最后反查一次。
 - [x] P7-08 反向搜索 Non-goals：无 backend/auth/team/marketplace/cloud-sync/model-playground，Web DOM 注入也已成为明确 Non-goal。
 - [ ] P7-09 README、PRODUCT、UX、ARCHITECTURE、DECISIONS、AGENTS、TASKS 最终实现态收口；当前代码态文档已同步，待最终浏览器验收后只做最终证据复核。
-- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径，补全 partial 合并刷新，context budget 单一贯穿，Provider streaming capability 按模型隔离，AI/Document Sheet 已 lazy-load；D020 新增网络 cadence、IME suppression、有限重试与有界 capability cache。主编辑器 chunk 仍 >500KB，继续保留 warning；必须以真实启动/输入体感决定是否进一步拆 TipTap，不调高 warningLimit 掩盖。
+- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径，补全 partial 合并刷新，context budget 单一贯穿，Provider streaming capability 按模型隔离，AI/Document Sheet 已 lazy-load；D020 增加网络 cadence、IME suppression、有限重试与有界 capability cache；D021 进一步把**预存长 block context 读取本身**限制到 caret 周边窗口并把 cache hit 前移。主编辑器 chunk 仍 >500KB，继续保留 warning；必须以真实启动/输入体感决定是否进一步拆 TipTap，不调高 warningLimit 掩盖。
 - [x] P7-11 D018 选区交互根修：以 ProseMirror selection 为唯一权威，选中文字后直接显示固定 SelectionActionBar；删除文字旁 `•••`、DOM selection、viewport rect 与 coords 业务状态；跨块选区禁用类型转换。
 - [x] P7-12 已完成上一轮 5 轮代码审查、5 轮代码优化、5 轮代码减法、5 轮性能优化，并保留真实改动证据。
 - [x] P7-13 已完成上一轮 5 轮实现态文档同步；最终发布证据仍由 P7-09/P8 关闭。
 - [x] P7-14 针对 P6-20 再完成 5 轮代码审查、5 轮代码优化、5 轮代码减法、5 轮性能优化：request storm → stable-context retry → Provider error/cache → policy/identity duplication → IME composition；均对应真实实现或删除，不以重复描述凑轮次。
 - [x] P7-15 针对 P6-20 完成 5 轮文档同步：UX → ARCHITECTURE → DECISIONS/D020 → AGENTS → TASKS/README；未用文档更新冒充 P6-15 真机验收。
+- [x] P7-16 用户纠正“较长内容是之前就写好的”后，针对 P6-21 完成新的 5 轮代码审查/优化/减法/性能优化：①预存 block 整块 `textBetween` → bounded scan；②header-only stream 判定 → body sniff；③persistent failure 跨 context 30 秒 cooldown → 删除；④通用不可用 toast/stale error → 真实原因 + recovery；⑤blur/composition ghost 生命周期与 cache hit 热路径 → 单一 invalidation + fast-path。
+- [x] P7-17 针对 P6-21 完成 5 轮文档同步：UX → ARCHITECTURE → DECISIONS/D021（并纠正 D020 归因）→ AGENTS → TASKS/README；未把静态/CI 结果冒充 P6-15 真机完成。
 
 ---
 
@@ -185,7 +188,7 @@
 - [ ] P8-05 在 Edge 完成当前最终构建真实主链 smoke。
 - [ ] P8-06 验证浏览器关闭/重启后的最近 Prompt 恢复。
 - [ ] P8-07 验证 AI 未配置/禁用/失败时的真实浏览器降级主链，以及补全开关关闭时无自动请求。
-- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；重点包含 block-local、任意 caret、设置 context budget 真正生效、中文 IME 40～100 字连续输入 + 多次自然停顿、流式 partial 持续更新、短时 Provider 错误自动恢复、旧 caret 失效和可选 completion model；不再验证 Web Adapter。
+- [ ] P8-08 验证 opt-in inline completion 在真实 Provider 下的最终端到端行为；重点包含 block-local、任意 caret、设置 context budget 真正生效、**预存长文本不继续输入时的 caret 补全**、中文 IME 持续输入稳定性、流式 partial 持续更新、错标流式响应兼容、短时 Provider 错误自动恢复、成功后 stale error 清除、旧 caret 失效和可选 completion model；不再验证 Web Adapter。
 - [x] P8-09 Manifest 权限审查：固定权限仅 `storage` / `sidePanel`；无 `activeTab`、`scripting`、content script。optional host permission 只用于用户配置的 AI Provider origin。
 - [x] P8-10 审查全部直接/传递依赖许可证与借鉴代码归属；lockfile + `npm ci` + 跨平台许可证 CI 门禁持续有效。
 - [ ] P8-11 生成 V1 release notes / Known Limitations。
@@ -196,12 +199,12 @@
 
 ## 当前状态
 
-当前阶段：**Web Insert 已按 D017 退役；文字旁 `•••` 已按 D018 退役；D020 已针对“中文句子写到几十字后更容易弹 AI 补全不可用”完成调度根修。补全现在区分 idle debounce 与真实 Provider cadence；IME composition 期间不发布 context；短时 429/5xx/timeout/transport 会在原 context 有效时有限次自动退避恢复；额度/认证/配置等持久错误仍保留真实提示；Provider error body、Retry-After 与 streaming capability cache 已收口。针对本问题的第二组 5×代码审查/优化/减法/性能优化和 5×文档同步已落地并通过代码门禁；仍需真实 Chrome 对最新构建复测，不能把静态/单测证据冒充真机完成。**
+当前阶段：**用户已纠正关键前提：截图中较长内容是之前已经存在，不是刚连续输入形成。上一轮 D020 的 cadence/IME 加固继续保留为持续输入稳定性措施，但不再作为该截图的根因。D021 已完成预存长文本链收口：局部 context 读取不再整块 materialize；Provider stream 以实际 body sniff；persistent failure 不再污染下一处新 context 30 秒；失败直接显示长度受控真实原因且成功后清 stale error；blur/composition 同时清 context + ghost；cache hit 在 request/provider 构造前 fast-path。针对这个纠正后的场景，新一组 5×代码审查/优化/减法/性能优化和 5×文档同步已经落地；仍需真实 Chrome 对最新最终构建复测，不能把单测/CI 冒充真机完成。**
 
 当前最优先剩余工作：
 
-1. Chrome 真机复现原场景：在“输出格式”等语义块里用中文输入法连续输入约 40～100 字，过程中自然停顿数次，确认不再弹“AI 补全暂不可用”，且停下后仍能正常出现 ghost completion；
-2. Chrome 真机继续复测补全：块首/块中/块尾/单字符、流式增长、Tab/Esc、移动 caret stale 失效、短时网络抖动恢复；
-3. Chrome 真机确认固定选区工具条和“检查” transient panel 仍稳定；
+1. Chrome 真机复现原场景：打开已经存在的较长 Prompt，**不要继续输入**，只在原有“输出格式”等语义块旧文本的块首/块中/块尾点击 caret，等待灰色 ghost；若仍失败，直接记录新版 toast 显示的真实 Provider 原因；
+2. 独立复测持续输入：中文 IME 连续输入约 40～100 字、多次自然停顿，确认 D020 不形成请求风暴；不要把这条和第 1 条混为同一个根因；
+3. Chrome 真机继续复测流式增长、Tab/Esc、移动 caret stale 失效、成功后旧 AI error 清除、固定选区工具条与检查面板；
 4. Edge 当前最终 Manifest smoke + 360px/键盘；浏览器重启恢复与 AI 禁用/错误/超时降级；
 5. Copy/Save 重复操作、最终真实性能、最后代码反查、release notes 与 Known Limitations。
