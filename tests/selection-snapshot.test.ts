@@ -1,7 +1,7 @@
 import { getSchema } from '@tiptap/core'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { PromptSection } from '../src/editor/promptSection'
 import { buildEditorSelectionSnapshot } from '../src/editor/selectionSnapshot'
 
@@ -21,29 +21,21 @@ function stateWithSelection(text: string, fromOffset: number, toOffset: number) 
 }
 
 describe('editor selection snapshot', () => {
-  it('derives selected text and viewport anchor from ProseMirror state', () => {
+  it('derives selected text and block type only from ProseMirror state', () => {
     const state = stateWithSelection('你是一位结构化思考专家', 2, 7)
-    const coordsAtPos = vi.fn(() => ({ left: 300, right: 306, top: 120, bottom: 138 }))
 
-    const snapshot = buildEditorSelectionSnapshot(state, coordsAtPos, 480)
+    const snapshot = buildEditorSelectionSnapshot(state)
 
-    expect(snapshot?.text).toBe('一位结构化')
-    expect(snapshot?.blockFormat).toBe('instruction')
-    expect(snapshot?.rect).toEqual({
-      left: 306,
-      top: 120,
-      width: 0,
-      height: 18,
-      containerWidth: 480,
+    expect(snapshot).toEqual({
+      text: '一位结构化',
+      from: state.selection.from,
+      to: state.selection.to,
+      blockFormat: 'instruction',
     })
-    expect(coordsAtPos).toHaveBeenCalledWith(state.selection.to)
   })
 
-  it('returns null for an empty caret selection so the text action trigger is hidden', () => {
+  it('returns null for an empty caret selection so selection actions stay hidden', () => {
     const state = stateWithSelection('任务内容', 2, 2)
-    const coordsAtPos = vi.fn()
-
-    expect(buildEditorSelectionSnapshot(state, coordsAtPos, 480)).toBeNull()
-    expect(coordsAtPos).not.toHaveBeenCalled()
+    expect(buildEditorSelectionSnapshot(state)).toBeNull()
   })
 })
