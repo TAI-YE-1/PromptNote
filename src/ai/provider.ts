@@ -46,9 +46,7 @@ async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Pr
   }
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  const text = await response.text()
-  if (!response.ok) throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+function parseJsonText(text: string): unknown {
   try {
     return JSON.parse(text) as unknown
   } catch {
@@ -56,13 +54,10 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-async function readSuccessfulJson(response: Response): Promise<unknown> {
+async function readJson(response: Response): Promise<unknown> {
   const text = await response.text()
-  try {
-    return JSON.parse(text) as unknown
-  } catch {
-    throw new Error('AI 返回了无法解析的 JSON。')
-  }
+  if (!response.ok) throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+  return parseJsonText(text)
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -125,38 +120,81 @@ function isUnsupportedStreaming(status: number, text: string): boolean {
   return [400, 404, 405, 415, 422].includes(status) && /stream|streaming|sse/i.test(text)
 }
 
-async function readSse(response: Response, onData: (data: string) => void): Promise<void> {
-  if (!response.body) throw new Error('AI 流式响应缺少可读取的 body。')
+function consumeSseEvent(event: string, onData: (data: string) => void) {
+  for (const rawLine of event.split('\n')) {
+    const line = rawLine.replace(/\r$/, '')
+    if (!line.startsWith('data:')) continue
+    const data = line.slice(5).trimStart()
+    if (data) onData(data)
+  }
+}
+
+function consumeCompleteSseEvents(buffer: string, onData: (data: string) => void): string {
+  let remainder = buffer.replace(/\r\n/g, '\n')
+  let boundary = remainder.indexOf('\n\n')
+  while (boundary >= 0) {
+    consumeSseEvent(remainder.slice(0, boundary), onData)
+    remainder = remainder.slice(boundary + 2)
+    boundary = remainder.indexOf('\n\n')
+  }
+  return remainder
+}
+
+type StreamBodyResult = { kind: 'sse' } | { kind: 'text'; text: string }
+
+async function readStreamingOrText(
+  response: Response,
+  onData: (data: string) => void,
+): Promise<StreamBodyResult> {
+  if (!response.body) return { kind: 'text', text: await response.text() }
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  let sse = isEventStream(response)
   let buffer = ''
+  let probe = ''
 
-  const consumeEvent = (event: string) => {
-    for (const rawLine of event.split('\n')) {
-      const line = rawLine.replace(/\r$/, '')
-      if (!line.startsWith('data:')) continue
-      const data = line.slice(5).trimStart()
-      if (data) onData(data)
+  const drainAsText = async (initial: string): Promise<StreamBodyResult> => {
+    let text = initial
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += decoder.decode(value, { stream: true })
     }
+    text += decoder.decode()
+    return { kind: 'text', text }
   }
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    buffer = buffer.replace(/\r\n/g, '\n')
+    const chunk = decoder.decode(value, { stream: true })
 
-    let boundary = buffer.indexOf('\n\n')
-    while (boundary >= 0) {
-      consumeEvent(buffer.slice(0, boundary))
-      buffer = buffer.slice(boundary + 2)
-      boundary = buffer.indexOf('\n\n')
+    if (!sse) {
+      probe += chunk
+      const normalizedProbe = probe.replace(/\r\n/g, '\n')
+      const trimmed = normalizedProbe.trimStart()
+      if (/^(?:data|event):/.test(trimmed)) {
+        sse = true
+        buffer = consumeCompleteSseEvents(normalizedProbe, onData)
+        probe = ''
+        continue
+      }
+      if (trimmed.startsWith('{') || normalizedProbe.length >= 128 || normalizedProbe.includes('\n')) {
+        return drainAsText(probe)
+      }
+      continue
     }
+
+    buffer = consumeCompleteSseEvents(buffer + chunk, onData)
   }
 
-  buffer += decoder.decode()
-  if (buffer.trim()) consumeEvent(buffer)
+  const tail = decoder.decode()
+  if (!sse) return { kind: 'text', text: probe + tail }
+
+  buffer = consumeCompleteSseEvents(buffer + tail, onData)
+  if (buffer.trim()) consumeSseEvent(buffer, onData)
+  return { kind: 'sse' }
 }
 
 async function fallbackCompletion(
@@ -233,15 +271,8 @@ class OpenAICompatibleProvider implements AiProvider {
       throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
     }
 
-    if (!isEventStream(response)) {
-      nonStreamingEndpoints.add(streamKey)
-      const text = extractOpenAIContent(await readSuccessfulJson(response))
-      onPartial(text)
-      return text
-    }
-
     let accumulated = ''
-    await readSse(response, (data) => {
+    const body = await readStreamingOrText(response, (data) => {
       if (data === '[DONE]') return
       let root: Record<string, unknown> | null = null
       try {
@@ -258,6 +289,13 @@ class OpenAICompatibleProvider implements AiProvider {
       accumulated += content
       onPartial(accumulated)
     })
+
+    if (body.kind === 'text') {
+      nonStreamingEndpoints.add(streamKey)
+      const text = extractOpenAIContent(parseJsonText(body.text))
+      onPartial(text)
+      return text
+    }
 
     if (!accumulated.trim()) throw new Error('OpenAI-compatible 流式补全返回空内容。')
     return accumulated.trimEnd()
@@ -321,15 +359,8 @@ class AnthropicProvider implements AiProvider {
       throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
     }
 
-    if (!isEventStream(response)) {
-      nonStreamingEndpoints.add(streamKey)
-      const text = extractAnthropicContent(await readSuccessfulJson(response))
-      onPartial(text)
-      return text
-    }
-
     let accumulated = ''
-    await readSse(response, (data) => {
+    const body = await readStreamingOrText(response, (data) => {
       let root: Record<string, unknown> | null = null
       try {
         root = asRecord(JSON.parse(data) as unknown)
@@ -352,6 +383,13 @@ class AnthropicProvider implements AiProvider {
       accumulated += delta.text
       onPartial(accumulated)
     })
+
+    if (body.kind === 'text') {
+      nonStreamingEndpoints.add(streamKey)
+      const text = extractAnthropicContent(parseJsonText(body.text))
+      onPartial(text)
+      return text
+    }
 
     if (!accumulated.trim()) throw new Error('Anthropic 流式补全返回空内容。')
     return accumulated.trimEnd()
