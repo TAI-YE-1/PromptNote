@@ -11,11 +11,9 @@ export function SelectionContextMenu(props: {
 }) {
   const [open, setOpen] = useState(false)
   const { rect } = props.selection
-  const desiredLeft = rect.left + rect.width + 18
-  const left = clamp(desiredLeft, 20, Math.max(20, rect.containerWidth - 20))
-  const placeBelow = rect.top < 52
+  const left = clamp(rect.left + rect.width + 12, 18, Math.max(18, rect.containerWidth - 18))
+  const placeBelow = rect.top < 42
   const top = placeBelow ? rect.top + rect.height + 8 : rect.top - 8
-  const align = left < 142 ? 'left' : left > rect.containerWidth - 142 ? 'right' : 'center'
   const currentLabel =
     props.selection.blockFormat === 'paragraph'
       ? '普通段落'
@@ -23,7 +21,7 @@ export function SelectionContextMenu(props: {
 
   return (
     <div
-      className={`selection-context selection-context--${placeBelow ? 'below' : 'above'} selection-context--align-${align}`}
+      className={`selection-context selection-context--${placeBelow ? 'below' : 'above'}`}
       style={{ left, top }}
       onMouseDown={(event) => event.stopPropagation()}
     >
