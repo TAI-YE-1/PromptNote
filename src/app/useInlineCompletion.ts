@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import { sectionKindMeta } from '../prompt/sectionKinds'
@@ -12,41 +12,42 @@ const COMPLETION_MIN_BLOCK_CONTEXT = 1
 const COMPLETION_CACHE_SIZE = 8
 const COMPLETION_MAX_CHARS = 240
 const COMPLETION_OVERLAP_MAX = 32
+const PARTIAL_RENDER_INTERVAL_MS = 48
 
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
-  onCompletion(completion: EditorCompletionSuggestion | null): void
   onError(message: string): void
 }
 
-export function useInlineCompletion(input: InlineCompletionInput): void {
+export function useInlineCompletion(
+  input: InlineCompletionInput,
+): EditorCompletionSuggestion | null {
+  const [completion, setCompletion] = useState<EditorCompletionSuggestion | null>(null)
   const lastErrorRef = useRef<string | null>(null)
   const retryAfterRef = useRef(0)
   const cacheRef = useRef(new Map<string, string>())
   const requestSequenceRef = useRef(0)
   const currentContextKeyRef = useRef<string | null>(null)
   const context = input.context
+  const settings = input.settings
   currentContextKeyRef.current = context?.key ?? null
 
-  const settingsKey = completionSettingsKey(input.settings)
-  const ready =
-    input.settings.enabled &&
-    input.settings.configured &&
-    input.settings.completionEnabled
+  const settingsKey = completionSettingsKey(settings)
+  const ready = settings.enabled && settings.configured && settings.completionEnabled
 
   useEffect(() => {
     requestSequenceRef.current += 1
     lastErrorRef.current = null
     retryAfterRef.current = 0
     cacheRef.current.clear()
-    input.onCompletion(null)
-  }, [settingsKey, input.onCompletion])
+    setCompletion(null)
+  }, [settingsKey])
 
   useEffect(() => {
-    input.onCompletion(null)
+    setCompletion(null)
     if (!ready || !context) return
-    if (context.contextChars !== input.settings.completionContextChars) return
+    if (context.contextChars !== settings.completionContextChars) return
     if (blockContextLength(context) < COMPLETION_MIN_BLOCK_CONTEXT) return
 
     const contextSnapshot = context
@@ -59,21 +60,44 @@ export function useInlineCompletion(input: InlineCompletionInput): void {
     })
     const cached = cacheRef.current.get(requestKey)
     if (cached) {
-      input.onCompletion(makeSuggestion(cached))
+      setCompletion(makeSuggestion(cached))
       return
     }
 
     const controller = new AbortController()
     const requestSequence = ++requestSequenceRef.current
     const remainingBackoff = Math.max(0, retryAfterRef.current - Date.now())
-    const startDelay = Math.max(input.settings.completionDelayMs, remainingBackoff)
+    const startDelay = Math.max(settings.completionDelayMs, remainingBackoff)
+    let renderTimer: number | null = null
+    let pendingPartial: string | null = null
+    let lastRendered: string | null = null
+
+    const flushPartial = () => {
+      if (renderTimer !== null) {
+        window.clearTimeout(renderTimer)
+        renderTimer = null
+      }
+      if (!pendingPartial || pendingPartial === lastRendered) return
+      lastRendered = pendingPartial
+      setCompletion(makeSuggestion(pendingPartial))
+    }
+
+    const queuePartial = (text: string) => {
+      pendingPartial = text
+      if (renderTimer !== null) return
+      renderTimer = window.setTimeout(() => {
+        renderTimer = null
+        flushPartial()
+      }, PARTIAL_RENDER_INTERVAL_MS)
+    }
+
     const timer = window.setTimeout(() => {
       void (async () => {
         let lastUsablePartial: string | null = null
         try {
-          const provider = getAiProvider(input.settings)
+          const provider = getAiProvider(settings)
           const result = await provider.streamCompletion(
-            input.settings,
+            settings,
             {
               action: 'complete',
               content: completionPrompt(contextSnapshot),
@@ -83,7 +107,7 @@ export function useInlineCompletion(input: InlineCompletionInput): void {
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
-              input.onCompletion(makeSuggestion(normalized))
+              queuePartial(normalized)
             },
             controller.signal,
           )
@@ -92,21 +116,23 @@ export function useInlineCompletion(input: InlineCompletionInput): void {
           const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
+          pendingPartial = normalized
+          flushPartial()
           cacheCompletion(cacheRef.current, requestKey, normalized)
-          input.onCompletion(makeSuggestion(normalized))
           lastErrorRef.current = null
         } catch (error) {
           if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
           if (lastUsablePartial) {
+            pendingPartial = lastUsablePartial
+            flushPartial()
             cacheCompletion(cacheRef.current, requestKey, lastUsablePartial)
-            input.onCompletion(makeSuggestion(lastUsablePartial))
             lastErrorRef.current = null
             return
           }
 
           const message = error instanceof Error ? error.message : String(error)
           retryAfterRef.current = Date.now() + COMPLETION_ERROR_BACKOFF_MS
-          input.onCompletion(null)
+          setCompletion(null)
           if (lastErrorRef.current !== message) {
             lastErrorRef.current = message
             input.onError(message)
@@ -117,9 +143,12 @@ export function useInlineCompletion(input: InlineCompletionInput): void {
 
     return () => {
       window.clearTimeout(timer)
+      if (renderTimer !== null) window.clearTimeout(renderTimer)
       controller.abort()
     }
-  }, [context, input.onCompletion, input.onError, input.settings, ready, settingsKey])
+  }, [context, input.onError, ready, settingsKey])
+
+  return completion
 }
 
 function isCurrentRequest(
