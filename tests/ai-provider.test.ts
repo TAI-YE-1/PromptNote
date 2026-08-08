@@ -40,9 +40,9 @@ describe('AI providers', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://example.com/v1/chat/completions')
   })
 
-  it('uses a short low-temperature request for inline completion', async () => {
+  it('keeps inline completion requests portable across OpenAI-compatible providers', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify({ choices: [{ message: { content: '并保持代码干净。' } }] }), {
+      new Response(JSON.stringify({ choices: [{ message: { content: ' and keep the code clean.  ' } }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -52,14 +52,15 @@ describe('AI providers', () => {
     await expect(
       getAiProvider(openAiSettings).generate(openAiSettings, {
         action: 'complete',
-        content: '只修改当前问题',
+        content: 'Only change the current issue',
       }),
-    ).resolves.toBe('并保持代码干净。')
+    ).resolves.toBe(' and keep the code clean.')
 
     const init = fetchMock.mock.calls[0]?.[1]
-    const body = JSON.parse(String(init?.body)) as { max_tokens?: number; temperature?: number }
-    expect(body.max_tokens).toBe(120)
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>
     expect(body.temperature).toBe(0.1)
+    expect(body).not.toHaveProperty('max_tokens')
+    expect(body).not.toHaveProperty('max_completion_tokens')
   })
 
   it('extracts Anthropic text responses', async () => {
@@ -100,7 +101,9 @@ describe('AI providers', () => {
   it('turns transport failures into actionable provider guidance', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Promise.reject(new TypeError('Failed to fetch'))),
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Promise.reject(new TypeError('Failed to fetch')),
+      ),
     )
 
     await expect(
@@ -132,7 +135,9 @@ describe('AI providers', () => {
       'fetch',
       vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))
+          init?.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+          )
         }),
       ),
     )
