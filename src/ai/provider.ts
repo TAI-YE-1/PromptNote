@@ -201,10 +201,6 @@ function anthropicBody(settings: AiSettings, request: AiRequest, stream: boolean
   })
 }
 
-function isEventStream(response: Response): boolean {
-  return (response.headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream')
-}
-
 function isUnsupportedStreaming(status: number, text: string): boolean {
   return [400, 404, 405, 415, 422].includes(status) && /stream|streaming|sse/i.test(text)
 }
@@ -239,7 +235,7 @@ async function readStreamingOrText(
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
-  let sse = isEventStream(response)
+  let sse = false
   let buffer = ''
   let probe = ''
 
@@ -263,13 +259,16 @@ async function readStreamingOrText(
       probe += chunk
       const normalizedProbe = probe.replace(/\r\n/g, '\n')
       const trimmed = normalizedProbe.trimStart()
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        return drainAsText(probe)
+      }
       if (/^(?::|data:|event:)/.test(trimmed)) {
         sse = true
         buffer = consumeCompleteSseEvents(normalizedProbe, onData)
         probe = ''
         continue
       }
-      if (trimmed.startsWith('{') || normalizedProbe.length >= 128 || normalizedProbe.includes('\n')) {
+      if (normalizedProbe.length >= 128 || normalizedProbe.includes('\n')) {
         return drainAsText(probe)
       }
       continue
