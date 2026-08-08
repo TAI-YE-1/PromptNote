@@ -84,10 +84,20 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       documentVersionRef.current += 1
       props.onChange(current.getJSON())
       emitCompletionContext(current)
+      emitSelectionSnapshot(current)
     },
-    onSelectionUpdate: ({ editor: current }) => emitCompletionContext(current),
-    onFocus: ({ editor: current }) => emitCompletionContext(current),
-    onBlur: () => publishCompletionContext(null),
+    onSelectionUpdate: ({ editor: current }) => {
+      emitCompletionContext(current)
+      emitSelectionSnapshot(current)
+    },
+    onFocus: ({ editor: current }) => {
+      emitCompletionContext(current)
+      emitSelectionSnapshot(current)
+    },
+    onBlur: () => {
+      publishCompletionContext(null)
+      props.onSelectionChange(null)
+    },
   })
 
   useEffect(() => {
@@ -124,6 +134,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     emitCompletionContext(editor)
   }, [completionContextChars, editor])
 
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const scroller = root.closest('.editor-scroll')
+    if (!(scroller instanceof HTMLElement)) return
+    const hideSelectionUi = () => props.onSelectionChange(null)
+    scroller.addEventListener('scroll', hideSelectionUi, { passive: true })
+    return () => scroller.removeEventListener('scroll', hideSelectionUi)
+  }, [])
+
   function publishCompletionContext(context: EditorCompletionContext | null) {
     const key = context?.key ?? null
     if (completionContextKeyRef.current === key) return
@@ -144,6 +164,39 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         maxChars: completionContextCharsRef.current,
       }),
     )
+  }
+
+  function emitSelectionSnapshot(currentEditor: NonNullable<typeof editor>) {
+    const { selection } = currentEditor.state
+    if (!currentEditor.view.hasFocus() || selection.empty) {
+      props.onSelectionChange(null)
+      return
+    }
+
+    const activeBlock = getActiveBlockFormat(currentEditor.state)
+    if (!activeBlock) {
+      props.onSelectionChange(null)
+      return
+    }
+
+    try {
+      const anchor = currentEditor.view.coordsAtPos(selection.to)
+      props.onSelectionChange({
+        text: currentEditor.state.doc.textBetween(selection.from, selection.to, '\n'),
+        from: selection.from,
+        to: selection.to,
+        blockFormat: activeBlock.format,
+        rect: {
+          left: anchor.right,
+          top: anchor.top,
+          width: 0,
+          height: Math.max(18, anchor.bottom - anchor.top),
+          containerWidth: window.innerWidth,
+        },
+      })
+    } catch {
+      props.onSelectionChange(null)
+    }
   }
 
   function convertSelectedBlock(format: EditableBlockFormat) {
@@ -187,46 +240,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     [editor],
   )
 
-  function captureSelection() {
-    if (!editor || editor.state.selection.empty) {
-      props.onSelectionChange(null)
-      return
-    }
-
-    const activeBlock = getActiveBlockFormat(editor.state)
-    if (!activeBlock) {
-      props.onSelectionChange(null)
-      return
-    }
-
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-
-    const rect = selection.getRangeAt(0).getBoundingClientRect()
-    props.onSelectionChange({
-      text: editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, '\n'),
-      from: editor.state.selection.from,
-      to: editor.state.selection.to,
-      blockFormat: activeBlock.format,
-      rect: {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-        containerWidth: window.innerWidth,
-      },
-    })
-  }
-
   return (
-    <div
-      ref={rootRef}
-      className="prompt-editor"
-      onMouseUp={() => window.setTimeout(captureSelection, 0)}
-      onKeyUp={(event) => {
-        if (event.shiftKey || event.key.startsWith('Arrow')) window.setTimeout(captureSelection, 0)
-      }}
-    >
+    <div ref={rootRef} className="prompt-editor">
       <EditorContent editor={editor} />
     </div>
   )
