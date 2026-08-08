@@ -1,7 +1,7 @@
 export type AiProviderId = 'openai-compatible' | 'anthropic'
 export type AiScope = 'selection' | 'context'
-export type CompletionContextChars = 160 | 320 | 640
-export type CompletionDelayMs = 150 | 300 | 600
+export type CompletionContextChars = number
+export type CompletionDelayMs = number
 export type AiAction =
   | 'clarify'
   | 'shorten'
@@ -11,6 +11,7 @@ export type AiAction =
   | 'structure'
   | 'complete'
 export type SuggestionAiAction = Exclude<AiAction, 'complete'>
+export type AiInstructionOverrides = Partial<Record<AiAction, string>>
 
 export interface AiSettings {
   enabled: boolean
@@ -18,6 +19,7 @@ export interface AiSettings {
   completionEnabled: boolean
   completionContextChars: CompletionContextChars
   completionDelayMs: CompletionDelayMs
+  instructionOverrides: AiInstructionOverrides
   provider: AiProviderId
   model: string
   baseUrl: string
