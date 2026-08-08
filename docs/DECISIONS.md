@@ -262,11 +262,11 @@ AND 编辑器内联补全开关已开启
 ### 性能约束
 
 - 编辑停顿防抖后再请求；
-- 每次只发送 caret 前有限上下文；
+- 每次只发送当前 text block 内受配置限制的 caret 局部上下文；
 - 新输入/移动 caret 时取消旧请求；
-- completion 使用短 token 上限和低温度；
-- 失败后退避，避免请求风暴；
-- stale completion 在 doc/selection 变化时立即清除。
+- completion 使用短输出和低温度；
+- 失败后短退避，避免请求风暴；
+- stale completion 在 doc/selection/context budget 变化时立即清除。
 
 ### 权限影响
 
@@ -288,6 +288,57 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 - 代码和测试面显著缩小；
 - 外部输出不再受网页改版影响；
 - AI 能力转而强化编辑器内部体验，更接近 IDE 辅助而不是浏览器自动化。
+
+---
+
+## D018 — 选区操作使用稳定底部工具条，不再使用文字旁 `•••`
+
+**状态：Accepted**
+
+### 决定
+
+选中文字后，在 Side Panel 主 actionbar 上方显示稳定的选区工具条，直接提供“改清楚 / 缩短 / 拆约束 / 更多 AI”和单块类型转换。
+
+选区状态只来自 ProseMirror EditorState：selected text、from/to、single-block format。不得把 DOM selection、viewport rect、`coordsAtPos` 结果作为选区业务状态，也不得恢复文字旁微型 `•••` 二级入口。
+
+### 原因
+
+真实 Chrome 窄 Side Panel 测试多次证明文字旁浮动入口存在：
+
+- 偶发不出现；
+- 浏览器 focus/selection 与 ProseMirror selection 竞争；
+- 出现后点击可能先丢失 selection；
+- 浮层容易被滚动容器裁剪或挤出边界；
+- 用户必须额外点击一次才能看到真正动作。
+
+继续修坐标属于维护失败交互，而不是修根因。
+
+### 影响
+
+- 删除旧 `SelectionContextMenu` 与 viewport rect 状态；
+- 跨块选区仍可执行文本 AI 动作，但禁止 block type 转换；
+- 选区工具与 AI busy / suggestion / lint 共用明确的 transient surface 优先级，不得互相覆盖。
+
+---
+
+## D019 — V1 收口采用单状态源性能优化，不以阈值掩盖问题
+
+**状态：Accepted**
+
+### 决定
+
+性能优化优先减少真实热路径工作，而不是调大 warning、增加隐藏缓存状态或制造第二实现：
+
+- completion context budget 由 AI 设置显式传入 Editor，并进入 request identity；
+- streaming partial 在短窗口合并 UI 刷新，避免 token 粒度根树 render；
+- streaming capability 按 provider + endpoint + completion model 缓存，SSE 容忍 keep-alive；
+- Repository 启动恢复批量读取 documents/current id，更旧 revision 不得覆盖更新 revision；
+- AI 设置与本地 Prompt Sheet 按用户打开时 lazy-load，正文和设置状态仍由原有单一状态源提供；
+- Vite `>500KB` 主 chunk warning 只有真实 bundle/启动问题解决后才可消失，不允许通过提高 `chunkSizeWarningLimit` 伪装优化。
+
+### 影响
+
+代码审查必须优先检查重复 IO、重复派生、token 级根组件 render、无必要首屏模块、过期异步结果和旧 revision 写回。
 
 ---
 
