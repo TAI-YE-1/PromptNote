@@ -103,6 +103,24 @@ describe('editor completion context', () => {
     expect(context?.beforeText).toBe(text.slice(-16))
   })
 
+  it('keeps context bounded for a large block that already existed before focus', () => {
+    const prefix = '旧内容'.repeat(20_000)
+    const suffix = '后文'.repeat(20_000)
+    const text = `${prefix}光标${suffix}`
+    const caretOffset = prefix.length + 2
+    const state = stateWithCaretInSecondBlock('前块不能泄漏', text, caretOffset)
+    const context = buildEditorCompletionContext(state, {
+      documentId: 'doc-large-existing',
+      documentVersion: 9,
+      maxChars: 64,
+    })
+
+    expect(context).not.toBeNull()
+    expect((context?.beforeText.length ?? 0) + (context?.afterText.length ?? 0)).toBeLessThanOrEqual(64)
+    expect(context?.beforeText.endsWith('光标')).toBe(true)
+    expect(context?.afterText.startsWith('后文')).toBe(true)
+  })
+
   it('changes request identity when document generation changes even if caret text is unchanged', () => {
     const state = stateWithCaretInSecondBlock('前文', '相同文本')
     const first = buildEditorCompletionContext(state, {
