@@ -20,7 +20,7 @@ const PARTIAL_RENDER_INTERVAL_MS = 48
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
-  onError(message: string): void
+  onError(message: string | null): void
 }
 
 export function useInlineCompletion(
@@ -49,13 +49,13 @@ export function useInlineCompletion(
     lastReportedErrorRef.current = null
     cacheRef.current.clear()
     setCompletion(null)
-  }, [settingsKey])
+    input.onError(null)
+  }, [input.onError, settingsKey])
 
   useEffect(() => {
     setCompletion(null)
     if (!ready || !context) return
     if (context.contextChars !== settings.completionContextChars) return
-    if (!hasBlockContext(context)) return
 
     const contextSnapshot = context
     const requestKey = contextSnapshot.key
@@ -69,6 +69,7 @@ export function useInlineCompletion(
     })
     const cached = cacheRef.current.get(requestKey)
     if (cached) {
+      markCompletionRecovered()
       setCompletion(makeSuggestion(cached))
       return
     }
@@ -90,10 +91,12 @@ export function useInlineCompletion(
     let pendingPartial: string | null = null
     let lastRendered: string | null = null
 
-    const markRecovered = () => {
+    function markCompletionRecovered() {
       transientFailureCountRef.current = 0
       retryAtRef.current = 0
+      if (!lastReportedErrorRef.current) return
       lastReportedErrorRef.current = null
+      input.onError(null)
     }
 
     const flushPartial = () => {
@@ -134,7 +137,7 @@ export function useInlineCompletion(
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
-              markRecovered()
+              markCompletionRecovered()
               queuePartial(normalized)
             },
             controller.signal,
@@ -144,7 +147,7 @@ export function useInlineCompletion(
           const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
-          markRecovered()
+          markCompletionRecovered()
           pendingPartial = normalized
           flushPartial()
           cacheCompletion(cacheRef.current, requestKey, normalized)
@@ -152,7 +155,7 @@ export function useInlineCompletion(
         } catch (error) {
           if (!isCurrent()) return
           if (lastUsablePartial) {
-            markRecovered()
+            markCompletionRecovered()
             pendingPartial = lastUsablePartial
             flushPartial()
             cacheCompletion(cacheRef.current, requestKey, lastUsablePartial)
@@ -217,10 +220,6 @@ function waitForRetry(delayMs: number, signal: AbortSignal): Promise<boolean> {
     }
     timer = window.setTimeout(() => finish(true), delayMs)
   })
-}
-
-function hasBlockContext(context: EditorCompletionContext): boolean {
-  return Boolean(context.beforeText.trim() || context.afterText.trim())
 }
 
 function completionPrompt(context: EditorCompletionContext): string {
