@@ -8,7 +8,6 @@ import type {
   EditorCompletionSuggestion,
 } from '../editor/completionContext'
 
-const COMPLETION_MIN_BLOCK_CONTEXT = 1
 const COMPLETION_CACHE_SIZE = 8
 const COMPLETION_MAX_CHARS = 240
 const COMPLETION_OVERLAP_MAX = 32
@@ -112,6 +111,12 @@ export function useInlineCompletion(
       }, PARTIAL_RENDER_INTERVAL_MS)
     }
 
+    const reportCompletionError = (message: string) => {
+      if (lastReportedErrorRef.current === message) return
+      lastReportedErrorRef.current = message
+      input.onError(message)
+    }
+
     const runRequest = async () => {
       while (isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) {
         let lastUsablePartial: string | null = null
@@ -177,12 +182,6 @@ export function useInlineCompletion(
       }
     }
 
-    const reportCompletionError = (message: string) => {
-      if (lastReportedErrorRef.current === message) return
-      lastReportedErrorRef.current = message
-      input.onError(message)
-    }
-
     const timer = window.setTimeout(() => {
       void runRequest()
     }, startDelay)
@@ -208,17 +207,25 @@ function isCurrentRequest(
 }
 
 function waitForRetry(delayMs: number, signal: AbortSignal): Promise<boolean> {
-  if (delayMs <= 0) return Promise.resolve(!signal.aborted)
+  if (signal.aborted) return Promise.resolve(false)
+  if (delayMs <= 0) return Promise.resolve(true)
   return new Promise((resolve) => {
-    const onAbort = () => {
-      window.clearTimeout(timer)
-      resolve(false)
-    }
-    const timer = window.setTimeout(() => {
+    let settled = false
+    let timer: number | null = null
+    const finish = (value: boolean) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) window.clearTimeout(timer)
       signal.removeEventListener('abort', onAbort)
-      resolve(!signal.aborted)
-    }, delayMs)
+      resolve(value)
+    }
+    const onAbort = () => finish(false)
     signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) {
+      finish(false)
+      return
+    }
+    timer = window.setTimeout(() => finish(true), delayMs)
   })
 }
 
