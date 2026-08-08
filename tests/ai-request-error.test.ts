@@ -57,6 +57,41 @@ describe('AiRequestError classification', () => {
     }
   })
 
+  it('recognizes localized quota exhaustion text as persistent', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ error: { message: '本周期额度已用尽' } }), { status: 429 })),
+    )
+
+    try {
+      await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+      throw new Error('expected provider request to fail')
+    } catch (error) {
+      expect(error).toBeInstanceOf(AiRequestError)
+      expect(error).toMatchObject({ status: 429, transient: false, message: '本周期额度已用尽' })
+    }
+  })
+
+  it('extracts a readable message from JSON provider error bodies', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { message: 'model temporarily unavailable', code: 'busy' } }), {
+          status: 503,
+        }),
+      ),
+    )
+
+    await expect(
+      getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' }),
+    ).rejects.toMatchObject({
+      name: 'AiRequestError',
+      status: 503,
+      transient: true,
+      message: 'model temporarily unavailable',
+    })
+  })
+
   it('treats upstream 5xx failures as transient', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream unavailable', { status: 503 })))
 
