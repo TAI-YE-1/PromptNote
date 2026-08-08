@@ -3,7 +3,7 @@ import { getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import type { EditorCompletionContext } from '../editor/PromptEditor'
 
-const COMPLETION_ERROR_BACKOFF_MS = 30_000
+const COMPLETION_ERROR_BACKOFF_MS = 3_000
 const COMPLETION_MIN_CONTEXT = 2
 const COMPLETION_CACHE_SIZE = 8
 
@@ -18,6 +18,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
   const lastErrorRef = useRef<string | null>(null)
   const retryAfterRef = useRef(0)
   const cacheRef = useRef(new Map<string, string>())
+  const requestSequenceRef = useRef(0)
   const contextPosition = input.context?.position ?? null
   const rawContext = input.context?.beforeText ?? ''
   const contextBeforeText = rawContext.slice(-input.settings.completionContextChars)
@@ -27,6 +28,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
     input.settings.completionEnabled
 
   useEffect(() => {
+    requestSequenceRef.current += 1
     lastErrorRef.current = null
     retryAfterRef.current = 0
     cacheRef.current.clear()
@@ -52,15 +54,22 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
     }
 
     const controller = new AbortController()
+    const requestSequence = ++requestSequenceRef.current
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const result = await getAiProvider(input.settings).generate(
+          const provider = getAiProvider(input.settings)
+          const result = await provider.streamCompletion(
             input.settings,
             { action: 'complete', content: contextBeforeText },
+            (partial) => {
+              if (controller.signal.aborted || requestSequenceRef.current !== requestSequence) return
+              const normalized = normalizeCompletion(partial)
+              if (normalized) setCompletionText(normalized)
+            },
             controller.signal,
           )
-          if (controller.signal.aborted) return
+          if (controller.signal.aborted || requestSequenceRef.current !== requestSequence) return
 
           const normalized = normalizeCompletion(result)
           if (!normalized) return
@@ -69,7 +78,7 @@ export function useInlineCompletion(input: InlineCompletionInput): string | null
           setCompletionText(normalized)
           lastErrorRef.current = null
         } catch (error) {
-          if (controller.signal.aborted) return
+          if (controller.signal.aborted || requestSequenceRef.current !== requestSequence) return
           const message = error instanceof Error ? error.message : String(error)
           retryAfterRef.current = Date.now() + COMPLETION_ERROR_BACKOFF_MS
           setCompletionText(null)
