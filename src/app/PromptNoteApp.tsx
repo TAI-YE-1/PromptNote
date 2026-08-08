@@ -505,6 +505,7 @@ export function PromptNoteApp() {
                 documentId={current.id}
                 content={current.content}
                 completionText={completionText}
+                completionContextChars={aiSettings.completionContextChars}
                 onChange={updateCurrentContent}
                 onSelectionChange={setSelection}
                 onCompletionContext={setCompletionContext}
