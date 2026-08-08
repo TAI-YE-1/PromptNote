@@ -14,6 +14,13 @@ function apiEndpoint(baseUrl: string, path: `/v1/${string}`): string {
   return base.endsWith('/v1') ? `${base}${path.slice(3)}` : `${base}${path}`
 }
 
+function modelForRequest(settings: AiSettings, request: AiRequest): string {
+  if (request.action === 'complete' && settings.completionModel.trim()) {
+    return settings.completionModel.trim()
+  }
+  return settings.model
+}
+
 function userPayload(request: AiRequest): string {
   if (!request.surroundingContext) return request.content
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
@@ -89,7 +96,7 @@ function extractAnthropicContent(value: unknown): string {
 
 function completionBody(settings: AiSettings, request: AiRequest, stream: boolean) {
   return JSON.stringify({
-    model: settings.model,
+    model: modelForRequest(settings, request),
     temperature: 0.1,
     stream,
     messages: [
@@ -101,7 +108,7 @@ function completionBody(settings: AiSettings, request: AiRequest, stream: boolea
 
 function anthropicBody(settings: AiSettings, request: AiRequest, stream: boolean) {
   return JSON.stringify({
-    model: settings.model,
+    model: modelForRequest(settings, request),
     max_tokens: request.action === 'complete' ? 120 : 800,
     temperature: request.action === 'complete' ? 0.1 : 0.2,
     stream,
@@ -179,7 +186,7 @@ class OpenAICompatibleProvider implements AiProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: settings.model,
+          model: modelForRequest(settings, request),
           temperature: request.action === 'complete' ? 0.1 : 0.2,
           messages: [
             { role: 'system', content: buildSystemInstruction(settings, request.action) },
@@ -227,6 +234,7 @@ class OpenAICompatibleProvider implements AiProvider {
     }
 
     if (!isEventStream(response)) {
+      nonStreamingEndpoints.add(streamKey)
       const text = extractOpenAIContent(await readSuccessfulJson(response))
       onPartial(text)
       return text
@@ -314,6 +322,7 @@ class AnthropicProvider implements AiProvider {
     }
 
     if (!isEventStream(response)) {
+      nonStreamingEndpoints.add(streamKey)
       const text = extractAnthropicContent(await readSuccessfulJson(response))
       onPartial(text)
       return text
