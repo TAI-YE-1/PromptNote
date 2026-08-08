@@ -1,4 +1,5 @@
 import type { PromptLintFinding } from '../ai/types'
+import './floatingPanels.css'
 
 export function LintCard(props: {
   findings: PromptLintFinding[]
@@ -6,7 +7,7 @@ export function LintCard(props: {
   onDeepCheck(): void
 }) {
   return (
-    <section className="lint-card">
+    <section className="lint-card lint-card--floating">
       <div className="lint-card__head">本地 Prompt 检查</div>
       {props.findings.length === 0 ? (
         <div className="lint-empty">没有发现明显的结构问题；这里不提供 Prompt 分数。</div>
