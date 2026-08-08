@@ -4,6 +4,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import { describe, expect, it, vi } from 'vitest'
 import { PromptSection } from '../src/editor/promptSection'
+import type { EditorCompletionSuggestion } from '../src/editor/completionContext'
 import {
   createGhostCompletionPlugin,
   getGhostCompletion,
@@ -35,8 +36,17 @@ function createHarness(text: string) {
   return { plugin, view, state: () => state }
 }
 
-function showCompletion(view: EditorView, text: string) {
-  view.dispatch(view.state.tr.setMeta(ghostCompletionKey, { text }))
+function completion(view: EditorView, text: string, contextKey = 'context-1'): EditorCompletionSuggestion {
+  return {
+    text,
+    contextKey,
+    documentId: 'doc-1',
+    position: view.state.selection.head,
+  }
+}
+
+function showCompletion(view: EditorView, value: EditorCompletionSuggestion) {
+  view.dispatch(view.state.tr.setMeta(ghostCompletionKey, value))
 }
 
 function keyEvent(key: string) {
@@ -52,7 +62,7 @@ function runGhostKey(harness: ReturnType<typeof createHarness>, event: KeyboardE
 describe('ghost completion', () => {
   it('accepts the visible completion with Tab and makes it real document text', () => {
     const harness = createHarness('目标')
-    showCompletion(harness.view, '：完成权限重构')
+    showCompletion(harness.view, completion(harness.view, '：完成权限重构'))
 
     expect(getGhostCompletion(harness.state())?.text).toBe('：完成权限重构')
     const event = keyEvent('Tab')
@@ -66,7 +76,7 @@ describe('ghost completion', () => {
 
   it('preserves meaningful leading whitespace when accepting an English completion', () => {
     const harness = createHarness('hello')
-    showCompletion(harness.view, ' world   ')
+    showCompletion(harness.view, completion(harness.view, ' world   '))
 
     expect(getGhostCompletion(harness.state())?.text).toBe(' world')
     runGhostKey(harness, keyEvent('Tab'))
@@ -76,7 +86,7 @@ describe('ghost completion', () => {
 
   it('dismisses the completion with Escape without changing document text', () => {
     const harness = createHarness('背景')
-    showCompletion(harness.view, '：只做当前任务')
+    showCompletion(harness.view, completion(harness.view, '：只做当前任务'))
 
     const event = keyEvent('Escape')
     const handled = runGhostKey(harness, event)
@@ -89,10 +99,35 @@ describe('ghost completion', () => {
 
   it('invalidates stale completion as soon as the document changes', () => {
     const harness = createHarness('任务')
-    showCompletion(harness.view, '：继续实现')
+    showCompletion(harness.view, completion(harness.view, '：继续实现'))
 
     harness.view.dispatch(harness.view.state.tr.insertText('A'))
 
     expect(getGhostCompletion(harness.state())?.text).toBeNull()
+  })
+
+  it('rejects a streamed completion that belongs to an old caret position', () => {
+    const harness = createHarness('任务内容')
+    const oldCompletion = completion(harness.view, '旧请求结果', 'old-context')
+    harness.view.dispatch(
+      harness.view.state.tr.setSelection(TextSelection.create(harness.view.state.doc, 2)),
+    )
+
+    showCompletion(harness.view, oldCompletion)
+
+    expect(getGhostCompletion(harness.state())?.text).toBeNull()
+    expect(runGhostKey(harness, keyEvent('Tab'))).toBe(false)
+    expect(harness.state().doc.textContent).toBe('任务内容')
+  })
+
+  it('does not accept a ghost after the caret moves away from its pinned position', () => {
+    const harness = createHarness('背景内容')
+    showCompletion(harness.view, completion(harness.view, '补全'))
+    harness.view.dispatch(
+      harness.view.state.tr.setSelection(TextSelection.create(harness.view.state.doc, 2)),
+    )
+
+    expect(getGhostCompletion(harness.state())?.text).toBeNull()
+    expect(runGhostKey(harness, keyEvent('Tab'))).toBe(false)
   })
 })
