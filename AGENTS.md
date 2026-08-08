@@ -60,6 +60,8 @@ PRODUCT Non-goals 不得顺手加入，尤其禁止：
 
 D017 已明确退役 Web Insert。不得重新加入 `activeTab`、`scripting`、content script、page bridge 或站点 Adapter 来恢复该能力，除非先修改 PRODUCT 与 DECISIONS。
 
+D018 已明确退役文字旁微型 `•••` 选区入口。不得重新用 `window.getSelection()`、viewport rect、`coordsAtPos` 浮动坐标或另一套 DOM selection 状态恢复它；选区操作入口固定为 Side Panel 主 actionbar 上方的稳定 SelectionActionBar。
+
 ## 3. 真实项目优先
 
 涉及以下内容必须读取仓库真实定义，不得猜测：
@@ -142,13 +144,15 @@ TipTap、Slash Menu、语义块、编辑命令、selection、ghost completion de
 
 不得直接访问 Storage 或 Provider。Ghost Extension 只负责展示/接受/忽略/失效，不负责发请求。
 
+选区业务状态只能从 ProseMirror EditorState 派生：selected text、from/to、single-block format。不得把 DOM selection 或屏幕坐标当第二状态源。跨块 selection 的 block format 为 `null`，禁止类型转换。
+
 ### `app/`
 
 组合应用状态和 UI。`useInlineCompletion` 只负责补全请求调度，不保存正文。
 
 ### `storage/`
 
-正文持久化唯一入口；AI preferences 使用独立 repository/namespace。UI 不得散落 Chrome Storage 调用。
+正文持久化唯一入口；AI preferences 使用独立 repository/namespace。UI 不得散落 Chrome Storage 调用。同一 Prompt 的旧 revision 不得覆盖已持久化的新 revision。
 
 ### `ai/`
 
@@ -159,6 +163,12 @@ Provider、Suggestion、Lint 与错误归一化。
 ### `extension/`
 
 V1 只保留 Extension 生命周期与 Side Panel 打开入口。不得重新演变成网页消息/DOM 自动化业务层。
+
+### `ui/`
+
+临时底部 UI 必须遵守 `AI busy > suggestion > lint > selection action bar` 的单一视觉优先级。不得让多个 fixed panel 同时覆盖同一区域。
+
+AI Settings / Document Sheet 可按打开时 lazy-load；lazy boundary 不得持有自己的 settings/documents 业务副本。
 
 ## 8. Inline Completion 特别规则
 
@@ -182,13 +192,17 @@ settings.configured
 - 关闭 AI 总开关必须停止补全；
 - 输入/移动 caret 后旧请求必须取消或其结果必须丢弃；
 - 请求必须防抖，不得每次键入立即调用 Provider；
-- 只发送 caret 前有限上下文，不借补全静默长期上传完整文档；
+- 只发送当前 text block 内、由 `completionContextChars` 限制的 caret 前后局部上下文，不借补全静默长期上传完整文档；
+- `completionContextChars` 必须显式贯穿 Editor，并进入 request identity；禁止 UI 显示小值而 Editor 静默回退更大值；
 - 使用短输出上限；
-- 失败后应退避，禁止请求风暴；
+- 失败后应短退避，禁止请求风暴；
 - ghost text 不写 PromptDocument、不触发 autosave/Compiler/revision；
 - `Tab` 接受，`Esc` 忽略；
-- doc/selection 变化必须清除 stale ghost；
-- 必须保留有意义的前导空格，兼容英文/代码续写。
+- doc/selection/context budget 变化必须清除 stale ghost；
+- 必须保留有意义的前导空格，兼容英文/代码续写；
+- streaming partial 可以在很短窗口合并 UI 更新，但不得等待完整回复后才显示；
+- streaming capability cache 必须至少区分 Provider、endpoint 与实际 completion model；
+- SSE parser 需要容忍合法 keep-alive/comment 行和错误 Content-Type。
 
 不要为了“更智能”自动接受补全、自动生成整篇 Prompt 或把 ghost 保存下来。
 
@@ -213,13 +227,18 @@ Suggestion：
 性能属于代码质量。修改默认编辑热路径、Storage、Compiler/Lint 或 completion 时必须主动检查：
 
 - 是否每次键入执行当前 UI 不需要的派生计算；
-- 是否重复读取整个 Storage；
+- 是否重复读取整个 Storage 或启动时重复读取相同 key；
 - 是否重复注册 listener；
 - 是否产生可取消却仍并发堆积的 AI 请求；
+- 是否每个 streaming token 都触发根组件 render；
 - 是否把 decoration 变化误当正文变化；
+- 是否首屏同步加载只有打开 Sheet 才需要的 UI；
+- 是否让更旧 revision 覆盖更新 revision；
 - 是否用提高 bundle warning threshold、隐藏日志、延长 loading 掩盖问题。
 
 优化以真实热路径和可验证收益为依据；不要为了“优化”引入复杂缓存或第二状态源。
+
+当前主编辑器 bundle 仍有 `>500KB` 构建 warning。不得通过提高 `chunkSizeWarningLimit` 消除；应先以真实启动数据判断 TipTap/ProseMirror 是否需要进一步拆分。
 
 ## 11. Manifest 与权限
 
@@ -252,10 +271,16 @@ sidePanel
 - legacy settings backfill；
 - Provider short request；
 - cancellation；
+- 当前 block 的 caret 前/后 context 和配置 budget；
+- streaming partial / fallback / SSE keepalive；
 - Tab accept；
 - Esc dismiss；
 - doc change stale invalidation；
 - 前导空格。
+
+选区至少覆盖：ProseMirror 非空 selection 可派生 snapshot；纯 caret 不显示操作；不得用浏览器 DOM selection fixture 冒充业务状态。
+
+Storage 至少覆盖：并发保存、revision 单调性、启动 current/documents 批量读取。
 
 最终仍必须有真实 Chrome/Edge 浏览器证据，fixture/单测不能冒充 E2E。
 
