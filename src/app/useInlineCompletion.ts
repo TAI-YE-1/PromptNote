@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import { sectionKindMeta } from '../prompt/sectionKinds'
@@ -16,13 +16,11 @@ const COMPLETION_OVERLAP_MAX = 32
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
+  onCompletion(completion: EditorCompletionSuggestion | null): void
   onError(message: string): void
 }
 
-export function useInlineCompletion(
-  input: InlineCompletionInput,
-): EditorCompletionSuggestion | null {
-  const [completion, setCompletion] = useState<EditorCompletionSuggestion | null>(null)
+export function useInlineCompletion(input: InlineCompletionInput): void {
   const lastErrorRef = useRef<string | null>(null)
   const retryAfterRef = useRef(0)
   const cacheRef = useRef(new Map<string, string>())
@@ -31,6 +29,7 @@ export function useInlineCompletion(
   const context = input.context
   currentContextKeyRef.current = context?.key ?? null
 
+  const settingsKey = completionSettingsKey(input.settings)
   const ready =
     input.settings.enabled &&
     input.settings.configured &&
@@ -41,23 +40,17 @@ export function useInlineCompletion(
     lastErrorRef.current = null
     retryAfterRef.current = 0
     cacheRef.current.clear()
-    setCompletion(null)
-  }, [input.settings])
+    input.onCompletion(null)
+  }, [settingsKey, input.onCompletion])
 
   useEffect(() => {
-    setCompletion(null)
+    input.onCompletion(null)
     if (!ready || !context) return
+    if (context.contextChars !== input.settings.completionContextChars) return
+    if (blockContextLength(context) < COMPLETION_MIN_BLOCK_CONTEXT) return
 
     const contextSnapshot = context
-    const requestContext = limitCaretContext(contextSnapshot, input.settings.completionContextChars)
-    if (blockContextLength(requestContext) < COMPLETION_MIN_BLOCK_CONTEXT) return
-
-    const requestKey = [
-      contextSnapshot.key,
-      requestContext.beforeText,
-      requestContext.afterText,
-      input.settings.completionContextChars,
-    ].join('\u0000')
+    const requestKey = contextSnapshot.key
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
       contextKey: contextSnapshot.key,
@@ -66,7 +59,7 @@ export function useInlineCompletion(
     })
     const cached = cacheRef.current.get(requestKey)
     if (cached) {
-      setCompletion(makeSuggestion(cached))
+      input.onCompletion(makeSuggestion(cached))
       return
     }
 
@@ -83,55 +76,37 @@ export function useInlineCompletion(
             input.settings,
             {
               action: 'complete',
-              content: completionPrompt(requestContext),
+              content: completionPrompt(contextSnapshot),
             },
             (partial) => {
-              if (
-                controller.signal.aborted ||
-                requestSequenceRef.current !== requestSequence ||
-                currentContextKeyRef.current !== contextSnapshot.key
-              ) {
-                return
-              }
-              const normalized = normalizeCompletion(partial, requestContext.beforeText)
+              if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
+              const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
-              setCompletion(makeSuggestion(normalized))
+              input.onCompletion(makeSuggestion(normalized))
             },
             controller.signal,
           )
-          if (
-            controller.signal.aborted ||
-            requestSequenceRef.current !== requestSequence ||
-            currentContextKeyRef.current !== contextSnapshot.key
-          ) {
-            return
-          }
+          if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
 
-          const normalized = normalizeCompletion(result, requestContext.beforeText)
+          const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
           cacheCompletion(cacheRef.current, requestKey, normalized)
-          setCompletion(makeSuggestion(normalized))
+          input.onCompletion(makeSuggestion(normalized))
           lastErrorRef.current = null
         } catch (error) {
-          if (
-            controller.signal.aborted ||
-            requestSequenceRef.current !== requestSequence ||
-            currentContextKeyRef.current !== contextSnapshot.key
-          ) {
-            return
-          }
+          if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
           if (lastUsablePartial) {
             cacheCompletion(cacheRef.current, requestKey, lastUsablePartial)
-            setCompletion(makeSuggestion(lastUsablePartial))
+            input.onCompletion(makeSuggestion(lastUsablePartial))
             lastErrorRef.current = null
             return
           }
 
           const message = error instanceof Error ? error.message : String(error)
           retryAfterRef.current = Date.now() + COMPLETION_ERROR_BACKOFF_MS
-          setCompletion(null)
+          input.onCompletion(null)
           if (lastErrorRef.current !== message) {
             lastErrorRef.current = message
             input.onError(message)
@@ -144,38 +119,17 @@ export function useInlineCompletion(
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [context, input.onError, input.settings, ready])
-
-  return completion
+  }, [context, input.onCompletion, input.onError, input.settings, ready, settingsKey])
 }
 
-function limitCaretContext(
-  context: EditorCompletionContext,
-  maxChars: number,
-): EditorCompletionContext {
-  const beforeAll = context.beforeText
-  const afterAll = context.afterText
-  if (beforeAll.length + afterAll.length <= maxChars) return context
-
-  if (!afterAll) return { ...context, beforeText: beforeAll.slice(-maxChars) }
-  if (!beforeAll) return { ...context, afterText: afterAll.slice(0, maxChars) }
-
-  const beforeTarget = Math.ceil(maxChars * 0.65)
-  const afterTarget = maxChars - beforeTarget
-  let beforeText = beforeAll.slice(-beforeTarget)
-  let afterText = afterAll.slice(0, afterTarget)
-  let remaining = maxChars - beforeText.length - afterText.length
-
-  if (remaining > 0 && beforeText.length < beforeAll.length) {
-    const extra = beforeAll.slice(-Math.min(beforeAll.length, beforeText.length + remaining))
-    remaining -= extra.length - beforeText.length
-    beforeText = extra
-  }
-  if (remaining > 0 && afterText.length < afterAll.length) {
-    afterText = afterAll.slice(0, afterText.length + remaining)
-  }
-
-  return { ...context, beforeText, afterText }
+function isCurrentRequest(
+  controller: AbortController,
+  sequenceRef: { current: number },
+  sequence: number,
+  contextKeyRef: { current: string | null },
+  contextKey: string,
+): boolean {
+  return !controller.signal.aborted && sequenceRef.current === sequence && contextKeyRef.current === contextKey
 }
 
 function blockContextLength(context: EditorCompletionContext): number {
@@ -187,6 +141,22 @@ function completionPrompt(context: EditorCompletionContext): string {
     ? `当前模块：${sectionKindMeta[context.sectionKind].label}\n`
     : ''
   return `${semantic}当前文本块（<光标> 表示续写位置）：\n${context.beforeText}<光标>${context.afterText}`
+}
+
+function completionSettingsKey(settings: AiSettings): string {
+  return [
+    settings.enabled,
+    settings.configured,
+    settings.completionEnabled,
+    settings.provider,
+    settings.model,
+    settings.completionModel,
+    settings.baseUrl,
+    settings.apiKey,
+    settings.completionContextChars,
+    settings.completionDelayMs,
+    settings.instructionOverrides.complete ?? '',
+  ].join('\u0000')
 }
 
 function cacheCompletion(cache: Map<string, string>, key: string, value: string) {
