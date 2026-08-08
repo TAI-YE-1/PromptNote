@@ -4,6 +4,29 @@ import type { AiProvider, AiRequest, AiSettings } from './types'
 export const AI_REQUEST_TIMEOUT_MS = 30_000
 
 const nonStreamingEndpoints = new Set<string>()
+const MAX_ERROR_BODY_CHARS = 2_000
+
+export class AiRequestError extends Error {
+  readonly status: number | null
+  readonly transient: boolean
+  readonly retryAfterMs: number | null
+
+  constructor(
+    message: string,
+    options: {
+      status?: number | null
+      transient: boolean
+      retryAfterMs?: number | null
+      cause?: unknown
+    },
+  ) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause })
+    this.name = 'AiRequestError'
+    this.status = options.status ?? null
+    this.transient = options.transient
+    this.retryAfterMs = options.retryAfterMs ?? null
+  }
+}
 
 function trimBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
@@ -30,6 +53,40 @@ function userPayload(request: AiRequest): string {
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
 }
 
+function boundedErrorText(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= MAX_ERROR_BODY_CHARS) return trimmed
+  return `${trimmed.slice(0, MAX_ERROR_BODY_CHARS)}…`
+}
+
+function retryAfterMs(response: Response): number | null {
+  const value = response.headers.get('retry-after')?.trim()
+  if (!value) return null
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, 120_000)
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return null
+  return Math.min(Math.max(0, timestamp - Date.now()), 120_000)
+}
+
+function quotaLikeMessage(text: string): boolean {
+  return /usage limit|quota|billing cycle|monthly usage|credits? exhausted|insufficient (?:balance|quota)/i.test(text)
+}
+
+function isTransientHttpFailure(status: number, text: string): boolean {
+  if (status === 429) return !quotaLikeMessage(text)
+  return status === 408 || status === 409 || status === 425 || status >= 500
+}
+
+function responseError(response: Response, text: string): AiRequestError {
+  const message = boundedErrorText(text) || `AI 请求失败：HTTP ${response.status}`
+  return new AiRequestError(message, {
+    status: response.status,
+    transient: isTransientHttpFailure(response.status, message),
+    retryAfterMs: retryAfterMs(response),
+  })
+}
+
 async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
   const timeoutSignal = AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
@@ -41,10 +98,14 @@ async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Pr
     if (error && typeof error === 'object' && 'name' in error) {
       const name = String((error as { name?: unknown }).name)
       if (name === 'TimeoutError' || name === 'AbortError') {
-        throw new Error(`AI 请求超过 ${AI_REQUEST_TIMEOUT_MS / 1000} 秒，已停止等待。`)
+        throw new AiRequestError(`AI 请求超过 ${AI_REQUEST_TIMEOUT_MS / 1000} 秒，已停止等待。`, {
+          transient: true,
+          cause: error,
+        })
       }
     }
-    throw new Error('无法连接 AI Provider。请检查 API Base URL、网络连接与站点访问授权。', {
+    throw new AiRequestError('无法连接 AI Provider。请检查 API Base URL、网络连接与站点访问授权。', {
+      transient: true,
       cause: error,
     })
   }
@@ -60,7 +121,7 @@ function parseJsonText(text: string): unknown {
 
 async function readJson(response: Response): Promise<unknown> {
   const text = await response.text()
-  if (!response.ok) throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+  if (!response.ok) throw responseError(response, text)
   return parseJsonText(text)
 }
 
@@ -272,7 +333,7 @@ class OpenAICompatibleProvider implements AiProvider {
         nonStreamingEndpoints.add(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
       }
-      throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+      throw responseError(response, text)
     }
 
     let accumulated = ''
@@ -360,7 +421,7 @@ class AnthropicProvider implements AiProvider {
         nonStreamingEndpoints.add(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
       }
-      throw new Error(text || `AI 请求失败：HTTP ${response.status}`)
+      throw responseError(response, text)
     }
 
     let accumulated = ''
