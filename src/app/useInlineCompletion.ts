@@ -38,7 +38,6 @@ export function useInlineCompletion(
   const settings = input.settings
   currentContextKeyRef.current = context?.key ?? null
 
-  const settingsKey = completionSettingsKey(settings)
   const ready = settings.enabled && settings.configured && settings.completionEnabled
 
   useEffect(() => {
@@ -50,7 +49,7 @@ export function useInlineCompletion(
     cacheRef.current.clear()
     setCompletion(null)
     input.onError(null)
-  }, [input.onError, settingsKey])
+  }, [input.onError, settings])
 
   useEffect(() => {
     if (!ready || !context || context.contextChars !== settings.completionContextChars) {
@@ -196,7 +195,7 @@ export function useInlineCompletion(
       if (renderTimer !== null) window.clearTimeout(renderTimer)
       controller.abort()
     }
-  }, [context, input.onError, ready, settingsKey])
+  }, [context, input.onError, ready, settings])
 
   return completion
 }
@@ -229,22 +228,6 @@ function completionPrompt(context: EditorCompletionContext): string {
     ? `当前模块：${sectionKindMeta[context.sectionKind].label}\n`
     : ''
   return `${semantic}当前文本块（<光标> 表示续写位置）：\n${context.beforeText}<光标>${context.afterText}`
-}
-
-function completionSettingsKey(settings: AiSettings): string {
-  return [
-    settings.enabled,
-    settings.configured,
-    settings.completionEnabled,
-    settings.provider,
-    settings.model,
-    settings.completionModel,
-    settings.baseUrl,
-    settings.apiKey,
-    settings.completionContextChars,
-    settings.completionDelayMs,
-    settings.instructionOverrides.complete ?? '',
-  ].join('\u0000')
 }
 
 function cacheCompletion(cache: Map<string, string>, key: string, value: string) {
