@@ -46,7 +46,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   props,
   ref,
 ) {
-  const rootRef = useRef<HTMLDivElement | null>(null)
   const completionContextKeyRef = useRef<string | null>(null)
   const documentVersionRef = useRef(0)
   const documentIdRef = useRef(props.documentId)
@@ -82,10 +81,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       emitCompletionContext(current)
       emitSelectionSnapshot(current)
     },
-    onBlur: () => {
-      publishCompletionContext(null)
-      props.onSelectionChange(null)
-    },
+    onBlur: () => publishCompletionContext(null),
   })
 
   useEffect(() => {
@@ -122,16 +118,6 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     emitCompletionContext(editor)
   }, [props.completionContextChars, editor])
 
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
-    const scroller = root.closest('.editor-scroll')
-    if (!(scroller instanceof HTMLElement)) return
-    const hideSelectionUi = () => props.onSelectionChange(null)
-    scroller.addEventListener('scroll', hideSelectionUi, { passive: true })
-    return () => scroller.removeEventListener('scroll', hideSelectionUi)
-  }, [])
-
   function publishCompletionContext(context: EditorCompletionContext | null) {
     const key = context?.key ?? null
     if (completionContextKeyRef.current === key) return
@@ -155,22 +141,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   }
 
   function emitSelectionSnapshot(currentEditor: NonNullable<typeof editor>) {
-    if (!currentEditor.view.hasFocus()) {
-      props.onSelectionChange(null)
-      return
-    }
-
-    try {
-      props.onSelectionChange(
-        buildEditorSelectionSnapshot(
-          currentEditor.state,
-          (position) => currentEditor.view.coordsAtPos(position),
-          window.innerWidth,
-        ),
-      )
-    } catch {
-      props.onSelectionChange(null)
-    }
+    props.onSelectionChange(buildEditorSelectionSnapshot(currentEditor.state))
   }
 
   function convertSelectedBlock(format: EditableBlockFormat) {
@@ -214,9 +185,5 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     [editor],
   )
 
-  return (
-    <div ref={rootRef} className="prompt-editor">
-      <EditorContent editor={editor} />
-    </div>
-  )
+  return <EditorContent editor={editor} />
 })
