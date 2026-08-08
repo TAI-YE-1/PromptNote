@@ -22,7 +22,7 @@
 - [x] P0-03 建立 `docs/UX.md`，固定编辑、Slash Menu、AI suggestion、Compiler 与 Copy 主链。
 - [x] P0-04 建立 `docs/PROMPT-DOCUMENT-CONTRACT.md`，固定唯一内容源与 Schema 边界。
 - [x] P0-05 建立 `docs/ARCHITECTURE.md`，固定模块职责、依赖方向和状态边界。
-- [x] P0-06 建立 `docs/DECISIONS.md`，记录关键产品/架构决策；D017 明确退役 Web Insert 并引入 opt-in inline completion。
+- [x] P0-06 建立 `docs/DECISIONS.md`，记录关键产品/架构决策；D017 退役 Web Insert，D018 固定稳定选区工具条，D019 固定 V1 收口性能原则。
 - [x] P0-07 建立 `TASKS.md` 唯一任务账本。
 - [x] P0-08 建立 `AGENTS.md` AI 开发协作规则。
 
@@ -72,6 +72,7 @@
 - [x] P2-08 保存失败在 UI 可见，不假装成功。
 - [x] P2-09 实现 PromptDocument JSON 备份导出/恢复导入；同 ID 冲突明确询问覆盖或另存副本。
 - [x] P2-10 增加 Schema、备份契约、Repository、并发保存聚焦测试。
+- [x] P2-11 收口 Storage 热路径：`ensureCurrent()` 批量读取 documents/current id；Repository 拒绝更旧 revision 覆盖更新 revision，并增加专项测试。
 
 **关闭标准：** PromptDocument 是唯一持久正文源；浏览器重启后的真实恢复证据放到 P8-06。
 
@@ -120,6 +121,7 @@
 - [x] P5-10 实现共享 source revision guard，拒绝应用过期 suggestion。
 - [ ] P5-11 完整验证未配置 AI、禁用 AI、Provider HTTP/transport 失败、30 秒超时情况下的**真实浏览器主链**仍可编辑/保存/lint/Compiler/Copy；用户已验证无 AI 可正常使用和错误 Base URL 会失败，仍缺禁用/超时及当前最终构建全链证据。
 - [x] P5-12 补齐 suggestion UI 行为测试：Accept / Ignore、过期禁用、advisory 不修改正文。
+- [x] P5-13 收口 streaming 兼容：能力缓存按 provider + endpoint + completion model 隔离；SSE 接受 keep-alive/comment 与错误 Content-Type，并有专项测试。
 
 ---
 
@@ -146,8 +148,9 @@
 - [x] P6-14 增加 completion preference、流式/降级/model route、Tab/Esc、stale invalidation、英文前导空格、当前 block context 隔离和移动 caret 后拒绝旧 ghost 的测试。
 - [x] P6-16 深排查真实浏览器补全错位/串块问题：context identity 绑定 document generation + block + caret；流式 partial 只可更新原 context；当前语义块不再隐式读取前一块正文；退避窗口内的新 context 不再静默丢弃。
 - [x] P6-17 深排查真机“只在部分 caret 触发 / 只显示首批两三个字”：补全上下文改为当前 block 的 caret 前后双向窗口并支持块首/块中/单字符；流式 ghost decoration key 随 partial 文本更新，禁止 ProseMirror 复用首批 widget DOM；补全指令显式使用 `<光标>` 并要求非空、有用续写。
-- [x] P6-18 深排查“最长块不补全”：发现 AI 设置中的 `completionContextChars` 曾未传入 PromptEditor，导致 UI 显示小上下文但编辑器仍可回退到内部 2000 字上限；现改为 PromptEditor 必填契约并由 App 显式传入，TypeScript 禁止再次漏传；新增小上下文预算长块测试。
-- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证块首/块中/块尾均能产生合理灰色续写，用户配置的小上下文真实生效，流式文字持续增长而非停在首批两三个字，Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；关闭补全后确认不再自动请求。此前真机暴露的问题已进入 P6-16/P6-17/P6-18，最新构建待复测。
+- [x] P6-18 深排查“最长块不补全”：AI 设置中的 `completionContextChars` 改为 PromptEditor 必填契约并显式贯穿；context budget 纳入 request identity；新增小上下文预算长块测试。
+- [x] P6-19 收口流式渲染热路径：连续 partial 约 48ms 合并刷新，避免 token 粒度根 React render；Editor 已完成一次 context 截取后 Hook 不再维护第二套裁剪实现。
+- [ ] P6-15 在真实 Chrome 中配置可用 AI，开启“编辑器内联补全”，验证块首/块中/块尾均能产生合理灰色续写，用户配置的小上下文真实生效，流式文字持续增长而非停在首批两三个字，Tab 接受、Esc 忽略、继续输入/移动 caret/切换块会取消旧建议，且不同语义块之间不串上下文；关闭补全后确认不再自动请求。最新 P6-16～P6-19 构建待复测。
 
 ---
 
@@ -155,14 +158,17 @@
 
 - [x] P7-01 完成轻量文档切换/列表/搜索/新建/删除入口，不扩成 Prompt 管理后台。
 - [x] P7-02 完成最近文档恢复逻辑。
-- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；选区命令菜单与本地检查结果已改为 viewport-safe 浮层；选区命令状态源进一步改为 ProseMirror selection + `coordsAtPos`，不再依赖 `mouseup/window.getSelection()`；需最新构建真机确认稳定出现、可点击、不裁剪、不被 actionbar 遮挡。
-- [ ] P7-04 检查键盘可达性和关键操作可发现性；重点含 Slash、Tab 接受 ghost、Esc 忽略 ghost/关闭顶层临时 UI、选区菜单键鼠交互。
+- [ ] P7-03 检查当前最终构建真实 Side Panel 360px 等窄宽度可用性；D018 已彻底删除不稳定的文字旁 `•••` / viewport rect 交互，改为 actionbar 上方固定选区工具条；检查结果与 suggestion 同属 transient surface，需最新构建真机确认稳定可见、可点击、不遮挡。
+- [ ] P7-04 检查键盘可达性和关键操作可发现性；重点含 Slash、Tab 接受 ghost、Esc 忽略 ghost/关闭顶层临时 UI、稳定选区工具条键鼠交互。
 - [ ] P7-05 完整审查错误路径无假成功、无静默失败；当前重点为 Storage、Copy、AI suggestion、inline completion Provider 失败/退避。
-- [ ] P7-06 检查 Copy / Save 的连续、重复操作与状态一致性；Web Insert 状态链已删除。
-- [ ] P7-07 做最终代码减法审查；已删除 Web Adapter/content script/messages/DOM fixtures/activeTab/scripting/旧 App runtime，待最终浏览器 smoke 后再反查一次。
+- [ ] P7-06 检查 Copy / Save 的连续、重复操作与状态一致性；Web Insert 状态链已删除，Repository 已增加 revision 单调写保护。
+- [ ] P7-07 做最终代码减法审查；本轮已删除旧 SelectionContextMenu、viewport rect/coords/scroll 定位、旧 selection CSS、重复 completion context 裁剪、冗余 floatingPanels stylesheet，并拆分 optional sheets；待最新浏览器 smoke 后最后反查一次。
 - [x] P7-08 反向搜索 Non-goals：无 backend/auth/team/marketplace/cloud-sync/model-playground，Web DOM 注入也已成为明确 Non-goal。
-- [ ] P7-09 README、PRODUCT、UX、ARCHITECTURE、DECISIONS、AGENTS、TASKS 最终实现态收口；当前已同步 block-local/context identity 规则，待最终浏览器验收后最后复核一次。
-- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径工作；补全使用可配置 delay/context、streaming-first、取消、context identity、短退避与可选低延迟模型，且 context budget 现从设置贯穿到 Editor。仍需验证 Side Panel 启动/输入流畅度及真实 Provider 首 partial 体感；主 bundle 仍需以真实启动数据决定是否 code splitting，不调高 warningLimit 掩盖。
+- [ ] P7-09 README、PRODUCT、UX、ARCHITECTURE、DECISIONS、AGENTS、TASKS 最终实现态收口；本轮五次文档同步已完成当前实现态更新，待最终浏览器验收后只做最终证据复核。
+- [ ] P7-10 完成真实浏览器性能收口：已减少 Storage/Lint/Compiler 默认热路径，补全 partial 合并刷新，context budget 单一贯穿，Provider streaming capability 按模型隔离，AI/Document Sheet 已 lazy-load。主编辑器 chunk 仍 >500KB，继续保留 warning；必须以真实启动/输入体感决定是否进一步拆 TipTap，不调高 warningLimit 掩盖。
+- [x] P7-11 D018 选区交互根修：以 ProseMirror selection 为唯一权威，选中文字后直接显示固定 SelectionActionBar；删除文字旁 `•••`、DOM selection、viewport rect 与 coords 业务状态；跨块选区禁用类型转换。
+- [x] P7-12 按要求完成 5 轮代码审查、5 轮代码优化、5 轮代码减法、5 轮性能优化；每轮均对应真实实现变更/删除或专项测试，不以重复描述凑轮次。
+- [x] P7-13 完成 5 轮当前实现态文档同步：PRODUCT、UX、ARCHITECTURE、DECISIONS、TASKS/AGENTS/README 组；最终发布证据仍由 P7-09/P8 关闭。
 
 ---
 
@@ -186,12 +192,12 @@
 
 ## 当前状态
 
-当前阶段：**Web Insert 已按 D017 从 V1 完整退役。编辑器 opt-in inline completion 已完成 P6-16/P6-17/P6-18 深修：当前 block 隔离、caret 前后双向上下文、document/block/caret identity、流式 partial DOM 持续刷新、设置 context budget 必须显式贯穿 Editor、可配置延迟/独立补全模型。选区命令状态源改为 ProseMirror selection + viewport coords，trigger mousedown 保留编辑器 selection；本地检查结果仍为 viewport-safe transient panel。代码门禁已通过，最新修复仍需真实 Chrome 复测，再继续 Edge、重启恢复和异常降级验收。**
+当前阶段：**Web Insert 已按 D017 退役；文字旁 `•••` 选区交互也已按 D018 完整退役。选区操作现在只依赖 ProseMirror selection，并固定显示在主 actionbar 上方；补全已完成 block-local、caret before/after、context budget identity、streaming partial 合并与 SSE/model capability 收口；Storage 增加 revision 单调写保护与启动批量读取；AI/Document Sheet 已按需加载。五轮代码审查/优化/减法/性能优化与五轮文档同步均已落地并通过代码门禁，当前仍需真实 Chrome 对最新构建复测，不能把静态/单测证据冒充真机完成。**
 
 当前最优先剩余工作：
 
-1. Chrome 真机复测 P6-18：最长块在用户设定的小 context 下仍能及时触发；块首/块中/块尾、单字符块均可补全；
-2. 真机确认选区 `•••` 稳定出现且点击可展开，不再因浏览器 DOM selection/focus 丢失而失效；
-3. 真机确认“检查”结果始终位于 actionbar 上方可见；
+1. Chrome 真机确认：选中文字后固定工具条每次稳定出现，四个动作可直接点击，跨块时类型转换禁用；不再出现 `•••`；
+2. Chrome 真机复测补全：最长块/块首/块中/块尾/单字符、流式增长、Tab/Esc、移动 caret stale 失效；
+3. 真机确认“检查”结果始终位于 actionbar 上方，且 AI busy > suggestion > lint > selection 的临时面板优先级没有遮挡；
 4. Edge 当前最终 Manifest smoke + 360px/键盘；浏览器重启恢复与 AI 禁用/错误/超时降级；
-5. Copy/Save 重复操作、错误路径、真实性能收口、最终代码减法、release notes 与 Known Limitations。
+5. Copy/Save 重复操作、最终真实浏览器性能、最后代码反查、release notes 与 Known Limitations。
