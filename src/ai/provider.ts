@@ -4,6 +4,7 @@ import type { AiProvider, AiRequest, AiSettings } from './types'
 export const AI_REQUEST_TIMEOUT_MS = 30_000
 
 const nonStreamingEndpoints = new Set<string>()
+const NON_STREAMING_ENDPOINT_CACHE_SIZE = 32
 const MAX_ERROR_BODY_CHARS = 2_000
 
 export class AiRequestError extends Error {
@@ -48,6 +49,16 @@ function streamingCapabilityKey(provider: string, endpoint: string, settings: Ai
   return `${provider}:${endpoint}:${modelForRequest(settings, request)}`
 }
 
+function rememberNonStreamingEndpoint(key: string) {
+  nonStreamingEndpoints.delete(key)
+  nonStreamingEndpoints.add(key)
+  while (nonStreamingEndpoints.size > NON_STREAMING_ENDPOINT_CACHE_SIZE) {
+    const oldest = nonStreamingEndpoints.values().next().value
+    if (typeof oldest !== 'string') break
+    nonStreamingEndpoints.delete(oldest)
+  }
+}
+
 function userPayload(request: AiRequest): string {
   if (!request.surroundingContext) return request.content
   return `选中内容：\n${request.content}\n\n相邻上下文：\n${request.surroundingContext}`
@@ -57,6 +68,19 @@ function boundedErrorText(text: string): string {
   const trimmed = text.trim()
   if (trimmed.length <= MAX_ERROR_BODY_CHARS) return trimmed
   return `${trimmed.slice(0, MAX_ERROR_BODY_CHARS)}…`
+}
+
+function readableErrorBody(text: string): string {
+  const fallback = boundedErrorText(text)
+  if (!fallback) return ''
+  try {
+    const parsed = asRecord(JSON.parse(text) as unknown)
+    const nestedError = asRecord(parsed?.error)
+    const message = nestedError?.message ?? parsed?.message
+    return typeof message === 'string' && message.trim() ? boundedErrorText(message) : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function retryAfterMs(response: Response): number | null {
@@ -70,7 +94,7 @@ function retryAfterMs(response: Response): number | null {
 }
 
 function quotaLikeMessage(text: string): boolean {
-  return /usage limit|quota|billing cycle|monthly usage|credits? exhausted|insufficient (?:balance|quota)/i.test(text)
+  return /usage limit|quota|billing cycle|monthly usage|credits? exhausted|insufficient (?:balance|quota)|额度|配额|用量上限|使用限额|余额不足/i.test(text)
 }
 
 function isTransientHttpFailure(status: number, text: string): boolean {
@@ -79,7 +103,7 @@ function isTransientHttpFailure(status: number, text: string): boolean {
 }
 
 function responseError(response: Response, text: string): AiRequestError {
-  const message = boundedErrorText(text) || `AI 请求失败：HTTP ${response.status}`
+  const message = readableErrorBody(text) || `AI 请求失败：HTTP ${response.status}`
   return new AiRequestError(message, {
     status: response.status,
     transient: isTransientHttpFailure(response.status, message),
@@ -154,11 +178,11 @@ function extractAnthropicContent(value: unknown): string {
   return text
 }
 
-function completionBody(settings: AiSettings, request: AiRequest, stream: boolean) {
+function openAiBody(settings: AiSettings, request: AiRequest, stream?: boolean) {
   return JSON.stringify({
     model: modelForRequest(settings, request),
-    temperature: 0.1,
-    stream,
+    temperature: request.action === 'complete' ? 0.1 : 0.2,
+    ...(stream === undefined ? {} : { stream }),
     messages: [
       { role: 'system', content: buildSystemInstruction(settings, request.action) },
       { role: 'user', content: userPayload(request) },
@@ -288,14 +312,7 @@ class OpenAICompatibleProvider implements AiProvider {
           Authorization: `Bearer ${settings.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: modelForRequest(settings, request),
-          temperature: request.action === 'complete' ? 0.1 : 0.2,
-          messages: [
-            { role: 'system', content: buildSystemInstruction(settings, request.action) },
-            { role: 'user', content: userPayload(request) },
-          ],
-        }),
+        body: openAiBody(settings, request),
       },
       signal,
     )
@@ -322,7 +339,7 @@ class OpenAICompatibleProvider implements AiProvider {
           Authorization: `Bearer ${settings.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: completionBody(settings, request, true),
+        body: openAiBody(settings, request, true),
       },
       signal,
     )
@@ -330,7 +347,7 @@ class OpenAICompatibleProvider implements AiProvider {
     if (!response.ok) {
       const text = await response.text()
       if (isUnsupportedStreaming(response.status, text)) {
-        nonStreamingEndpoints.add(streamKey)
+        rememberNonStreamingEndpoint(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
       }
       throw responseError(response, text)
@@ -356,7 +373,7 @@ class OpenAICompatibleProvider implements AiProvider {
     })
 
     if (body.kind === 'text') {
-      nonStreamingEndpoints.add(streamKey)
+      rememberNonStreamingEndpoint(streamKey)
       const text = extractOpenAIContent(parseJsonText(body.text))
       onPartial(text)
       return text
@@ -418,7 +435,7 @@ class AnthropicProvider implements AiProvider {
     if (!response.ok) {
       const text = await response.text()
       if (isUnsupportedStreaming(response.status, text)) {
-        nonStreamingEndpoints.add(streamKey)
+        rememberNonStreamingEndpoint(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
       }
       throw responseError(response, text)
@@ -450,7 +467,7 @@ class AnthropicProvider implements AiProvider {
     })
 
     if (body.kind === 'text') {
-      nonStreamingEndpoints.add(streamKey)
+      rememberNonStreamingEndpoint(streamKey)
       const text = extractAnthropicContent(parseJsonText(body.text))
       onPartial(text)
       return text
