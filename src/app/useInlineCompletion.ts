@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { getAiProvider } from '../ai/provider'
+import { computeCompletionStartDelayMs } from '../ai/completionTuning'
+import { AiRequestError, getAiProvider } from '../ai/provider'
 import type { AiSettings } from '../ai/types'
 import { sectionKindMeta } from '../prompt/sectionKinds'
 import type {
@@ -7,25 +8,30 @@ import type {
   EditorCompletionSuggestion,
 } from '../editor/completionContext'
 
-const COMPLETION_ERROR_BACKOFF_MS = 3_000
 const COMPLETION_MIN_BLOCK_CONTEXT = 1
 const COMPLETION_CACHE_SIZE = 8
 const COMPLETION_MAX_CHARS = 240
 const COMPLETION_OVERLAP_MAX = 32
 const PARTIAL_RENDER_INTERVAL_MS = 48
+const TRANSIENT_BACKOFF_BASE_MS = 1_500
+const TRANSIENT_BACKOFF_MAX_MS = 12_000
+const PERSISTENT_FAILURE_BACKOFF_MS = 30_000
+const TRANSIENT_REPORT_AFTER = 3
 
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
-  onError(message: string): void
+  onError(message: string | null): void
 }
 
 export function useInlineCompletion(
   input: InlineCompletionInput,
 ): EditorCompletionSuggestion | null {
   const [completion, setCompletion] = useState<EditorCompletionSuggestion | null>(null)
-  const lastErrorRef = useRef<string | null>(null)
-  const retryAfterRef = useRef(0)
+  const lastReportedErrorRef = useRef<string | null>(null)
+  const retryAtRef = useRef(0)
+  const lastRequestStartedAtRef = useRef(0)
+  const transientFailureCountRef = useRef(0)
   const cacheRef = useRef(new Map<string, string>())
   const requestSequenceRef = useRef(0)
   const currentContextKeyRef = useRef<string | null>(null)
@@ -38,11 +44,16 @@ export function useInlineCompletion(
 
   useEffect(() => {
     requestSequenceRef.current += 1
-    lastErrorRef.current = null
-    retryAfterRef.current = 0
+    retryAtRef.current = 0
+    lastRequestStartedAtRef.current = 0
+    transientFailureCountRef.current = 0
     cacheRef.current.clear()
     setCompletion(null)
-  }, [settingsKey])
+    if (lastReportedErrorRef.current) {
+      lastReportedErrorRef.current = null
+      input.onError(null)
+    }
+  }, [input.onError, settingsKey])
 
   useEffect(() => {
     setCompletion(null)
@@ -66,11 +77,24 @@ export function useInlineCompletion(
 
     const controller = new AbortController()
     const requestSequence = ++requestSequenceRef.current
-    const remainingBackoff = Math.max(0, retryAfterRef.current - Date.now())
-    const startDelay = Math.max(settings.completionDelayMs, remainingBackoff)
+    const now = Date.now()
+    const startDelay = computeCompletionStartDelayMs({
+      configuredDelayMs: settings.completionDelayMs,
+      lastRequestStartedAtMs: lastRequestStartedAtRef.current,
+      retryAtMs: retryAtRef.current,
+      nowMs: now,
+    })
     let renderTimer: number | null = null
     let pendingPartial: string | null = null
     let lastRendered: string | null = null
+
+    const clearReportedError = () => {
+      transientFailureCountRef.current = 0
+      retryAtRef.current = 0
+      if (!lastReportedErrorRef.current) return
+      lastReportedErrorRef.current = null
+      input.onError(null)
+    }
 
     const flushPartial = () => {
       if (renderTimer !== null) {
@@ -94,6 +118,7 @@ export function useInlineCompletion(
     const timer = window.setTimeout(() => {
       void (async () => {
         let lastUsablePartial: string | null = null
+        lastRequestStartedAtRef.current = Date.now()
         try {
           const provider = getAiProvider(settings)
           const result = await provider.streamCompletion(
@@ -107,6 +132,7 @@ export function useInlineCompletion(
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
+              clearReportedError()
               queuePartial(normalized)
             },
             controller.signal,
@@ -116,25 +142,38 @@ export function useInlineCompletion(
           const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
+          clearReportedError()
           pendingPartial = normalized
           flushPartial()
           cacheCompletion(cacheRef.current, requestKey, normalized)
-          lastErrorRef.current = null
         } catch (error) {
           if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
           if (lastUsablePartial) {
+            clearReportedError()
             pendingPartial = lastUsablePartial
             flushPartial()
             cacheCompletion(cacheRef.current, requestKey, lastUsablePartial)
-            lastErrorRef.current = null
             return
           }
 
-          const message = error instanceof Error ? error.message : String(error)
-          retryAfterRef.current = Date.now() + COMPLETION_ERROR_BACKOFF_MS
           setCompletion(null)
-          if (lastErrorRef.current !== message) {
-            lastErrorRef.current = message
+          const message = error instanceof Error ? error.message : String(error)
+          if (error instanceof AiRequestError && error.transient) {
+            const failures = transientFailureCountRef.current + 1
+            transientFailureCountRef.current = failures
+            const exponentialBackoff = Math.min(
+              TRANSIENT_BACKOFF_BASE_MS * 2 ** (failures - 1),
+              TRANSIENT_BACKOFF_MAX_MS,
+            )
+            retryAtRef.current = Date.now() + Math.max(exponentialBackoff, error.retryAfterMs ?? 0)
+            if (failures < TRANSIENT_REPORT_AFTER) return
+          } else {
+            transientFailureCountRef.current = 0
+            retryAtRef.current = Date.now() + PERSISTENT_FAILURE_BACKOFF_MS
+          }
+
+          if (lastReportedErrorRef.current !== message) {
+            lastReportedErrorRef.current = message
             input.onError(message)
           }
         }
