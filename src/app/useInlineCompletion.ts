@@ -8,7 +8,7 @@ import type {
 } from '../editor/completionContext'
 
 const COMPLETION_ERROR_BACKOFF_MS = 3_000
-const COMPLETION_MIN_CONTEXT = 2
+const COMPLETION_MIN_BLOCK_CONTEXT = 1
 const COMPLETION_CACHE_SIZE = 8
 const COMPLETION_MAX_CHARS = 240
 const COMPLETION_OVERLAP_MAX = 32
@@ -31,8 +31,6 @@ export function useInlineCompletion(
   const context = input.context
   currentContextKeyRef.current = context?.key ?? null
 
-  const rawContext = context?.beforeText ?? ''
-  const contextBeforeText = rawContext.slice(-input.settings.completionContextChars)
   const ready =
     input.settings.enabled &&
     input.settings.configured &&
@@ -48,16 +46,10 @@ export function useInlineCompletion(
 
   useEffect(() => {
     setCompletion(null)
-    if (
-      !ready ||
-      !context ||
-      contextBeforeText.trim().length < COMPLETION_MIN_CONTEXT
-    ) {
-      return
-    }
+    if (!ready || !context || blockContextLength(context) < COMPLETION_MIN_BLOCK_CONTEXT) return
 
     const contextSnapshot = context
-    const requestKey = `${contextSnapshot.key}\u0000${contextBeforeText}`
+    const requestKey = contextSnapshot.key
     const makeSuggestion = (text: string): EditorCompletionSuggestion => ({
       text,
       contextKey: contextSnapshot.key,
@@ -83,7 +75,7 @@ export function useInlineCompletion(
             input.settings,
             {
               action: 'complete',
-              content: completionPrompt(contextSnapshot, contextBeforeText),
+              content: completionPrompt(contextSnapshot),
             },
             (partial) => {
               if (
@@ -93,7 +85,7 @@ export function useInlineCompletion(
               ) {
                 return
               }
-              const normalized = normalizeCompletion(partial, contextBeforeText)
+              const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
               setCompletion(makeSuggestion(normalized))
@@ -108,7 +100,7 @@ export function useInlineCompletion(
             return
           }
 
-          const normalized = normalizeCompletion(result, contextBeforeText)
+          const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
           cacheCompletion(cacheRef.current, requestKey, normalized)
@@ -144,21 +136,20 @@ export function useInlineCompletion(
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [
-    context,
-    contextBeforeText,
-    input.onError,
-    input.settings,
-    input.settings.completionDelayMs,
-    ready,
-  ])
+  }, [context, input.onError, input.settings, ready])
 
   return completion
 }
 
-function completionPrompt(context: EditorCompletionContext, beforeText: string): string {
-  if (!context.sectionKind) return beforeText
-  return `当前模块：${sectionKindMeta[context.sectionKind].label}\n光标前文本：${beforeText}`
+function blockContextLength(context: EditorCompletionContext): number {
+  return (context.beforeText + context.afterText).trim().length
+}
+
+function completionPrompt(context: EditorCompletionContext): string {
+  const semantic = context.sectionKind
+    ? `当前模块：${sectionKindMeta[context.sectionKind].label}\n`
+    : ''
+  return `${semantic}当前文本块（<光标> 表示续写位置）：\n${context.beforeText}<光标>${context.afterText}`
 }
 
 function cacheCompletion(cache: Map<string, string>, key: string, value: string) {
