@@ -50,6 +50,8 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const documentVersionRef = useRef(0)
   const documentIdRef = useRef(props.documentId)
   const completionContextCharsRef = useRef(props.completionContextChars)
+  const appliedDocumentIdRef = useRef(props.documentId)
+  const appliedContentRef = useRef(props.content)
   documentIdRef.current = props.documentId
   completionContextCharsRef.current = props.completionContextChars
 
@@ -69,7 +71,9 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     },
     onUpdate: ({ editor: current }) => {
       documentVersionRef.current += 1
-      props.onChange(current.getJSON())
+      const content = current.getJSON() as PromptNodeJSON
+      appliedContentRef.current = content
+      props.onChange(content)
       emitCompletionContext(current)
       emitSelectionSnapshot(current)
     },
@@ -86,14 +90,22 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   useEffect(() => {
     if (!editor) return
+    const documentChanged = appliedDocumentIdRef.current !== props.documentId
+    const contentChanged = appliedContentRef.current !== props.content
+    if (!documentChanged && !contentChanged) return
+
+    appliedDocumentIdRef.current = props.documentId
+    appliedContentRef.current = props.content
     documentVersionRef.current += 1
-    editor.commands.setContent(props.content as JSONContent, {
-      emitUpdate: false,
-      errorOnInvalidContent: true,
-    })
+    if (contentChanged) {
+      editor.commands.setContent(props.content as JSONContent, {
+        emitUpdate: false,
+        errorOnInvalidContent: true,
+      })
+    }
     invalidateCompletion(editor)
     props.onSelectionChange(null)
-  }, [editor, props.documentId])
+  }, [editor, props.content, props.documentId])
 
   useEffect(() => {
     if (!editor) return
