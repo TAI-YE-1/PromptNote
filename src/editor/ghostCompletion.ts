@@ -74,7 +74,12 @@ export function createGhostCompletionPlugin(): Plugin<GhostCompletionState> {
               span.textContent = ghost.text
               return span
             },
-            { side: 1, key: `promptnote-ghost-completion:${ghost.contextKey ?? ''}` },
+            {
+              side: 1,
+              // Streaming partials share one context identity but grow over time.
+              // Include the visible text in the key so ProseMirror recreates the widget DOM.
+              key: `promptnote-ghost-completion:${ghost.contextKey ?? ''}:${ghost.text}`,
+            },
           ),
         ])
       },
