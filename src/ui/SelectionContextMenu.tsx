@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { sectionKindMeta, sectionKinds } from '../prompt/sectionKinds'
 import type { EditableBlockFormat } from '../editor/blockConversion'
 import type { EditorSelectionSnapshot } from '../editor/PromptEditor'
+import './floatingPanels.css'
 
 export function SelectionContextMenu(props: {
   selection: EditorSelectionSnapshot
@@ -21,7 +22,7 @@ export function SelectionContextMenu(props: {
 
   return (
     <div
-      className={`selection-context selection-context--${placeBelow ? 'below' : 'above'}`}
+      className={`selection-context selection-context--viewport selection-context--${placeBelow ? 'below' : 'above'}`}
       style={{ left, top }}
       onMouseDown={(event) => event.stopPropagation()}
     >
