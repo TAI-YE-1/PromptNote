@@ -2,7 +2,6 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { COMPLETION_CONTEXT_MAX } from '../ai/completionTuning'
 import { PromptSection } from './promptSection'
 import { GhostCompletion, setGhostCompletion } from './ghostCompletion'
 import {
@@ -46,7 +45,7 @@ interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
   completionText: EditorCompletionSuggestion | null
-  completionContextChars?: number
+  completionContextChars: number
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
   onCompletionContext(context: EditorCompletionContext | null): void
@@ -61,10 +60,9 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const completionContextKeyRef = useRef<string | null>(null)
   const documentVersionRef = useRef(0)
   const documentIdRef = useRef(props.documentId)
-  const completionContextChars = props.completionContextChars ?? COMPLETION_CONTEXT_MAX
-  const completionContextCharsRef = useRef(completionContextChars)
+  const completionContextCharsRef = useRef(props.completionContextChars)
   documentIdRef.current = props.documentId
-  completionContextCharsRef.current = completionContextChars
+  completionContextCharsRef.current = props.completionContextChars
 
   const editor = useEditor({
     extensions: [StarterKit, PromptSection, GhostCompletion],
@@ -132,7 +130,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     if (!editor) return
     completionContextKeyRef.current = null
     emitCompletionContext(editor)
-  }, [completionContextChars, editor])
+  }, [props.completionContextChars, editor])
 
   useEffect(() => {
     const root = rootRef.current
