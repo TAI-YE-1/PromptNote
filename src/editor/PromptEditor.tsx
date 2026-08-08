@@ -5,6 +5,11 @@ import StarterKit from '@tiptap/starter-kit'
 import { COMPLETION_CONTEXT_MAX } from '../ai/completionTuning'
 import { PromptSection } from './promptSection'
 import { GhostCompletion, setGhostCompletion } from './ghostCompletion'
+import {
+  buildEditorCompletionContext,
+  type EditorCompletionContext,
+  type EditorCompletionSuggestion,
+} from './completionContext'
 import type { PromptNodeJSON } from '../prompt/schema'
 import type { SectionKind } from '../prompt/sectionKinds'
 import {
@@ -12,6 +17,8 @@ import {
   getActiveBlockFormat,
   type EditableBlockFormat,
 } from './blockConversion'
+
+export type { EditorCompletionContext } from './completionContext'
 
 export interface EditorSelectionSnapshot {
   text: string
@@ -27,11 +34,6 @@ export interface EditorSelectionSnapshot {
   }
 }
 
-export interface EditorCompletionContext {
-  position: number
-  beforeText: string
-}
-
 export interface PromptEditorHandle {
   insertSection(kind: SectionKind, text?: string): void
   replaceRange(from: number, to: number, text: string): void
@@ -43,7 +45,7 @@ export interface PromptEditorHandle {
 interface PromptEditorProps {
   documentId: string
   content: PromptNodeJSON
-  completionText: string | null
+  completionText: EditorCompletionSuggestion | null
   completionContextChars?: number
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
@@ -57,7 +59,13 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 ) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const completionContextKeyRef = useRef<string | null>(null)
+  const documentVersionRef = useRef(0)
+  const documentIdRef = useRef(props.documentId)
   const completionContextChars = props.completionContextChars ?? COMPLETION_CONTEXT_MAX
+  const completionContextCharsRef = useRef(completionContextChars)
+  documentIdRef.current = props.documentId
+  completionContextCharsRef.current = completionContextChars
+
   const editor = useEditor({
     extensions: [StarterKit, PromptSection, GhostCompletion],
     content: props.content as JSONContent,
@@ -73,14 +81,18 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       },
     },
     onUpdate: ({ editor: current }) => {
+      documentVersionRef.current += 1
       props.onChange(current.getJSON())
       emitCompletionContext(current)
     },
     onSelectionUpdate: ({ editor: current }) => emitCompletionContext(current),
+    onFocus: ({ editor: current }) => emitCompletionContext(current),
+    onBlur: () => publishCompletionContext(null),
   })
 
   useEffect(() => {
     if (!editor) return
+    documentVersionRef.current += 1
     editor.commands.setContent(props.content as JSONContent, {
       emitUpdate: false,
       errorOnInvalidContent: true,
@@ -93,8 +105,18 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
 
   useEffect(() => {
     if (!editor) return
-    setGhostCompletion(editor.view, props.completionText)
-  }, [editor, props.completionText])
+    const completion = props.completionText
+    const selection = editor.state.selection
+    const isCurrent =
+      completion !== null &&
+      completion.documentId === props.documentId &&
+      completion.contextKey === completionContextKeyRef.current &&
+      selection.empty &&
+      selection.head === completion.position &&
+      editor.view.hasFocus()
+
+    setGhostCompletion(editor.view, isCurrent ? completion : null)
+  }, [editor, props.completionText, props.documentId])
 
   useEffect(() => {
     if (!editor) return
@@ -103,27 +125,25 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   }, [completionContextChars, editor])
 
   function publishCompletionContext(context: EditorCompletionContext | null) {
-    const key = context ? `${context.position}\u0000${context.beforeText}` : null
+    const key = context?.key ?? null
     if (completionContextKeyRef.current === key) return
     completionContextKeyRef.current = key
     props.onCompletionContext(context)
   }
 
   function emitCompletionContext(currentEditor: NonNullable<typeof editor>) {
-    const { selection, doc } = currentEditor.state
-    if (completionContextChars <= 0 || !selection.empty || !currentEditor.view.hasFocus()) {
+    if (!currentEditor.view.hasFocus()) {
       publishCompletionContext(null)
       return
     }
 
-    const from = Math.max(0, selection.from - completionContextChars)
-    const beforeText = doc.textBetween(from, selection.from, '\n', '\n').trimEnd()
-    if (!beforeText.trim()) {
-      publishCompletionContext(null)
-      return
-    }
-
-    publishCompletionContext({ position: selection.from, beforeText })
+    publishCompletionContext(
+      buildEditorCompletionContext(currentEditor.state, {
+        documentId: documentIdRef.current,
+        documentVersion: documentVersionRef.current,
+        maxChars: completionContextCharsRef.current,
+      }),
+    )
   }
 
   function convertSelectedBlock(format: EditableBlockFormat) {
