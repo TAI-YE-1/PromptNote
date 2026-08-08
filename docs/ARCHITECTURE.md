@@ -44,6 +44,9 @@
 Extension Preferences
 ├─ AI enabled
 ├─ completionEnabled
+├─ completionContextChars
+├─ completionDelayMs
+├─ instructionOverrides
 ├─ Provider
 ├─ Model
 ├─ API Base URL
@@ -74,6 +77,8 @@ src/
 │  ├─ promptRepository.ts
 │  └─ aiSettingsRepository.ts
 ├─ ai/
+│  ├─ completionTuning.ts
+│  ├─ instructions.ts
 │  ├─ provider.ts
 │  ├─ suggestions.ts
 │  ├─ lint.ts
@@ -81,11 +86,19 @@ src/
 ├─ extension/
 │  └─ background.ts
 ├─ ui/
-│  └─ components.tsx
+│  ├─ components.tsx        # 稳定 barrel，仅 re-export
+│  ├─ AiSheet.tsx
+│  ├─ AiAdvancedSettings.tsx
+│  ├─ DocumentSheet.tsx
+│  ├─ SelectionContextMenu.tsx
+│  ├─ SlashMenu.tsx
+│  ├─ SuggestionCard.tsx
+│  ├─ LintCard.tsx
+│  └─ Preview.tsx
 └─ main.tsx
 ```
 
-文件拆分按真实职责，不为“架构感”制造空 wrapper。
+文件拆分按真实职责，不为“架构感”制造空 wrapper；`components.tsx` 只保留稳定聚合入口，避免再次退化成巨型 UI 文件。
 
 ## 4. 依赖方向
 
@@ -120,7 +133,7 @@ settings.configured
 `storage/` 是本地持久化唯一入口。
 
 - `PromptRepository`：PromptDocument；
-- AI settings repository：Provider、credential、AI 总开关、补全开关等扩展偏好。
+- AI settings repository：Provider、credential、AI 总开关、补全开关、补全调优数值和每动作指令覆盖等扩展偏好。
 
 禁止正文同时写 localStorage / IndexedDB / Chrome Storage 多份副本；禁止保存 Markdown/XML 派生副本。
 
@@ -145,6 +158,8 @@ Suggestion 必须带来源 revision；过期 suggestion 不得应用。
 
 内联补全不创建 PromptSuggestion，也不创建第二正文状态，只返回短 continuation 字符串。
 
+`ai/instructions.ts` 是内置 AI 动作指令的唯一权威。每个 action 可以在 Extension Preferences 中保存一个局部 override；空 override 使用默认。公共行为约束仍由代码统一附加，避免每个 Provider 维护另一套 system prompt。
+
 ### 4.7 Prompt Lint
 
 本地 deterministic lint 不依赖 AI。AI semantic lint 只有用户显式触发时调用。
@@ -163,14 +178,18 @@ AND completionEnabled = true
 
 默认 `completionEnabled=false`。修改 Provider / Model / Base URL / API Key 后，连接状态和补全开关必须失效，避免对未经重新确认的端点自动发请求。
 
+补全上下文和触发延迟属于行为偏好，不属于 Provider 身份；改变它们或 action instruction override 不要求重新验证连接。
+
 ### 5.2 热路径
 
 当前实现原则：
 
-- caret 前最多取有限上下文，不发送无限增长全文；
-- 编辑停顿约 750ms 后才请求；
+- caret 前只发送 `completionContextChars` 指定的有限上下文；默认 320 字符；快捷预设 160 / 320 / 640，也允许 16–2000 的自定义整数；
+- 编辑停顿 `completionDelayMs` 后才请求；默认 300ms；快捷预设 150 / 300 / 600ms，也允许 50–3000ms 的自定义整数；
+- preset 只是 UI 快捷选择，持久状态只保存最终整数，禁止维护第二套 preset/customValue 业务状态；
 - 继续输入/移动 caret 时取消旧请求；
-- Provider 请求使用短输出上限；
+- 相同上下文允许短期小容量复用，避免无意义重复请求；
+- Provider 请求保持短 continuation；
 - 失败后短暂退避，避免连续失败造成请求风暴；
 - 过期结果不得显示；
 - ghost text 不触发 autosave / Compiler / revision。
@@ -194,6 +213,9 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 
 - AI enabled；
 - completionEnabled；
+- completionContextChars；
+- completionDelayMs；
+- instructionOverrides；
 - Provider；
 - Model；
 - Base URL；
@@ -207,7 +229,8 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 - AI suggestions；
 - 当前 selection；
 - ghost completion；
-- UI 打开/关闭状态。
+- UI 打开/关闭状态；
+- “自定义”输入编辑中的临时文本。
 
 临时状态不得反向成为正文源。
 
@@ -222,7 +245,8 @@ Ghost completion 使用 ProseMirror Plugin state + Decoration.widget：
 - Lint 关闭时仍重跑 Lint；
 - ghost decoration 变化触发正文保存；
 - 每次键入立即发补全请求；
-- 多个过期补全请求并发堆积。
+- 多个过期补全请求并发堆积；
+- 明明配置了短上下文却仍向 Provider 发送更长上下文。
 
 AI 配置保存和正文 autosave 是不同语义，不得共享 revision 或对象。
 
@@ -264,6 +288,8 @@ V1 优先覆盖：
 - PromptSection / Slash Menu / block conversion；
 - Repository 与 AI preferences；
 - Provider HTTP / transport / timeout / cancellation；
+- AI action instruction override 与默认公共约束组合；
+- 自定义补全参数持久化、非法历史值回退；
 - Suggestion 接受/忽略/revision guard；
 - Ghost completion：默认偏好关闭、Tab 接受、Esc 忽略、doc change 失效、前导空格；
 - Chrome / Edge 真实 Side Panel 主链。
