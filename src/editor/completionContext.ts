@@ -7,6 +7,7 @@ export interface EditorCompletionContext {
   documentVersion: number
   position: number
   blockStart: number
+  contextChars: number
   beforeText: string
   afterText: string
   sectionKind: SectionKind | null
@@ -49,6 +50,7 @@ export function buildEditorCompletionContext(
     options.documentVersion,
     blockStart,
     selection.from,
+    options.maxChars,
     sectionKind ?? '',
     beforeText,
     afterText,
@@ -60,6 +62,7 @@ export function buildEditorCompletionContext(
     documentVersion: options.documentVersion,
     position: selection.from,
     blockStart,
+    contextChars: options.maxChars,
     beforeText,
     afterText,
     sectionKind,
