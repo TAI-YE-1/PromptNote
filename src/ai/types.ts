@@ -1,5 +1,7 @@
 export type AiProviderId = 'openai-compatible' | 'anthropic'
 export type AiScope = 'selection' | 'context'
+export type CompletionContextChars = 160 | 320 | 640
+export type CompletionDelayMs = 150 | 300 | 600
 export type AiAction =
   | 'clarify'
   | 'shorten'
@@ -14,6 +16,8 @@ export interface AiSettings {
   enabled: boolean
   configured: boolean
   completionEnabled: boolean
+  completionContextChars: CompletionContextChars
+  completionDelayMs: CompletionDelayMs
   provider: AiProviderId
   model: string
   baseUrl: string
