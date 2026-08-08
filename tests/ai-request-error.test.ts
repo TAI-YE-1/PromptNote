@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiRequestError, getAiProvider } from '../src/ai/provider'
 import type { AiSettings } from '../src/ai/types'
 
