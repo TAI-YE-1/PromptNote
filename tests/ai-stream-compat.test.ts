@@ -51,6 +51,28 @@ describe('OpenAI-compatible streaming compatibility', () => {
     expect(partials).toEqual(['继续'])
   })
 
+  it('falls back to JSON when a gateway labels a non-stream response as event-stream', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ choices: [{ message: { content: '普通 JSON 补全' } }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+      ),
+    )
+
+    const partials: string[] = []
+    await expect(
+      getAiProvider(settings('mislabeled-json')).streamCompletion(
+        settings('mislabeled-json'),
+        { action: 'complete', content: '现有较长文本' },
+        (text) => partials.push(text),
+      ),
+    ).resolves.toBe('普通 JSON 补全')
+    expect(partials).toEqual(['普通 JSON 补全'])
+  })
+
   it('does not disable streaming for every model after one model rejects stream=true', async () => {
     const fetchMock = vi
       .fn()
