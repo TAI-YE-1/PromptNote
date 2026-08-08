@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  PromptEditor,
-  type EditorCompletionContext,
-  type EditorSelectionSnapshot,
-  type PromptEditorHandle,
+import { PromptEditor } from '../editor/LazyPromptEditor'
+import type {
+  EditorCompletionContext,
+  EditorSelectionSnapshot,
+  PromptEditorHandle,
 } from '../editor/PromptEditor'
 import { compilePrompt, type CompileFormat } from '../prompt/compiler'
 import {
@@ -29,10 +29,11 @@ import {
   DocumentSheet,
   LintCard,
   Preview,
-  SelectionContextMenu,
+  SelectionActionBar,
   SlashMenu,
   SuggestionCard,
 } from '../ui/components'
+import { resolveImportedDocument } from './importDocument'
 import { useInlineCompletion } from './useInlineCompletion'
 
 const promptRepository = new ChromePromptRepository()
@@ -43,6 +44,7 @@ type AiPanel = 'menu' | 'settings' | null
 
 export function PromptNoteApp() {
   const editorRef = useRef<PromptEditorHandle | null>(null)
+  const currentRef = useRef<PromptDocument | null>(null)
   const deletedDocumentIds = useRef(new Set<string>())
   const [documents, setDocuments] = useState<PromptDocument[]>([])
   const [current, setCurrent] = useState<PromptDocument | null>(null)
@@ -64,6 +66,7 @@ export function PromptNoteApp() {
   const [aiTestState, setAiTestState] = useState<'idle' | 'ok' | 'error'>('idle')
   const [aiError, setAiError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  currentRef.current = current
 
   const handleCompletionError = useCallback((message: string | null) => {
     setAiError(message)
@@ -158,9 +161,13 @@ export function PromptNoteApp() {
     if (deletedDocumentIds.current.has(document.id)) return
     try {
       await promptRepository.save(document)
-      setSaveState('saved')
-      setDocuments((previous) => upsertDocument(previous, document))
+      const latest = currentRef.current
+      const superseded =
+        latest?.id === document.id && latest.revision > document.revision
+      if (!superseded) setDocuments((previous) => upsertDocument(previous, document))
+      if (isSameDocumentVersion(latest, document)) setSaveState('saved')
     } catch (saveError) {
+      if (!isSameDocumentVersion(currentRef.current, document)) return
       setSaveState('error')
       setError(`保存失败：${messageOf(saveError)}`)
     }
@@ -271,25 +278,14 @@ export function PromptNoteApp() {
       const backup = parsePromptDocumentExport(raw)
       await flushCurrent()
 
-      let imported = backup.document
-      const existing = await promptRepository.get(imported.id)
-      if (existing) {
-        const overwrite = window.confirm(
-          `本地已存在同 ID 的“${existing.title || '未命名 Prompt'}”。确定覆盖它吗？\n\n取消则会作为一个新的导入副本保存。`,
-        )
-        if (!overwrite) {
-          const now = new Date().toISOString()
-          imported = {
-            ...imported,
-            id: crypto.randomUUID(),
-            title: `${imported.title || '未命名 Prompt'}（导入）`,
-            revision: imported.revision + 1,
-            updatedAt: now,
-          }
-        } else {
-          deletedDocumentIds.current.delete(imported.id)
-        }
-      }
+      const existing = await promptRepository.get(backup.document.id)
+      const overwrite = existing
+        ? window.confirm(
+            `本地已存在同 ID 的“${existing.title || '未命名 Prompt'}”。确定覆盖它吗？\n\n取消则会作为一个新的导入副本保存。`,
+          )
+        : false
+      const imported = resolveImportedDocument(backup.document, existing, overwrite)
+      if (overwrite) deletedDocumentIds.current.delete(imported.id)
 
       await promptRepository.save(imported)
       await promptRepository.setCurrentId(imported.id)
@@ -513,7 +509,7 @@ export function PromptNoteApp() {
               />
               {slashOpen && <SlashMenu onClose={() => setSlashOpen(false)} onInsert={(kind) => { editorRef.current?.insertSection(kind); setSlashOpen(false) }} />}
               {selection && !aiBusy && (
-                <SelectionContextMenu
+                <SelectionActionBar
                   selection={selection}
                   onAction={(action) => void runSelectionAi(action)}
                   onMore={() => openAi(false)}
@@ -576,10 +572,31 @@ export function PromptNoteApp() {
   )
 }
 
+function isSameDocumentVersion(
+  left: PromptDocument | null,
+  right: PromptDocument,
+): boolean {
+  return left?.id === right.id && left.revision === right.revision
+}
+
 function upsertDocument(documents: PromptDocument[], document: PromptDocument): PromptDocument[] {
-  return [...documents.filter((item) => item.id !== document.id), document].sort((left, right) =>
-    right.updatedAt.localeCompare(left.updatedAt),
-  )
+  const existing = documents.find((item) => item.id === document.id)
+  if (
+    existing &&
+    (existing.revision > document.revision ||
+      (existing.revision === document.revision && existing.updatedAt >= document.updatedAt))
+  ) {
+    return documents
+  }
+
+  const withoutCurrent = documents.filter((item) => item.id !== document.id)
+  const insertAt = withoutCurrent.findIndex((item) => item.updatedAt < document.updatedAt)
+  if (insertAt < 0) return [...withoutCurrent, document]
+  return [
+    ...withoutCurrent.slice(0, insertAt),
+    document,
+    ...withoutCurrent.slice(insertAt),
+  ]
 }
 
 function validateAiSettings(settings: AiSettings) {
