@@ -36,6 +36,8 @@ PromptNote V1 不再向第三方网页输入框写入内容。Copy 是稳定、�
 
 选区操作不得依赖文字旁边的微型 `•••`、浏览器 DOM selection 的临时坐标或必须先点一次才能展开的二级入口。窄 Side Panel 中“能稳定出现、能直接点击”优先于追求贴着文字的浮动效果。
 
+TipTap/ProseMirror 编辑器运行时可以在 Side Panel 外壳完成首屏后按需加载，以减少首屏同步解析；加载期间只允许显示轻量加载状态。lazy-load 只能改变模块加载时机，PromptDocument、当前文档、保存状态和 Editor ref 仍必须保持单一应用状态源。
+
 ### 2.2 Slash Menu
 
 输入 `/` 后提供结构块与常用文档块。
@@ -268,7 +270,11 @@ AI 设置和本地 Prompt 管理不是首屏编辑所需能力，可以按用户
 
 用户关闭 Side Panel、刷新页面、重启浏览器后应能恢复最近编辑内容。保存失败必须可见，不能假装成功。
 
-同一 Prompt 的 revision 必须单调；更旧 revision 的异步保存不得覆盖已经持久化的更新 revision。
+同一 Prompt 的 revision 必须单调；更旧 revision 的异步保存不得覆盖已经持久化的更新 revision。顶部“已保存”只允许表示**当前编辑中的最新 document id + revision**已经成功持久化；旧 revision 的晚到成功回调不得把仍在编辑的新 revision 错标为“已保存”，也不得把文档列表回退到旧快照。
+
+从电脑恢复备份时，如果备份与本地文档同 ID，用户明确选择“覆盖”必须产生一个高于本地与备份双方的更新 revision，再写入 Repository；不能被旧 revision 防回退规则静默拒绝。即使 document id 没变，覆盖后的外部内容也必须立即替换当前 Editor；普通本地键入则不得因此触发整份 Editor `setContent()` 重灌。
+
+如果用户拒绝同 ID 覆盖，导入副本必须使用新 id，并保持与原文档相互独立。
 
 ghost completion、AI suggestion、lint findings、Preview 都是派生/临时状态，不得成为持久正文源。
 
