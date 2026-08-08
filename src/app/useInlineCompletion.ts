@@ -21,7 +21,7 @@ const TRANSIENT_REPORT_AFTER = 3
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
-  onError(message: string | null): void
+  onError(message: string): void
 }
 
 export function useInlineCompletion(
@@ -47,13 +47,10 @@ export function useInlineCompletion(
     retryAtRef.current = 0
     lastRequestStartedAtRef.current = 0
     transientFailureCountRef.current = 0
+    lastReportedErrorRef.current = null
     cacheRef.current.clear()
     setCompletion(null)
-    if (lastReportedErrorRef.current) {
-      lastReportedErrorRef.current = null
-      input.onError(null)
-    }
-  }, [input.onError, settingsKey])
+  }, [settingsKey])
 
   useEffect(() => {
     setCompletion(null)
@@ -88,12 +85,10 @@ export function useInlineCompletion(
     let pendingPartial: string | null = null
     let lastRendered: string | null = null
 
-    const clearReportedError = () => {
+    const markRecovered = () => {
       transientFailureCountRef.current = 0
       retryAtRef.current = 0
-      if (!lastReportedErrorRef.current) return
       lastReportedErrorRef.current = null
-      input.onError(null)
     }
 
     const flushPartial = () => {
@@ -132,7 +127,7 @@ export function useInlineCompletion(
               const normalized = normalizeCompletion(partial, contextSnapshot.beforeText)
               if (!normalized) return
               lastUsablePartial = normalized
-              clearReportedError()
+              markRecovered()
               queuePartial(normalized)
             },
             controller.signal,
@@ -142,14 +137,14 @@ export function useInlineCompletion(
           const normalized = normalizeCompletion(result, contextSnapshot.beforeText)
           if (!normalized) return
 
-          clearReportedError()
+          markRecovered()
           pendingPartial = normalized
           flushPartial()
           cacheCompletion(cacheRef.current, requestKey, normalized)
         } catch (error) {
           if (!isCurrentRequest(controller, requestSequenceRef, requestSequence, currentContextKeyRef, contextSnapshot.key)) return
           if (lastUsablePartial) {
-            clearReportedError()
+            markRecovered()
             pendingPartial = lastUsablePartial
             flushPartial()
             cacheCompletion(cacheRef.current, requestKey, lastUsablePartial)
