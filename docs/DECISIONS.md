@@ -342,6 +342,34 @@ PromptNote 的核心价值是“舒服地写、整理和检查 Prompt”，而�
 
 ---
 
+## D020 — 内联补全将“用户停顿”与“网络请求”分开治理
+
+**状态：Accepted**
+
+### 决定
+
+`completionDelayMs` 只表示 caret 需要稳定多久才具备请求资格，不再等价于“每次停顿都可以立即向 Provider 发一个新请求”。真实 Provider 请求另有 cadence 和错误恢复规则：
+
+- 相邻网络请求存在独立最小启动间隔；
+- IME composition/组词期间不发布 completion context；
+- 短时 429、5xx、timeout、transport failure 在原 context 仍有效时有限次指数退避自动恢复，并尊重 `Retry-After`；
+- 用户继续输入、移动 caret 或产生新 context 时，旧请求与旧 retry 一并取消；
+- 单次短时错误不直接升级为“AI 补全不可用”；连续自动恢复失败后才提示；
+- 认证、配置、额度/配额耗尽等持久错误不进行无限重试，必须保留真实错误。
+
+### 原因
+
+较长中文句子包含自然停顿和输入法 composition。如果把“300ms 没打字”直接映射为新的网络请求，会在正常写作过程中制造请求风暴；即使浏览器随后 Abort，远端 Provider 也不一定已经停止处理这些请求。结果表现为文本越长越容易出现 429/5xx，用户看到的却只是笼统“补全不可用”。
+
+### 影响
+
+- `ai/completionTuning.ts` 成为 completion delay、request cadence、retry policy 的唯一数值权威；
+- Provider 错误必须能区分 transient/persistent，并保留 HTTP status / Retry-After 等必要元数据；
+- 不允许用“把 debounce 调大”代替 cadence 治理，也不允许用“隐藏 toast”代替真正的自动恢复；
+- Chrome 真机验收必须包含中文 IME 连续输入约 40–100 字、多个自然停顿后的补全稳定性。
+
+---
+
 ## 决策变更规则
 
 如果要推翻 Accepted 决策：
