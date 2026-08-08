@@ -26,7 +26,7 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - 全局 AI：歧义检查、验收标准、结构建议；
 - source revision 过期建议保护；
 - 独立 opt-in 的编辑器内联补全：灰色 ghost text、Tab 接受、Esc 忽略；
-- completion 可配置上下文/延迟/独立补全模型，支持 streaming-first、旧请求取消、短退避；
+- completion 可配置上下文/延迟/独立补全模型，支持 streaming-first、旧请求取消、独立网络 cadence、IME composition 抑制和 transient error 自动恢复；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 **Web Insert 已从 V1 删除。** PromptNote 不再向 ChatGPT/Claude/Gemini 等网页输入框注入内容，也没有 Web Adapter/content script/page bridge。外部交付统一使用 Copy。
@@ -114,15 +114,18 @@ AND 编辑器内联补全已开启
 开启后：
 
 - 光标停顿到用户配置的触发延迟后，可出现灰色 ghost text；默认 300ms，可选 150/300/600ms 或自定义 50–3000ms；
+- “停顿多久”只决定何时具备请求资格，真实 Provider 请求另有独立最小间隔，避免较长句子中多个自然停顿形成请求风暴；
+- 中文、日文等输入法仍在组词/composition 时不会触发补全，输入法提交稳定正文后才重新建立 context；
 - 当前块上下文默认 320 字符，可选 160/320/640 或自定义 16–2000；实际值从设置显式贯穿 Editor；
 - caret 位于块首、块中、块尾时都使用当前 text block 的局部 before/after 上下文，不跨语义块拼正文；
 - Provider 支持 streaming 时，首批有效文本尽快显示；连续 partial 在短窗口合并 UI 刷新，避免每个 token 重渲染整页；
 - 可单独指定低延迟“补全模型”，留空沿用主 Model；
 - `Tab` 接受；
 - `Esc` 忽略；
-- 继续输入、移动光标、切块或改变 context budget 会使旧补全失效；
-- 过期请求会取消；
-- Provider 失败后短退避，不连续刷请求；
+- 继续输入、移动光标、切块或改变 context budget 会使旧补全和旧 retry 失效；
+- 短时 429、5xx、timeout 或网络抖动会在原 caret/context 仍有效时有限次自动退避恢复，并尊重 Provider 的 `Retry-After`；
+- 单次短时错误不会立即弹“AI 补全暂不可用”；连续自动恢复失败后才升级提示；
+- 认证、配置、额度/配额耗尽等持久错误不会无限重试，会保留真实错误供 AI 设置检查；
 - ghost text 不属于 PromptDocument，不自动保存、不进入 Compiler；
 - 只有接受后才成为真实正文。
 
@@ -133,7 +136,7 @@ AND 编辑器内联补全已开启
 - API Key 与 PromptDocument 分离，保存在扩展本地设置；
 - `chrome.storage.local` 不是加密保险库；
 - 普通 selection/global AI 动作只有用户显式触发时才发送内容；
-- 只有用户额外开启补全后，编辑停顿才会自动请求短 continuation；
+- 只有用户额外开启补全后，编辑停顿且不处于 IME composition 时才可能自动请求短 continuation；
 - 补全只使用当前 text block 内、受用户 context budget 限制的局部上下文；
 - AI 未配置、关闭或失败不影响编辑、保存、本地 lint、Compiler、Preview、Copy；
 - AI Provider 网络错误和 30 秒超时不会伪装成功。
@@ -159,8 +162,10 @@ Preview 可以显式选择 Plain / Markdown / XML，并复制当前格式。
 - 检查关闭时不每次键入运行 lint；
 - Preview 关闭时不每次键入编译；
 - ghost decoration 不触发正文保存；
-- completion 防抖、Abort 旧请求、短退避；streaming partial 约每 48ms 合并 UI 刷新；
-- streaming capability 按 Provider + endpoint + completion model 隔离，并兼容 SSE keep-alive；
+- completion 的 idle debounce 与真实网络 cadence 分离；IME composition 不请求；旧 request/retry 可取消；
+- transient Provider failure 使用有限指数退避，persistent failure 不无限重试；
+- streaming partial 约每 48ms 合并 UI 刷新；
+- streaming capability 按 Provider + endpoint + completion model 隔离且缓存有界，并兼容 SSE keep-alive；
 - AI Settings 与本地 Prompt Sheet 只有打开时才 lazy-load；
 - 不存在网页 bridge/content script 常驻开销。
 
