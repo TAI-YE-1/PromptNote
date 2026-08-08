@@ -10,6 +10,10 @@ export const COMPLETION_DELAY_MAX_MS = 3_000
 // This separate floor controls how frequently real network requests may start while
 // a user is composing a longer sentence with natural pauses between keystrokes.
 export const COMPLETION_REQUEST_MIN_INTERVAL_MS = 1_200
+export const COMPLETION_TRANSIENT_BACKOFF_BASE_MS = 1_500
+export const COMPLETION_TRANSIENT_BACKOFF_MAX_MS = 12_000
+export const COMPLETION_TRANSIENT_AUTO_RETRY_LIMIT = 3
+export const COMPLETION_PERSISTENT_FAILURE_BACKOFF_MS = 30_000
 
 export const COMPLETION_CONTEXT_PRESETS = [160, 320, 640] as const
 export const COMPLETION_DELAY_PRESETS = [150, 300, 600] as const
@@ -44,4 +48,15 @@ export function computeCompletionStartDelayMs(options: {
     : 0
   const retryWait = Math.max(0, options.retryAtMs - options.nowMs)
   return Math.max(options.configuredDelayMs, cadenceWait, retryWait)
+}
+
+export function computeCompletionTransientRetryDelayMs(
+  failureCount: number,
+  providerRetryAfterMs: number | null,
+): number {
+  const exponentialBackoff = Math.min(
+    COMPLETION_TRANSIENT_BACKOFF_BASE_MS * 2 ** Math.max(0, failureCount - 1),
+    COMPLETION_TRANSIENT_BACKOFF_MAX_MS,
+  )
+  return Math.max(exponentialBackoff, providerRetryAfterMs ?? 0)
 }
