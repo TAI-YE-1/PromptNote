@@ -30,3 +30,16 @@ jobs:
         run: npm test
       - name: Build extension
         run: npm run build
+      - name: Package release artifact
+        if: github.event_name == 'push'
+        run: |
+          cd dist
+          zip -qr ../promptnote-1.0.0.zip .
+      - name: Upload release artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptnote-1.0.0
+          path: promptnote-1.0.0.zip
+          if-no-files-found: error
+          retention-days: 30
