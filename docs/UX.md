@@ -36,11 +36,16 @@ PromptNote V1 不再向第三方网页输入框写入内容。Copy 是稳定、�
 
 选区操作不得依赖文字旁边的微型 `•••`、浏览器 DOM selection 的临时坐标或必须先点一次才能展开的二级入口。窄 Side Panel 中“能稳定出现、能直接点击”优先于追求贴着文字的浮动效果。
 
-TipTap/ProseMirror 编辑器运行时可以在 Side Panel 外壳完成首屏后按需加载，以减少首屏同步解析；加载期间只允许显示轻量加载状态。lazy-load 只能改变模块加载时机，PromptDocument、当前文档、保存状态和 Editor ref 仍必须保持单一应用状态源。
+TipTap/ProseMirror `PromptEditor` 在 V1 中保持同步打包。2026-08-08 的真实 Chrome 验证证明，对 Editor 运行时使用 `React.lazy + dynamic import()` 会造成 Side Panel 短暂显示后白屏，因此该拆分已撤销。AI 设置与本地 Prompt 管理 Sheet 仍可按用户打开时异步加载，但任何 lazy boundary 都不得复制 PromptDocument、设置或保存状态。
 
 ### 2.2 Slash Menu
 
-输入 `/` 后提供结构块与常用文档块。
+`/` 是上下文 Slash Command，而不是全局拦截字符：
+
+- caret 为空选区，且位于文本块/行首，或前一个字符为空白时输入 `/` → 打开结构菜单；
+- URL、日期、路径、`A/B` 等正文中的 `/` → 作为普通字符输入，不打开菜单；
+- 菜单支持 `↑` / `↓`、`Home` / `End`、`Enter`；
+- 菜单打开后按 `Esc` → 关闭菜单并把该 `/` 作为普通字符写回原 caret。
 
 V1 Prompt 语义块：
 
@@ -281,7 +286,7 @@ ghost completion、AI suggestion、lint findings、Preview 都是派生/临时�
 ## 8. 可用性底线
 
 - 核心操作必须支持键盘；
-- Side Panel 窄宽度下仍可使用；
+- Side Panel 在浏览器实际允许的窄宽度下仍可使用；V1 Chrome 真机已验证约 382px；
 - 不依赖 hover 才能发现关键能力；
 - 错误信息描述真实失败原因，不使用假成功；
 - 用户内容删除需要明确动作；
