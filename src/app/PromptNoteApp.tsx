@@ -507,7 +507,19 @@ export function PromptNoteApp() {
                 onCompletionContext={setCompletionContext}
                 onSlashRequest={() => { setSlashOpen(true); setSelection(null) }}
               />
-              {slashOpen && <SlashMenu onClose={() => setSlashOpen(false)} onInsert={(kind) => { editorRef.current?.insertSection(kind); setSlashOpen(false) }} />}
+              {slashOpen && (
+                <SlashMenu
+                  onClose={() => setSlashOpen(false)}
+                  onEscape={() => {
+                    editorRef.current?.insertText('/')
+                    setSlashOpen(false)
+                  }}
+                  onInsert={(kind) => {
+                    editorRef.current?.insertSection(kind)
+                    setSlashOpen(false)
+                  }}
+                />
+              )}
               {selection && !aiBusy && (
                 <SelectionActionBar
                   selection={selection}

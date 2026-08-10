@@ -19,12 +19,14 @@ import {
   createBlockConversionTransaction,
   type EditableBlockFormat,
 } from './blockConversion'
+import { shouldOpenSlashMenu } from './slashCommand'
 
 export type { EditorCompletionContext } from './completionContext'
 export type { EditorSelectionSnapshot } from './selectionSnapshot'
 
 export interface PromptEditorHandle {
   insertSection(kind: SectionKind, text?: string): void
+  insertText(text: string): void
   replaceRange(from: number, to: number, text: string): void
   appendSection(kind: SectionKind, text: string): void
   convertSelectedBlock(format: EditableBlockFormat): void
@@ -60,8 +62,17 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     content: props.content as JSONContent,
     editorProps: {
       attributes: { class: 'prompt-editor__content', spellcheck: 'false' },
-      handleKeyDown: (_view, event) => {
-        if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      handleKeyDown: (view, event) => {
+        const slashCommandRequested =
+          event.key === '/' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.isComposing &&
+          !view.composing &&
+          shouldOpenSlashMenu(view.state)
+
+        if (slashCommandRequested) {
           event.preventDefault()
           props.onSlashRequest()
           return true
@@ -180,6 +191,9 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
             content: text ? [{ type: 'text', text }] : [],
           })
           .run()
+      },
+      insertText(text) {
+        editor?.chain().focus().insertContent(text).run()
       },
       replaceRange(from, to, text) {
         editor?.chain().focus().insertContentAt({ from, to }, text).run()

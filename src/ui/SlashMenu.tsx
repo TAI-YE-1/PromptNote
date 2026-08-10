@@ -11,7 +11,13 @@ export function nextSlashMenuIndex(currentIndex: number, key: string, itemCount:
   return currentIndex
 }
 
-export function SlashMenu(props: { onClose(): void; onInsert(kind: SectionKind): void }) {
+interface SlashMenuProps {
+  onClose(): void
+  onEscape?(): void
+  onInsert(kind: SectionKind): void
+}
+
+export function SlashMenu(props: SlashMenuProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -31,7 +37,8 @@ export function SlashMenu(props: { onClose(): void; onInsert(kind: SectionKind):
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
-      props.onClose()
+      const handleEscape = props.onEscape ?? props.onClose
+      handleEscape()
       return
     }
 
