@@ -28,6 +28,10 @@ PromptNote 1.0.0 是第一个面向普通用户发布的稳定版本。
 
 完整说明见根目录 `PRIVACY.md`。
 
+## 开源许可
+
+PromptNote 源码采用 Mozilla Public License 2.0（MPL-2.0）发布，完整条款见根目录 `LICENSE`。第三方依赖继续遵循各自许可证。
+
 ## 已知限制
 
 - 当前没有账号、云同步或多设备同步；
