@@ -1,5 +1,7 @@
 # PromptNote / 提词笺
 
+<img src="docs/store-assets/icon-300.png" alt="PromptNote" width="120">
+
 > 像写文档一样写 Prompt。
 
 PromptNote 是一款本地优先的 Chrome / Edge Side Panel Prompt 编辑器。你可以像写普通文档一样组织 Prompt，不需要先学习 Markdown、XML 或复杂的 Prompt Engineering 语法。

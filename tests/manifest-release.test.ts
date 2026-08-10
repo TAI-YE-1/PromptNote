@@ -16,6 +16,19 @@ describe('release manifest', () => {
     expect(manifest.optional_host_permissions).not.toContain('http://*/*')
   })
 
+  it('ships the PromptNote brand icon for extension and toolbar surfaces', () => {
+    expect(manifest.icons).toEqual({
+      '16': 'icons/icon-16.png',
+      '32': 'icons/icon-32.png',
+      '48': 'icons/icon-48.png',
+      '128': 'icons/icon-128.png',
+    })
+    expect(manifest.action.default_icon).toEqual({
+      '16': 'icons/icon-16.png',
+      '32': 'icons/icon-32.png',
+    })
+  })
+
   it('keeps the store short description concise', () => {
     expect(manifest.description.length).toBeGreaterThan(20)
     expect(manifest.description.length).toBeLessThanOrEqual(132)
