@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "PromptNote / 提词笺",
+  "short_name": "PromptNote",
+  "version": "1.0.0",
+  "description": "像写文档一样写 Prompt。支持结构化、检查、预览和可选 AI 辅助。",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "sidePanel"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "homepage_url": "https://github.com/TAI-YE-1/PromptNote",
+  "action": {
+    "default_title": "打开 PromptNote"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}
