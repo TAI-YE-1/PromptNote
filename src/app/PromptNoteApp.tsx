@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PromptEditor } from '../editor/LazyPromptEditor'
+import { PromptEditor } from '../editor/PromptEditor'
 import type {
   EditorCompletionContext,
   EditorSelectionSnapshot,
