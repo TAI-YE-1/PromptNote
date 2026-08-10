@@ -66,9 +66,9 @@ src/
 │  ├─ importDocument.ts
 │  └─ useInlineCompletion.ts
 ├─ editor/
-│  ├─ LazyPromptEditor.tsx   # TipTap/ProseMirror 运行时按需加载边界
 │  ├─ PromptEditor.tsx
 │  ├─ promptSection.ts
+│  ├─ slashCommand.ts
 │  ├─ completionContext.ts
 │  ├─ ghostCompletion.ts
 │  ├─ selectionSnapshot.ts
@@ -104,7 +104,7 @@ src/
 └─ main.tsx
 ```
 
-文件拆分按真实职责，不为“架构感”制造空 wrapper；`components.tsx` 只保留稳定聚合入口，避免再次退化成巨型 UI 文件。已经被替代的 `SelectionContextMenu`、viewport rect 定位和独立 floating-panel stylesheet 不得以别名或兼容导出的形式残留为平行旧链。
+文件拆分按真实职责，不为“架构感”制造空 wrapper；`components.tsx` 只保留稳定聚合入口，避免再次退化成巨型 UI 文件。已经被替代的 `SelectionContextMenu`、`LazyPromptEditor`、viewport rect 定位和独立 floating-panel stylesheet 不得以别名、re-export 或兼容导出的形式残留为平行旧链。
 
 ## 4. 依赖方向
 
@@ -116,9 +116,11 @@ src/
 
 ### 4.2 Editor 层
 
-`editor/` 负责 TipTap Extension、Slash Menu、编辑命令、选区、语义块转换和 ghost completion decoration。
+`editor/` 负责 TipTap Extension、Slash 触发判定、编辑命令、选区、语义块转换和 ghost completion decoration。
 
 Editor 不直接读写 Storage，也不直接调用 Provider。`completionContext.ts` 负责从当前 EditorState 产生补全 context identity；ghost completion 只接收已经绑定到该 identity 的短字符串并负责显示、失效、`Tab` 接受、`Esc` 忽略。
+
+Slash Command 的触发只依赖当前 ProseMirror selection 与当前 text block 上下文。`slashCommand.ts` 是纯判定逻辑：仅空选区且位于块/行首或前一字符为空白时拦截 `/`；URL、日期、路径、`A/B` 等普通正文保留 `/`。菜单取消时由真实 Editor command 在原 caret 写回 `/`，不建立第二正文状态。
 
 补全 context 必须至少绑定：document id、editor document generation、当前 block 起点、caret position、用户当前 `completionContextChars`、当前 block 的光标前/后文本和 section kind。AI 返回结果不得在到达时重新读取“当前 selection”决定位置。
 
@@ -204,16 +206,23 @@ Streaming capability cache 必须至少区分 provider + endpoint + 实际 compl
 
 本地 deterministic lint 不依赖 AI。AI semantic lint 只有用户显式触发时调用。
 
-### 4.8 Lazy runtime boundaries
+### 4.8 Runtime loading boundaries
 
-AI 设置 Sheet、本地 Prompt 管理 Sheet 和 TipTap/ProseMirror 编辑器运行时都允许通过 `React.lazy`/dynamic import 拆分。
+V1 对运行时拆分采取“真实浏览器稳定性优先”策略：
 
-- Sheet 只在用户打开时加载；
-- Editor chunk 在 Side Panel shell/应用状态加载后异步获取；
-- lazy boundary 只改变代码加载时机，不复制 AI settings、Prompt list、PromptDocument、save state 或 Editor 业务状态；
-- Editor wrapper 只负责 `Suspense + ref` 转发，不创建第二 Editor 实现。
+- AI Settings / Document Sheet 不是首屏必需，可继续通过 `React.lazy`/dynamic import 按用户打开时加载；
+- TipTap/ProseMirror `PromptEditor` **同步打包**，不再保留 `LazyPromptEditor` wrapper；
+- 2026-08-08 的真实 Chrome 测试证明 Editor runtime lazy split 会导致 Side Panel 短暂显示后白屏，尽管 TypeScript、单测与 production build 全部通过；
+- D023 supersede D022 中仅与 Editor runtime lazy split 有关的决定，不改变 D022 的 revision ownership、导入覆盖和 object identity 规则；
+- Vite `>500KB` warning 明确保留，不通过提高 warning limit 掩盖。
 
-当前真实构建由原单一 `sidepanel` 约 616.97 kB（gzip 195.41 kB）拆为约 228.57 kB（gzip 73.72 kB）的同步 shell 与约 388.80 kB（gzip 122.57 kB）的异步 PromptEditor chunk。该变化表示**首屏同步解析体积下降**，不等同于总 JavaScript 删除 63%。Vite `>500KB` warning 因真实拆包自然消失，未修改 warning limit；最终用户体感仍需真实 Chrome/Edge 验收。
+当前 V1 验收前生产构建约为：
+
+```text
+sidepanel 619.68 kB / gzip 196.27 kB
+```
+
+这不是继续优化的禁止线；后续性能工作仍应基于真实启动/输入 profile、依赖体积与可验证瓶颈，而不是再次为了消除 warning 冒险拆 Editor runtime。
 
 ## 5. 内联补全架构
 
@@ -371,7 +380,7 @@ AI busy > suggestion > lint > selection action bar
 - 短时 Provider 抖动立即升级为全局不可用；
 - 持久错误给后续全新 context 人为添加 cooldown；
 - 把旧 partial/ghost 留在失焦/composing Editor；
-- 首屏同步加载可拆分的大型 Editor/Sheet 运行时代码。
+- 把已经由真实浏览器证明不稳定的 Editor runtime lazy split 当成消除 bundle warning 的默认手段。
 
 AI 配置保存和正文 autosave 是不同语义，不得共享 revision 或对象。
 
@@ -410,7 +419,7 @@ sidePanel
 V1 优先覆盖：
 
 - Schema / Compiler；
-- PromptSection / Slash Menu / block conversion；
+- PromptSection / contextual Slash Menu / block conversion；
 - Repository、revision 单调性、启动批量读取与 AI preferences；
 - 同 ID 导入冲突：覆盖时 revision rebase，拒绝覆盖时新 id；
 - Editor 同 ID 外部 content replacement 与本地输入不重灌；
@@ -424,7 +433,7 @@ V1 优先覆盖：
 - Selection snapshot；
 - Completion context bounded scan；
 - Ghost completion；
-- Chrome / Edge 真实主链，并增加 Editor lazy chunk 首次加载、快速连续编辑 save badge、同 ID 备份覆盖立即刷新 Editor 的 smoke。
+- Chrome / Edge 真实主链、浏览器实际窄宽、快速连续编辑 save badge、同 ID 备份覆盖立即刷新 Editor。
 
 Web Adapter 等退役链不保留测试。
 
@@ -439,6 +448,7 @@ Web Adapter 等退役链不保留测试。
 - 改变内联补全自动调用条件或从 block-local 改为跨 block 上下文；
 - 重新引入第三方网页 DOM 注入；
 - 重新引入 DOM selection/viewport rect 业务状态；
+- 重新引入 PromptEditor runtime lazy split；
 - 引入新的框架级依赖；
 - 跨模块职责迁移。
 
