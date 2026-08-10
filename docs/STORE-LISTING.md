@@ -1,6 +1,6 @@
 # PromptNote 1.0.0 浏览器商店文案
 
-用于 Chrome Web Store / Edge Add-ons 提交。正式提交时按商店字段长度要求微调，不改变产品事实。
+用于 Chrome Web Store / Edge Add-ons 提交。提交时可以按商店字段长度微调，但不得改变产品事实。
 
 ## 名称
 
@@ -27,9 +27,9 @@ PromptNote 是一款本地优先的 Side Panel Prompt 编辑器。
 - 用户主动开启的 IDE 风格内联补全，Tab 接受、Esc 忽略；
 - 支持用户自行配置 OpenAI-compatible / Anthropic Provider。
 
-PromptNote 不向 ChatGPT、Claude、Gemini 等第三方网页输入框自动注入内容，也不会自动发送 Prompt。
+PromptNote 不向第三方网页输入框自动注入内容，也不会自动发送 Prompt。
 
-V1.0 没有 PromptNote 自有账号、后端、云数据库、广告或第三方统计 SDK。Prompt 文档与扩展设置默认保存在浏览器本地。
+当前版本没有 PromptNote 自有账号、后端、云数据库、广告或第三方统计 SDK。Prompt 文档与扩展设置默认保存在浏览器本地。
 
 ## 单一用途说明
 
@@ -47,11 +47,11 @@ PromptNote 的单一用途是：在浏览器 Side Panel 中帮助用户编写、
 
 ### optional host permissions
 
-用户可以自行配置 AI Provider 的 API Base URL。只有用户使用对应 AI 功能时，PromptNote 才需要访问该 Provider 地址。
+用户可以自行配置 AI Provider 的 API Base URL。只有使用对应 AI 功能时，PromptNote 才需要访问该 Provider 地址。
 
 PromptNote 不使用 `activeTab`、`scripting` 或第三方网页 content script。
 
-## 数据使用声明要点
+## 数据使用声明
 
 - PromptNote 自身不收集、出售或共享用户数据用于广告；
 - 没有 PromptNote 自有遥测 / 分析服务器；

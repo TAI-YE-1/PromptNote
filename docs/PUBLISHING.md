@@ -1,25 +1,28 @@
-# PromptNote 1.0 发布清单
+# PromptNote 发布清单
 
-本文件只保留正式发行需要的操作，不记录 V1 开发过程。
+本文件只记录当前正式发行需要的操作。
 
-## 浏览器商店发布前
+## 发布前
 
-- Manifest 版本与发布版本一致；
+- 更新 `public/manifest.json` 的版本号；
+- 更新对应版本 Release Notes；
 - GitHub Actions 最新 `main` 构建通过；
-- 使用最新构建产物完成一次 Chrome / Edge smoke；
-- 隐私政策链接指向仓库根目录 `PRIVACY.md`；
-- 准备浏览器商店要求的图标、截图与宣传素材；
-- 明确项目源码许可证 / 授权方式；
-- 上传同一份构建产物，不从未验证的本地工作树临时打包。
+- 使用同一份构建产物完成 Chrome / Edge smoke；
+- 隐私政策指向根目录 `PRIVACY.md`；
+- 浏览器商店文案与实际权限、数据用途保持一致；
+- 准备商店要求的图标、截图与宣传素材；
+- 明确源码许可证 / 授权方式；
+- 只上传经过 CI 验证的发行包，不从未验证的本地工作树临时打包。
 
-## 当前 V1.0 技术边界
+## 当前技术边界
 
 - 固定权限：`storage`、`sidePanel`；
 - AI 网络地址使用 optional host permission；
 - 无 content script、`activeTab`、`scripting`；
-- 无 PromptNote 自有后端、账号或云同步；
-- PromptEditor 同步打包；Vite `>500KB` warning 当前为已知非阻塞项。
+- 无 PromptNote 自有后端、账号或云同步。
 
 ## 发布后
 
-正式版本发布后，新增功能或行为变化使用 GitHub Issue / PR 或新的明确实施计划追踪，不恢复已完成的 V1 开发任务账本。
+- 缺陷与需求使用 GitHub Issue / PR 或新的明确实施计划追踪；
+- 行为、权限、数据用途或 Schema 变化同步更新对应权威文档；
+- 发行包必须能追溯到明确 commit 和 CI run。
