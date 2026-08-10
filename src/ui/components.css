@@ -39,6 +39,26 @@ body:has(.suggestion-card) .lint-card--floating {
   display: none;
 }
 
+.title-input {
+  padding: 5px 7px;
+  border: 1px solid #edf0eb;
+  border-radius: 8px;
+  background: #f9faf7;
+  cursor: text;
+  transition: border-color .14s ease, background .14s ease, box-shadow .14s ease;
+}
+
+.title-input:hover {
+  border-color: #dbe3dc;
+  background: #f5f8f5;
+}
+
+.title-input:focus {
+  border-color: #aebfaf;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(49, 95, 71, .08);
+}
+
 .sheet-search {
   margin-top: 14px;
 }

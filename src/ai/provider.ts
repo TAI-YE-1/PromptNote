@@ -111,6 +111,35 @@ function responseError(response: Response, text: string): AiRequestError {
   })
 }
 
+function responseBodyTransportError(error: unknown): AiRequestError {
+  const detail = boundedErrorText(error instanceof Error ? error.message : String(error))
+  return new AiRequestError(
+    detail ? `AI 响应读取中断：${detail}` : 'AI 响应读取中断。',
+    { transient: true, cause: error },
+  )
+}
+
+async function readResponseText(response: Response, signal?: AbortSignal): Promise<string> {
+  try {
+    return await response.text()
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw responseBodyTransportError(error)
+  }
+}
+
+async function readStreamChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  try {
+    return await reader.read()
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw responseBodyTransportError(error)
+  }
+}
+
 async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
   const timeoutSignal = AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
@@ -143,8 +172,8 @@ function parseJsonText(text: string): unknown {
   }
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  const text = await response.text()
+async function readJson(response: Response, signal?: AbortSignal): Promise<unknown> {
+  const text = await readResponseText(response, signal)
   if (!response.ok) throw responseError(response, text)
   return parseJsonText(text)
 }
@@ -230,8 +259,9 @@ type StreamBodyResult = { kind: 'sse' } | { kind: 'text'; text: string }
 async function readStreamingOrText(
   response: Response,
   onData: (data: string) => void,
+  signal?: AbortSignal,
 ): Promise<StreamBodyResult> {
-  if (!response.body) return { kind: 'text', text: await response.text() }
+  if (!response.body) return { kind: 'text', text: await readResponseText(response, signal) }
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -242,7 +272,7 @@ async function readStreamingOrText(
   const drainAsText = async (initial: string): Promise<StreamBodyResult> => {
     let text = initial
     while (true) {
-      const { done, value } = await reader.read()
+      const { done, value } = await readStreamChunk(reader, signal)
       if (done) break
       text += decoder.decode(value, { stream: true })
     }
@@ -251,7 +281,7 @@ async function readStreamingOrText(
   }
 
   while (true) {
-    const { done, value } = await reader.read()
+    const { done, value } = await readStreamChunk(reader, signal)
     if (done) break
     const chunk = decoder.decode(value, { stream: true })
 
@@ -315,7 +345,7 @@ class OpenAICompatibleProvider implements AiProvider {
       },
       signal,
     )
-    return extractOpenAIContent(await readJson(response))
+    return extractOpenAIContent(await readJson(response, signal))
   }
 
   async streamCompletion(
@@ -344,7 +374,7 @@ class OpenAICompatibleProvider implements AiProvider {
     )
 
     if (!response.ok) {
-      const text = await response.text()
+      const text = await readResponseText(response, signal)
       if (isUnsupportedStreaming(response.status, text)) {
         rememberNonStreamingEndpoint(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
@@ -369,7 +399,7 @@ class OpenAICompatibleProvider implements AiProvider {
       if (typeof content !== 'string' || !content) return
       accumulated += content
       onPartial(accumulated)
-    })
+    }, signal)
 
     if (body.kind === 'text') {
       rememberNonStreamingEndpoint(streamKey)
@@ -402,7 +432,7 @@ class AnthropicProvider implements AiProvider {
       },
       signal,
     )
-    return extractAnthropicContent(await readJson(response))
+    return extractAnthropicContent(await readJson(response, signal))
   }
 
   async streamCompletion(
@@ -432,7 +462,7 @@ class AnthropicProvider implements AiProvider {
     )
 
     if (!response.ok) {
-      const text = await response.text()
+      const text = await readResponseText(response, signal)
       if (isUnsupportedStreaming(response.status, text)) {
         rememberNonStreamingEndpoint(streamKey)
         return fallbackCompletion(this, settings, request, onPartial, signal)
@@ -463,7 +493,7 @@ class AnthropicProvider implements AiProvider {
       if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || !delta.text) return
       accumulated += delta.text
       onPartial(accumulated)
-    })
+    }, signal)
 
     if (body.kind === 'text') {
       rememberNonStreamingEndpoint(streamKey)

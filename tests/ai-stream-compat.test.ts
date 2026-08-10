@@ -73,6 +73,32 @@ describe('OpenAI-compatible streaming compatibility', () => {
     expect(partials).toEqual(['普通 JSON 补全'])
   })
 
+  it('classifies response body stream interruptions as transient provider errors', async () => {
+    const brokenBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new TypeError('BodyStreamBuffer was aborted'))
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(brokenBody, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+      ),
+    )
+
+    const error = await getAiProvider(settings('broken-stream'))
+      .streamCompletion(settings('broken-stream'), { action: 'complete', content: '较长上下文' }, () => {})
+      .catch((caught: unknown) => caught)
+
+    expect(error).toMatchObject({ name: 'AiRequestError', transient: true, status: null })
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain('AI 响应读取中断')
+    expect((error as Error).message).toContain('BodyStreamBuffer was aborted')
+  })
+
   it('does not disable streaming for every model after one model rejects stream=true', async () => {
     const fetchMock = vi
       .fn()
