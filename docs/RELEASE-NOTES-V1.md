@@ -1,34 +1,47 @@
-# PromptNote V1 Release Notes
+# PromptNote 1.0.0 Release Notes
 
-## V1 状态
-
-PromptNote V1 主链已完成并经过真实 Chrome / Edge 验收：写作 → Slash 结构化 → AI suggestion / opt-in 内联补全 → Prompt lint → Preview → Copy → 本地文档管理与恢复。
+PromptNote 1.0.0 是第一个面向普通用户发布的稳定版本。
 
 ## 主要能力
 
-- Chrome / Edge Manifest V3 Side Panel Extension。
-- TipTap / ProseMirror 富文本编辑器与单一 `promptSection.kind` 语义块模型。
-- Contextual Slash Command：块首/行首或空白后 `/` 打开结构菜单；URL、日期、`A/B` 等正文中的 `/` 保持普通字符；菜单支持方向键、Home/End、Enter 与 Esc。
-- `PromptDocument` 作为唯一持久正文源，`chrome.storage.local` 自动保存、文档切换、JSON 备份与恢复。
-- Plain Text / Markdown / XML Compiler 与 Copy。
-- 本地 Prompt lint、SelectionActionBar、全局/选区 AI suggestion。
-- 用户显式开启的 IDE 风格内联补全：block-local context、streaming、Tab 接受、Esc 忽略、IME suppression、stale cancellation、transient retry 与错误恢复。
-- 同 ID 备份覆盖使用合法递增 revision；旧 autosave callback 无权回退较新保存状态。
-- 根级 Runtime Error Boundary，避免 React 运行时异常退化为无信息白屏。
+- Chrome / Edge Manifest V3 Side Panel Extension；
+- TipTap / ProseMirror 富文本编辑器；
+- contextual Slash Command 与 Prompt 语义块；
+- 本地 Prompt 文档管理、自动保存、JSON 备份与恢复；
+- Plain Text / Markdown / XML Preview 与 Copy；
+- 本地 Prompt Check；
+- 选区 AI suggestion 与全局 AI 辅助；
+- 用户主动开启的 IDE 风格内联补全：block-local context、streaming、Tab 接受、Esc 忽略、IME suppression、stale cancellation 与短时错误恢复；
+- OpenAI-compatible / Anthropic Provider；
+- 根级 Runtime Error Boundary。
 
-## V1 验收
+## Slash Command
 
-- Chrome 主链、补全、快速输入保存状态、同 ID 恢复覆盖、浏览器重启恢复、AI 禁用/失败降级已通过真实浏览器验证。
-- Edge 已完成当前 Manifest / 主链 smoke。
-- Chrome Side Panel 在实际可拖到的约 382px 宽度下仍可用，核心操作无遮挡、无横向溢出。
-- Slash 键盘导航与普通 `/` 输入均已真机验证。
-- GitHub Actions 门禁包含 license audit、TypeScript、ESLint、unit tests 与 production extension build。
+在块首 / 行首或空白后输入 `/` 打开结构菜单。菜单支持方向键、Home / End、Enter 与 Esc。
+
+普通正文中的 `/` 保持普通字符，例如 URL、日期与 `A/B`。菜单打开后按 Esc 可以写回一个普通 `/`。
+
+## 数据与隐私
+
+- Prompt 文档和设置默认保存在浏览器扩展本地存储；
+- 没有 PromptNote 自有账号、后端或云数据库；
+- 没有广告或第三方统计 SDK；
+- AI 请求直接发往用户配置的 Provider；
+- 固定 Manifest 权限只有 `storage` 与 `sidePanel`。
+
+完整隐私说明见仓库根目录 `PRIVACY.md`。
+
+## 验收状态
+
+1.0.0 已完成真实 Chrome / Edge 主链验证，包括：编辑、Slash、AI suggestion、内联补全、Prompt Check、Preview、Copy、文档切换、备份恢复、浏览器重启恢复、AI 禁用 / 失败降级、快速 autosave 与窄 Side Panel。
+
+最新生产门禁包含 dependency license audit、TypeScript、ESLint、unit tests 与 Extension build。
 
 ## Known Limitations
 
-- V1 本地优先，无账号、后端、云同步或多设备同步；数据保存在浏览器扩展本地存储中。
-- `chrome.storage.local` 不是加密保险库；AI API Key 仍应视为本机扩展偏好，而不是高安全密钥托管。
-- PromptNote 不向 ChatGPT、Claude、Gemini 等第三方网页输入框注入内容；V1 外部交付统一使用 Copy。
-- Side Panel 的实际最小/最大宽度由浏览器宿主控制；PromptNote 只保证在浏览器允许的窄宽范围内布局可用。
-- TipTap/ProseMirror `PromptEditor` 当前同步打包。2026-08-08 的真实 Chrome 回归证明 runtime `React.lazy + dynamic import()` 会导致 Side Panel 短暂显示后白屏，因此 V1 明确不采用该拆分。当前生产构建保留 Vite `>500KB` warning，不通过提高 warning limit 掩盖。
-- AI 行为受用户配置的 Provider、模型、网络、额度与兼容网关影响；Provider 失败不会阻断编辑、保存、Lint、Compiler、Preview 或 Copy。
+- 当前没有账号、云同步或多设备同步；
+- `chrome.storage.local` 不是专用加密保险库；
+- PromptNote 不向第三方网页输入框自动注入内容；外部交付统一通过 Copy；
+- Side Panel 实际宽度范围由 Chrome / Edge 宿主控制；
+- AI 效果与可用性依赖用户配置的 Provider、Model、网络与额度；
+- PromptEditor 当前采用稳定优先的同步打包，生产构建保留 Vite `>500KB` warning。该 warning 不影响已经完成的真实浏览器功能验收。
