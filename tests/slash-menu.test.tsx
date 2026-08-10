@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { sectionKindMeta, sectionKinds } from '../src/prompt/sectionKinds'
 import { SlashMenu } from '../src/ui/components'
+import { nextSlashMenuIndex } from '../src/ui/SlashMenu'
 
 describe('SlashMenu', () => {
   it('renders every authoritative semantic section exactly once', () => {
@@ -19,5 +20,20 @@ describe('SlashMenu', () => {
     const renderedKinds = [...html.matchAll(/data-kind="([^"]+)"/g)].map((match) => match[1])
 
     expect(renderedKinds).toEqual([...sectionKinds])
+  })
+
+  it('exposes the first item as the initial keyboard target', () => {
+    const html = renderToStaticMarkup(<SlashMenu onClose={() => undefined} onInsert={() => undefined} />)
+    expect(html).toContain('role="menu"')
+    expect(html).toContain('slash-item slash-item--active')
+    expect(html).toContain('tabindex="0"')
+  })
+
+  it('moves keyboard selection with wrapping and Home/End', () => {
+    expect(nextSlashMenuIndex(0, 'ArrowDown', 3)).toBe(1)
+    expect(nextSlashMenuIndex(2, 'ArrowDown', 3)).toBe(0)
+    expect(nextSlashMenuIndex(0, 'ArrowUp', 3)).toBe(2)
+    expect(nextSlashMenuIndex(1, 'Home', 3)).toBe(0)
+    expect(nextSlashMenuIndex(1, 'End', 3)).toBe(2)
   })
 })
