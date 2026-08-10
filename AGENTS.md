@@ -40,7 +40,7 @@ D018 已退役文字旁 `•••` 选区入口；只保留 `SelectionActionBar
 
 D020 把 completion idle debounce 与真实 Provider cadence 分开；D021 又明确区分“刚输入的长文本”和“早已存在的长文本”。用户已经说明是预存内容时，禁止继续自动归因到 typing request storm / IME。
 
-D022 要求所有异步用户可见状态按 document id + revision 收口；显式覆盖通过合法新 revision 表达，不绕开 Repository；重型运行时允许真实代码分割，但 lazy boundary 不能复制业务状态。
+D022 要求所有异步用户可见状态按 document id + revision 收口；显式覆盖通过合法新 revision 表达，不绕开 Repository。D023 已 supersede D022 中仅与 PromptEditor runtime lazy split 有关的部分：V1 的 PromptEditor 保持同步 import/打包，不保留 LazyPromptEditor wrapper；非首屏 Sheet 仍可按需加载。
 
 ## 3. 真实项目优先
 
@@ -49,6 +49,8 @@ D022 要求所有异步用户可见状态按 document id + revision 收口；显
 用户提供的关键事实属于诊断前提。例如用户明确说“这段文字以前就写好了”，后续必须以预存文本场景为前提。
 
 未执行的验证不得描述为已通过。中间 CI 失败必须说明真实原因并修复，不能只报告后续绿色结果仿佛中间没有发现问题。
+
+真实浏览器证据高于“构建可以通过”的推断。2026-08-08 PromptEditor runtime lazy split 在静态 CI 全绿的情况下仍导致真实 Chrome 白屏，后续不得再次用静态门禁冒充该类运行时验证。
 
 ## 4. PromptDocument 是唯一正文源
 
@@ -109,11 +111,13 @@ ghost completion 只有 `Tab` 接受并通过真实 Editor transaction 写入后
 
 ### `editor/`
 
-TipTap、Slash Menu、语义块、编辑命令、selection、ghost completion decoration。
+TipTap、Slash Command 判定、语义块、编辑命令、selection、ghost completion decoration。
 
 不得直接访问 Storage 或 Provider。Ghost Extension 只负责展示/接受/忽略/失效，不负责发请求。
 
 选区业务状态只能从 ProseMirror EditorState 派生：selected text、from/to、single-block format。不得把 DOM selection 或屏幕坐标当第二状态源。
+
+Slash Command 只在空选区且位于块/行首或前一字符为空白时拦截 `/`。URL、日期、路径、`A/B` 等普通文本中的 `/` 必须保持普通字符；取消 Slash Menu 时通过真实 Editor command 写回 `/`，不得制造第二正文状态。
 
 `completionContextChars` 同时约束发送上下文和 Editor **读取成本**。对长 block，先根据 caret 建 bounded scan window，再 `textBetween()`；禁止整块 materialize 后 slice。
 
@@ -121,7 +125,7 @@ Editor 在 `view.composing=true` 或失焦时必须同时撤销 completion conte
 
 **受控 Editor 外部同步不得用全文 stringify 判断。** Editor 自身 `onUpdate` 产生的 content object identity 作为“已经应用”标记；App 本地更新沿用同一 content 对象时 O(1) 跳过 `setContent()`。同 ID 导入/外部替换产生新的 content object 时才执行一次受控 `setContent()`，同时增加 editor generation、清 selection/completion transient state。
 
-`LazyPromptEditor.tsx` 只允许作为 `Suspense + ref` 代码加载边界，不得创建第二份 TipTap state、PromptDocument 或 Editor API。
+`PromptNoteApp` 直接 import `PromptEditor.tsx`。不得恢复 `LazyPromptEditor.tsx` wrapper/re-export；重新引入 PromptEditor runtime lazy split 属于 D023 决策变更，必须先有 Chrome + Edge 可重复真机验证方案。
 
 ### `app/`
 
@@ -189,6 +193,7 @@ settings.configured && settings.enabled && settings.completionEnabled
 - streaming partial 可短窗口合并，但不得等完整回复才显示；
 - streaming capability cache 区分 Provider + endpoint + actual completion model，并有容量上限；
 - stream parser 从 body sniff SSE/JSON；
+- response body 读取中断归一化为 transient provider error，但 caller 主动 Abort 仍保持取消语义；
 - success cache hit 直接恢复，不构造无意义 Provider request。
 
 ### 8.1 “长文本不补全”的诊断顺序
@@ -223,7 +228,7 @@ B 类看 D021：context 是否整块读取、focus/caret/document generation ide
 - 是否 IME 中间态请求；
 - 是否 token 粒度根组件 render；
 - 是否 decoration 被当正文；
-- 是否首屏同步加载可拆的大型 runtime；
+- 非核心 Sheet 等是否仍无必要首屏同步加载；
 - 是否旧 revision 覆盖新 revision或其 callback 回退 UI；
 - 是否每次 autosave 全量 sort 文档列表；
 - 是否为检测外部 Editor content 每次 stringify 整篇正文；
@@ -231,7 +236,7 @@ B 类看 D021：context 是否整块读取、focus/caret/document generation ide
 
 优化以真实热路径和可验证收益为依据，不为“优化”引入复杂缓存或第二状态源。
 
-当前构建已经通过真实 lazy split 把同步 `sidepanel` 从约 616.97 kB / gzip 195.41 kB 降到约 228.57 kB / gzip 73.72 kB，并把约 388.80 kB / gzip 122.57 kB 的 PromptEditor runtime 放入异步 chunk。**这不是总 JS 减少 63%，而是首屏同步 chunk 降低。** `>500KB` warning 已因真实拆包消失，禁止以后通过调 warningLimit“继续优化”。最终性能仍以真实浏览器启动/输入体感为准。
+PromptEditor 在 V1 中同步打包。真实 Chrome 已证明 Editor runtime lazy split 会造成白屏，因此不得为了消除 bundle warning 再次默认拆分。当前主 Side Panel bundle 约 620 kB / gzip 196 kB，Vite `>500KB` warning 明确保留；禁止通过调 `chunkSizeWarningLimit` 伪装优化。AI Settings / Document Sheet 等非首屏 Sheet 仍按需加载。最终性能判断以真实浏览器启动/输入体感和 profile 为准。
 
 ## 11. Manifest 与权限
 
@@ -250,15 +255,17 @@ sidePanel
 
 测试失败必须区分实现缺陷、测试假设错误、浏览器环境差异、依赖版本问题。不得削弱有效测试来变绿。
 
-当前至少覆盖：Schema/Compiler、Repository revision、同 ID import rebase/copy、Editor history/conversion、selection snapshot/actionbar、Provider/error/stream compatibility、completion context/cadence/ghost、Suggestion/Lint、AI preferences。
+当前至少覆盖：Schema/Compiler、Repository revision、同 ID import rebase/copy、Editor history/conversion、contextual Slash、selection snapshot/actionbar、Provider/error/stream compatibility、completion context/cadence/ghost、Suggestion/Lint、AI preferences。
 
 最终真实浏览器证据必须额外验证：
 
-- Editor lazy chunk 首次出现时主链可用；
+- Side Panel 首次打开和持续输入稳定，不出现短暂显示后白屏；
 - 快速连续输入期间 save badge 不被旧 revision 晚到结果误报；
 - 导出后用同 ID 备份选择覆盖，当前 Editor 即时换成备份正文，重开后仍一致；
 - 打开预存长 Prompt 后旧文本 caret completion；
 - 中文 IME 持续输入稳定性；
+- contextual Slash 的方向键/Enter/Esc 与普通 `/` 输入；
+- 浏览器实际允许的窄 Side Panel（V1 Chrome 真机约 382px）；
 - Chrome / Edge 当前最终 Manifest。
 
 fixture/单测不能冒充 E2E。
