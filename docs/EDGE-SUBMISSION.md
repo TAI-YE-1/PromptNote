@@ -1,6 +1,6 @@
 # PromptNote 1.0.0 — Microsoft Edge Add-ons 提交材料
 
-本文件用于 Microsoft Partner Center 的 Edge 扩展提交。除视觉素材外，字段已经按 PromptNote 1.0.0 的真实行为准备好，可直接复制粘贴。
+本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo 已准备完成；除商店截图外，其余字段已经按 PromptNote 1.0.0 的真实行为准备好，可直接复制粘贴。
 
 最后核对：2026-08-10
 
@@ -12,7 +12,7 @@ GitHub Actions 下载 `promptnote-1.0.0` artifact 后，先解压外层 artifact
 promptnote-1.0.0.zip
 ```
 
-ZIP 根目录必须直接包含 `manifest.json`、`sidepanel.html` 和构建后的 JS/CSS 文件，不要把外层 artifact ZIP 直接提交到 Partner Center。
+ZIP 根目录必须直接包含 `manifest.json`、`sidepanel.html`、`icons/` 和构建后的 JS/CSS 文件，不要把外层 artifact ZIP 直接提交到 Partner Center。
 
 ## 2. Availability
 
@@ -157,23 +157,34 @@ AI 辅助
 
 第一版留空。
 
-## 6. 视觉素材规格
+## 6. 视觉素材
 
-下一步单独设计，不在本文件内生成。
+### 正式 Logo：已完成
 
-### 必需
+Edge 商店上传用：
 
-- Extension logo：1:1；推荐 `300 × 300`，最低 `128 × 128`。
+```text
+docs/store-assets/icon-300.png
+```
 
-### 可选但建议
+扩展安装包使用：
 
-- Screenshots：最多 6 张；使用 `1280 × 800`；
-- Small promotional tile：`440 × 280`；
-- Large promotional tile：`1400 × 560`。
+```text
+public/icons/icon-16.png
+public/icons/icon-32.png
+public/icons/icon-48.png
+public/icons/icon-128.png
+```
 
-第一版优先准备 1 个 logo + 4 张 1280×800 截图即可，促销 tile 可以第二阶段再补。
+`manifest.json` 已配置顶层 `icons` 和 `action.default_icon`，因此 Edge 安装后的扩展管理页、工具栏/扩展入口会使用同一套森林绿 PromptNote 图标。
 
-### 截图拍摄清单
+### 仍需准备：商店截图
+
+- Screenshots：建议 4 张，统一使用 `1280 × 800`；
+- Small promotional tile：`440 × 280`，第一版可选；
+- Large promotional tile：`1400 × 560`，第一版可选。
+
+截图拍摄清单：
 
 1. 主编辑器：展示自由文本 + 多个 Prompt 结构块；
 2. Slash Menu：输入 `/` 后展示目标、背景、任务、约束等菜单；
@@ -216,7 +227,8 @@ https://github.com/TAI-YE-1/PromptNote
 - [ ] Remote code = No；
 - [ ] 权限说明与 manifest 完全一致；
 - [ ] 数据使用声明没有把 AI 传输错误写成“完全不传数据”；
-- [ ] Logo 已上传；
+- [x] 正式 Logo 文件已准备；
+- [ ] Edge Partner Center 中已上传 Logo；
 - [ ] 至少准备 4 张无敏感信息的产品截图；
 - [ ] Notes for certification 已粘贴；
 - [ ] 最后点击 Publish 前再次核对扩展名、短描述和版本号。
