@@ -8,11 +8,14 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 
 ## 当前实现状态
 
+PromptNote V1 已完成实现与真实浏览器验收。发布说明与已知限制见 `docs/RELEASE-NOTES-V1.md`。
+
 当前真实 Extension 已实现：
 
 - Manifest V3 + Chrome / Edge Side Panel；
 - React + TypeScript + TipTap / ProseMirror；
-- 单一 `promptSection.kind` 语义块模型与 `/` Slash Menu；
+- 单一 `promptSection.kind` 语义块模型与 contextual `/` Slash Menu；
+- Slash Menu 支持方向键、Home/End、Enter、Esc；URL、日期、`A/B` 等普通正文中的 `/` 不会被错误拦截；
 - 普通段落 ↔ 语义块无损转换与常态可见块边界；
 - `PromptDocument` 唯一正文源；
 - `chrome.storage.local` 自动保存、文档列表、新建/切换/删除；
@@ -28,13 +31,11 @@ PromptNote 是一个 **manual-first、syntaxless、rich-text** 的 Prompt 编辑
 - 独立 opt-in 编辑器内联补全：ghost text、Tab 接受、Esc 忽略；
 - completion 可配置上下文/延迟/独立模型，支持 streaming-first、旧请求取消、独立网络 cadence、IME suppression 和 transient recovery；
 - 预存长文本补全按局部 caret context 读取，不为了发送有限上下文 materialize 整个已有 block；
-- Provider 流式兼容以实际 response body 为准，可处理 `text/plain` SSE 和误标成 `text/event-stream` 的普通 JSON；
+- Provider 流式兼容以实际 response body 为准，可处理 `text/plain` SSE、误标成 `text/event-stream` 的普通 JSON，以及可恢复的 response body 读取中断；
 - 根级 Runtime Error Boundary：运行时异常应显示真实错误与“重新打开”，不得再次无信息整页白屏；
 - GitHub Actions：许可证审计、TypeScript、ESLint、单测、Extension build。
 
 **Web Insert 已从 V1 删除。** PromptNote 不再向 ChatGPT/Claude/Gemini 等网页输入框注入内容，也没有 Web Adapter/content script/page bridge。外部交付统一使用 Copy。
-
-V1 尚未标记完成；最终 Chrome / Edge、真实 AI 补全、浏览器重启恢复、异常降级和发布文档仍以 `TASKS.md` 为准。
 
 ## 本地开发
 
@@ -79,7 +80,7 @@ AI 自定义 Base URL 使用 optional host permission，按实际 Provider origi
 
 1. 打开 PromptNote Side Panel；
 2. 自然书写 Prompt；
-3. 使用 `/` 插入目标、背景、任务、约束、示例、输出格式、验收标准等语义块；
+3. 在块/行首或空白后使用 `/` 打开结构菜单，插入目标、背景、任务、约束、示例、输出格式、验收标准等语义块；普通 URL、日期、路径和 `A/B` 中的 `/` 仍是普通字符；
 4. 可选选中文字并从 SelectionActionBar 使用局部 AI / 类型转换；
 5. 可选使用 global AI suggestion；
 6. 可选开启 IDE 风格内联补全；
@@ -134,23 +135,12 @@ AND 编辑器内联补全已开启
 - 可单独指定低延迟补全模型；
 - `Tab` 接受，`Esc` 忽略；
 - 新输入、移动 caret、切块、context budget、focus/composition 变化使旧补全失效；
-- transient 429/5xx/timeout/transport 在原 context 有效时有限退避恢复并尊重 `Retry-After`；
+- transient 429/5xx/timeout/transport/body-read interruption 在原 context 有效时有限退避恢复并尊重 `Retry-After`；
 - persistent auth/config/quota error 不无限重试，也不给新 context 人为 30 秒 cooldown；
 - 真正失败显示长度受控的 Provider 原因，后续成功会清 stale AI error；
 - 相同成功 context 的短缓存命中直接恢复 ghost；
 - 补全设置失效直接依赖稳定 `AiSettings` 对象 identity，不再每次 render 拼接包含 API Key 的复合字符串；
 - ghost 不属于 PromptDocument，不自动保存、不进入 Compiler。
-
-### 预存长文本复测方式
-
-1. 打开已经存在较长正文的 Prompt；
-2. 开启 AI 与内联补全；
-3. **不要输入新文字**；
-4. 分别点击旧文本块首、块中、块尾；
-5. 等待 ghost；
-6. 若失败，记录 `AI 补全失败：...` 的真实原因。
-
-这与“中文 IME 连续输入 40～100 字”的持续输入稳定性测试分开验证。
 
 ## AI 与隐私边界
 
@@ -187,27 +177,30 @@ AND 编辑器内联补全已开启
 - idle debounce 与 network cadence 分离，IME composition 不请求；
 - streaming partial 约每 48ms 合并刷新；
 - AI Settings / Document Sheet 仍按需加载；
-- **PromptEditor 当前恢复为同步打包。**
+- **PromptEditor 同步打包并由 App 直接 import。**
 
-2026-08-08 的真实 Chrome 反馈显示：把 TipTap/ProseMirror `PromptEditor` 拆成运行时 `React.lazy + dynamic import()` 后，Side Panel 会先短暂正常显示约 0.1 秒，随后整页白屏。CI/typecheck/build 均无法捕获这个浏览器运行时回归。因此该拆包已立即撤销。
+2026-08-08 的真实 Chrome 反馈显示：把 TipTap/ProseMirror `PromptEditor` 拆成运行时 `React.lazy + dynamic import()` 后，Side Panel 会先短暂正常显示约 0.1 秒，随后整页白屏。CI/typecheck/build 均无法捕获这个浏览器运行时回归。因此该拆包已撤销，`LazyPromptEditor` wrapper 也已删除。D023 supersede D022 中仅与 Editor runtime lazy split 有关的决定。
 
-最新静态构建重新回到单主包约：
+当前生产构建主 Side Panel bundle 约：
 
 ```text
-sidepanel 618.05 kB / gzip 195.78 kB
+sidepanel ≈ 620 kB / gzip ≈ 196 kB
 ```
 
-`>500KB` Vite warning 重新出现并明确保留。**不得通过调整 `chunkSizeWarningLimit` 掩盖；也不得在没有真实 Chrome/Edge 验证方案前重新引入 PromptEditor runtime lazy split。** 性能优化继续优先从真实热路径、依赖与可验证启动瓶颈入手。
+`>500KB` Vite warning 明确保留。**不得通过调整 `chunkSizeWarningLimit` 掩盖；也不得在没有新的 Chrome + Edge 真机验证方案前重新引入 PromptEditor runtime lazy split。** 性能优化继续优先从真实热路径、依赖与可验证启动瓶颈入手。
 
-## 当前建议的真实浏览器 smoke
+## V1 真实浏览器验收
 
-更新构建后优先验证：
+V1 已完成以下真实浏览器验证：
 
-1. Side Panel 打开后保持稳定，不再出现“正常约 0.1 秒 → 白屏”；若仍有运行时异常，应显示 `PromptNote 运行失败` 和真实错误，而不是纯白；
-2. 快速连续输入约 5～10 秒，最终“已保存”只对应最新正文；
-3. 保存一份电脑 JSON 备份，继续修改正文，再恢复同 ID 备份并选择“覆盖”，确认 Editor 立即换回备份正文；
-4. 关闭/重开 Side Panel 或浏览器后，确认覆盖内容仍在；
-5. 再分别验证预存长文本 completion 和中文 IME 持续输入 completion。
+1. Chrome Side Panel 可持续稳定打开和编辑，不再出现“正常约 0.1 秒 → 白屏”；
+2. 快速连续输入后保存状态只对应最新正文；
+3. 导出 → 同 ID 导入 → 选择覆盖后，Editor 立即切换到备份内容，关闭/重开和浏览器重启后仍一致；
+4. 预存长文本 caret completion、中文 IME 持续输入、Tab/Esc、stale cancellation、错误恢复可用；
+5. AI 未配置、禁用、错误/超时情况下核心编辑链仍可用，关闭补全后不自动请求；
+6. Chrome 当前 Side Panel 真机可缩到约 382px，布局和核心操作仍可用；
+7. contextual Slash 的方向键/Enter/Esc 与普通 `/` 输入均通过；
+8. Edge 当前 Manifest / 主链 smoke 通过。
 
 ## V1 明确不做
 
