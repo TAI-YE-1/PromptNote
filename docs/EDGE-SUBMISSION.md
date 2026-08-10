@@ -1,6 +1,6 @@
 # PromptNote 1.0.0 — Microsoft Edge Add-ons 提交材料
 
-本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo、商店截图方案和其余提交字段均已按 PromptNote 1.0.0 的真实行为准备好，可直接使用。
+本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo、商店截图和其余提交字段均已按 PromptNote 1.0.0 的真实行为准备好，可直接使用。
 
 最后核对：2026-08-10
 
@@ -180,22 +180,25 @@ public/icons/icon-128.png
 
 ### 商店截图
 
-第一版使用 4 张 `1280 × 800` PNG：
+第一版使用 4 张已经提交到仓库的 `1280 × 800` PNG：
 
 ```text
-screenshot-01-editor.png
-screenshot-02-slash-menu.png
-screenshot-03-ai-assist.png
-screenshot-04-preview-copy.png
+docs/store-assets/screenshots/screenshot-01-editor.png
+docs/store-assets/screenshots/screenshot-02-slash-menu.png
+docs/store-assets/screenshots/screenshot-03-ai-assist.png
+docs/store-assets/screenshots/screenshot-04-preview-copy.png
 ```
 
 内容依次覆盖：主编辑器、Slash Menu、AI 辅助 / 内联补全、Preview + Copy。截图不包含真实 API Key、私人 Prompt、邮箱、访问令牌或其他敏感信息。
 
-仓库内可维护源文件：
+可维护渲染源与自动生成工作流：
 
 ```text
-docs/store-assets/store-screenshots-source.html
+docs/store-assets/store-screenshots-render.html
+.github/workflows/store-assets.yml
 ```
+
+修改渲染源后，GitHub Actions 会重新生成并提交 4 张商店 PNG，当前仓库不再依赖聊天附件保存发行素材。
 
 Small promotional tile（`440 × 280`）和 Large promotional tile（`1400 × 560`）第一版均可不提交。
 
@@ -233,7 +236,7 @@ https://github.com/TAI-YE-1/PromptNote
 - [ ] 权限说明与 manifest 完全一致；
 - [ ] 数据使用声明没有把 AI 传输错误写成“完全不传数据”；
 - [x] 正式 Logo 文件已准备；
-- [x] 4 张商店截图已准备；
+- [x] 4 张商店截图已提交到仓库；
 - [ ] Edge Partner Center 中已上传 Logo 和截图；
 - [ ] Notes for certification 已粘贴；
 - [ ] 最后点击 Publish 前再次核对扩展名、短描述和版本号。
