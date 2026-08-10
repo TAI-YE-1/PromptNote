@@ -1,0 +1,92 @@
+name: store-assets
+
+on:
+  push:
+    paths:
+      - 'docs/store-assets/store-screenshots-render.html'
+      - 'docs/store-assets/icon-300.png'
+      - '.github/workflows/store-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate Chrome
+        id: chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || true)"
+          if [ -z "$CHROME" ]; then
+            echo 'Chrome/Chromium not found on runner.' >&2
+            exit 1
+          fi
+          echo "path=$CHROME" >> "$GITHUB_OUTPUT"
+
+      - name: Render 1280x800 Edge store screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/store-assets/screenshots
+          PAGE="file://$GITHUB_WORKSPACE/docs/store-assets/store-screenshots-render.html"
+          CHROME='${{ steps.chrome.outputs.path }}'
+          while read -r screen file; do
+            "$CHROME" \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --hide-scrollbars \
+              --force-device-scale-factor=1 \
+              --window-size=1280,800 \
+              --screenshot="$GITHUB_WORKSPACE/docs/store-assets/screenshots/$file" \
+              "$PAGE?screen=$screen"
+          done <<'EOF'
+          editor screenshot-01-editor.png
+          slash screenshot-02-slash-menu.png
+          ai screenshot-03-ai-assist.png
+          preview screenshot-04-preview-copy.png
+          EOF
+
+      - name: Validate screenshot files
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import struct
+          root = Path('docs/store-assets/screenshots')
+          names = [
+              'screenshot-01-editor.png',
+              'screenshot-02-slash-menu.png',
+              'screenshot-03-ai-assist.png',
+              'screenshot-04-preview-copy.png',
+          ]
+          for name in names:
+              path = root / name
+              data = path.read_bytes()
+              if data[:8] != b'\x89PNG\r\n\x1a\n':
+                  raise SystemExit(f'{name}: not a PNG')
+              width, height = struct.unpack('>II', data[16:24])
+              if (width, height) != (1280, 800):
+                  raise SystemExit(f'{name}: expected 1280x800, got {width}x{height}')
+              print(f'{name}: {width}x{height}, {len(data)} bytes')
+          PY
+
+      - name: Commit rendered screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/store-assets/screenshots/*.png
+          if git diff --cached --quiet; then
+            echo 'Store screenshots are already up to date.'
+            exit 0
+          fi
+          git commit -m 'docs(store): render Edge screenshots'
+          git push
