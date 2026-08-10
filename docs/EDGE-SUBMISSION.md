@@ -1,6 +1,6 @@
 # PromptNote 1.0.0 — Microsoft Edge Add-ons 提交材料
 
-本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo 已准备完成；除商店截图外，其余字段已经按 PromptNote 1.0.0 的真实行为准备好，可直接复制粘贴。
+本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo、商店截图方案和其余提交字段均已按 PromptNote 1.0.0 的真实行为准备好，可直接使用。
 
 最后核对：2026-08-10
 
@@ -159,7 +159,7 @@ AI 辅助
 
 ## 6. 视觉素材
 
-### 正式 Logo：已完成
+### 正式 Logo
 
 Edge 商店上传用：
 
@@ -176,23 +176,28 @@ public/icons/icon-48.png
 public/icons/icon-128.png
 ```
 
-`manifest.json` 已配置顶层 `icons` 和 `action.default_icon`，因此 Edge 安装后的扩展管理页、工具栏/扩展入口会使用同一套森林绿 PromptNote 图标。
+`manifest.json` 已配置顶层 `icons` 和 `action.default_icon`。
 
-### 仍需准备：商店截图
+### 商店截图
 
-- Screenshots：建议 4 张，统一使用 `1280 × 800`；
-- Small promotional tile：`440 × 280`，第一版可选；
-- Large promotional tile：`1400 × 560`，第一版可选。
+第一版使用 4 张 `1280 × 800` PNG：
 
-截图拍摄清单：
+```text
+screenshot-01-editor.png
+screenshot-02-slash-menu.png
+screenshot-03-ai-assist.png
+screenshot-04-preview-copy.png
+```
 
-1. 主编辑器：展示自由文本 + 多个 Prompt 结构块；
-2. Slash Menu：输入 `/` 后展示目标、背景、任务、约束等菜单；
-3. AI 辅助：展示 AI 设置或内联 ghost completion，但不要在截图中出现真实 API Key；
-4. Preview / Copy：展示 Plain Text / Markdown / XML 预览与复制；
-5. 可选：文档管理、JSON 备份和恢复。
+内容依次覆盖：主编辑器、Slash Menu、AI 辅助 / 内联补全、Preview + Copy。截图不包含真实 API Key、私人 Prompt、邮箱、访问令牌或其他敏感信息。
 
-截图内不得出现真实 API Key、私人 Prompt、邮箱、访问令牌或其他敏感信息。
+仓库内可维护源文件：
+
+```text
+docs/store-assets/store-screenshots-source.html
+```
+
+Small promotional tile（`440 × 280`）和 Large promotional tile（`1400 × 560`）第一版均可不提交。
 
 ## 7. Notes for certification
 
@@ -228,8 +233,8 @@ https://github.com/TAI-YE-1/PromptNote
 - [ ] 权限说明与 manifest 完全一致；
 - [ ] 数据使用声明没有把 AI 传输错误写成“完全不传数据”；
 - [x] 正式 Logo 文件已准备；
-- [ ] Edge Partner Center 中已上传 Logo；
-- [ ] 至少准备 4 张无敏感信息的产品截图；
+- [x] 4 张商店截图已准备；
+- [ ] Edge Partner Center 中已上传 Logo 和截图；
 - [ ] Notes for certification 已粘贴；
 - [ ] 最后点击 Publish 前再次核对扩展名、短描述和版本号。
 
