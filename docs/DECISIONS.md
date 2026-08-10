@@ -220,7 +220,7 @@ AI 内联补全采用 IDE ghost text 心智：编辑停顿 → caret 后灰色�
 
 ## D022 — 异步结果必须按 revision 收口，重型运行时可拆包但不得复制状态
 
-**状态：Accepted**
+**状态：Accepted；决定 C 中 PromptEditor runtime lazy split 已由 D023 supersede**
 
 ### 决定 A：异步 UI 状态受 document version 所有权约束
 
@@ -245,18 +245,18 @@ max(local.revision, backup.revision) + 1
 
 同 ID 外部替换必须立即进入当前 Editor；Editor 通过“自身刚产生的 content object identity vs 外部新 content object”区分本地输入和外部替换，本地每次键入不得 stringify 全文或反复 `setContent()`。
 
-### 决定 C：重型运行时允许真实代码分割
+### 决定 C：重型运行时允许真实代码分割（历史决定，PromptEditor 部分由 D023 supersede）
 
-TipTap/ProseMirror Editor 可以从 Side Panel shell 中拆为 lazy chunk。lazy wrapper 只负责 `Suspense + ref` 转发，不维护第二份 PromptDocument/Editor 状态。
+TipTap/ProseMirror Editor 曾从 Side Panel shell 中拆为 lazy chunk。lazy wrapper 只负责 `Suspense + ref` 转发，不维护第二份 PromptDocument/Editor 状态。
 
-当前构建从单一约 616.97 kB / gzip 195.41 kB 的主 Side Panel JS，拆为约：
+当时静态构建从单一约 616.97 kB / gzip 195.41 kB 的主 Side Panel JS，拆为约：
 
 ```text
 sidepanel shell   228.57 kB / gzip 73.72 kB
 PromptEditor      388.80 kB / gzip 122.57 kB（async）
 ```
 
-这代表首屏同步解析体积显著下降，不代表总 JS 删除了约 63%。`>500KB` warning 因真实拆包自然消失，未修改 warning limit；最终用户体感仍必须由真实 Chrome/Edge 验证。
+这只代表当时首屏同步解析体积下降，不代表总 JS 删除约 63%。随后真实 Chrome 运行验证暴露白屏回归，D023 因此撤销 PromptEditor runtime lazy split；非首屏 Sheet 仍可按需加载。
 
 ### 决定 D：不制造无必要的身份字符串和兼容别名
 
@@ -270,6 +270,32 @@ PromptEditor      388.80 kB / gzip 122.57 kB（async）
 ### 影响
 
 后续代码审查必须把**异步回调是否仍拥有当前版本**作为一等检查项；显式覆盖通过生成合法新 revision 表达，而不是绕开约束；性能报告必须区分同步首屏 chunk 与异步/总字节，不能用 code splitting 冒充代码删除。
+
+---
+
+## D023 — PromptEditor V1 保持同步打包，runtime lazy split 暂停
+
+**状态：Accepted**
+
+**Supersedes:** D022 决定 C 中“PromptEditor runtime 使用 `React.lazy + dynamic import()` 拆分”的部分。D022 的 revision ownership、显式覆盖 revision rebase、Editor content object identity 和无冗余 identity 规则继续有效。
+
+### 决定
+
+- V1 的 `PromptEditor` 由 `PromptNoteApp` 直接同步 import，不保留 `LazyPromptEditor` wrapper/re-export；
+- `RuntimeErrorBoundary` 继续作为根级运行时错误边界；
+- AI Settings / Document Sheet 等非首屏 Sheet 可以继续按需加载；
+- Vite `>500KB` warning 明确保留，不通过提高 `chunkSizeWarningLimit` 掩盖；
+- 未来若重新引入 PromptEditor runtime lazy split，必须先有可重复的 Chrome + Edge 真机验证方案，并在接受前证明首次打开、持续输入、重开 Side Panel 均稳定。
+
+### 原因
+
+2026-08-08 的真实 Chrome 验证显示：PromptEditor 改成运行时 `React.lazy + dynamic import()` 后，Side Panel 先正常显示约 0.1 秒，随后整页白屏。该构建当时 TypeScript、Lint、单测与 production build 全部通过，说明静态 CI 不能替代浏览器运行时证据。
+
+在恢复同步 PromptEditor、保留 Runtime Error Boundary 后，后续真实 Chrome 验证持续稳定，补全、Slash、保存、恢复和其它主链均正常。因此 V1 以已验证的同步运行时为正确性基线。
+
+### 影响
+
+当前生产构建保持约 620 kB / gzip 196 kB 的同步 Side Panel 主包，并保留 Vite `>500KB` warning。该 warning 是已知性能债，不是通过冒险拆分 Editor 或调整阈值解决的发布阻塞项。后续性能优化继续以真实 profile、依赖体积和可验证启动瓶颈为依据。
 
 ---
 
