@@ -22,7 +22,7 @@
 - [x] P0-03 建立 `docs/UX.md`，固定编辑、Slash Menu、AI suggestion、Compiler 与 Copy 主链。
 - [x] P0-04 建立 `docs/PROMPT-DOCUMENT-CONTRACT.md`，固定唯一内容源与 Schema 边界。
 - [x] P0-05 建立 `docs/ARCHITECTURE.md`，固定模块职责、依赖方向和状态边界。
-- [x] P0-06 建立 `docs/DECISIONS.md`；D017 退役 Web Insert，D018 固定 SelectionActionBar，D019 固定真实性能收口，D020 固定持续输入 cadence/IME，D021 固定预存长文本诊断边界，D022 固定异步 revision 所有权、显式覆盖 revision rebase 与 Editor lazy split。
+- [x] P0-06 建立 `docs/DECISIONS.md`；D017 退役 Web Insert，D018 固定 SelectionActionBar，D019 固定真实性能收口，D020 固定持续输入 cadence/IME，D021 固定预存长文本诊断边界，D022 固定异步 revision 所有权与显式覆盖 revision rebase，D023 supersede D022 中仅与 PromptEditor runtime lazy split 有关的决定并固定 V1 同步 Editor。
 - [x] P0-07 建立 `TASKS.md` 唯一任务账本。
 - [x] P0-08 建立 `AGENTS.md` AI 开发协作规则。
 
@@ -56,7 +56,7 @@
 - [-] P1-05 page bridge/content script 随 D017 退役。
 - [x] P1-06 建立 TypeScript、ESLint、Prettier、Vitest 与 GitHub Actions 基线。
 - [x] P1-07 增加开发态构建与 Chrome/Edge 本地加载说明。
-- [ ] P1-08 验证 Chrome 与 Edge 至少各完成一次**当前最终 Manifest（固定权限仅 storage + sidePanel）**真实手动加载。
+- [x] P1-08 Chrome 与 Edge 均完成当前最终 Manifest 真实手动加载；固定权限仍只有 `storage + sidePanel`，optional host 仅服务 Provider。
 
 ---
 
@@ -73,10 +73,10 @@
 - [x] P2-09 实现 PromptDocument JSON 备份导出/恢复；同 ID 冲突明确询问覆盖或另存副本。
 - [x] P2-10 增加 Schema、备份契约、Repository、并发保存测试。
 - [x] P2-11 `ensureCurrent()` 批量读取 documents/current id；Repository 拒绝旧 revision 覆盖新 revision。
-- [x] P2-12 修复同 ID 显式备份覆盖与 revision 单调保护冲突：覆盖时 rebase 到 `max(local, backup)+1`；拒绝覆盖生成新 id；新增 3 个纯逻辑测试。
+- [x] P2-12 修复同 ID 显式备份覆盖与 revision 单调保护冲突：覆盖时 rebase 到 `max(local, backup)+1`；拒绝覆盖生成新 id；新增纯逻辑测试。
 - [x] P2-13 收口 autosave callback 的版本所有权：只有当前 id+revision 对应的 save 结果才能修改 save badge；旧 snapshot 不得回退文档列表或用旧失败污染新 revision。
 
-**关闭标准：** PromptDocument 是唯一持久正文源；真实浏览器重启恢复仍由 P8-06 验收。
+**关闭标准已满足：** PromptDocument 是唯一持久正文源；真实浏览器关闭/重启恢复由 P8-06 完成。
 
 ---
 
@@ -85,7 +85,7 @@
 - [x] P3-01 接入 TipTap，完成普通富文本编辑基础。
 - [x] P3-02 实现单一 `promptSection` TipTap Node。
 - [x] P3-03 从权威 `sectionKinds` 派生显示名与语义元数据。
-- [x] P3-04 实现 Slash Menu。
+- [x] P3-04 实现 contextual Slash Menu。
 - [x] P3-05 支持 Goal / Context / Instruction / Constraint / Example / Output Format / Acceptance。
 - [x] P3-06 支持自由文本与语义块混写。
 - [x] P3-07 支持普通段落与语义块无损转换。
@@ -94,6 +94,7 @@
 - [x] P3-10 增加 PromptSection、Slash、转换、history 测试。
 - [x] P3-11 语义块常态可见边界。
 - [x] P3-12 修复同 document id 外部正文替换：Editor 以 content object identity 区分自身输入和外部替换；本地键入 O(1) 跳过整份 `setContent()`，同 ID 导入则真实重灌并增加 editor generation。
+- [x] P3-13 Slash Command 收口：仅块/行首或空白后拦截 `/`；URL/日期/`A/B` 保留普通斜杠；方向键/Home/End/Enter/Esc 真机可用，Esc 可写回普通 `/`。
 
 ---
 
@@ -122,10 +123,11 @@
 - [x] P5-08 全局 ambiguity/draft acceptance/structure。
 - [x] P5-09 suggestion/advisory 用户接受后才修改。
 - [x] P5-10 source revision guard。
-- [ ] P5-11 真实浏览器验证未配置/禁用/HTTP/transport/30s timeout 下核心主链仍可用；已有“无 AI 正常”和错误 Base URL 失败证据，仍缺最终构建全链。
+- [x] P5-11 真实浏览器完成未配置/禁用/错误 Base URL/transport/timeout 降级验证；AI 失败时编辑、保存、Lint、Compiler、Preview、Copy 主链仍可用。
 - [x] P5-12 suggestion UI Accept/Ignore/stale/advisory 测试。
 - [x] P5-13 streaming compatibility/capability cache/SSE 测试。
 - [x] P5-14 `AiRequestError` transient/persistent/status/Retry-After/error body 分类。
+- [x] P5-15 response body 读取中断归一化为 transient provider error；caller 主动 Abort 仍保持取消语义，并有流兼容测试。
 
 ---
 
@@ -150,6 +152,7 @@
 - [x] P6-12 delay/context/block-local/Abort/streaming-first/短输出/补全模型。
 - [x] P6-13 Provider 身份变动后连接/补全失效；关闭 AI 关闭补全。
 - [x] P6-14 preference/stream/model/Tab/Esc/context/stale 测试。
+- [x] P6-15 真实 Chrome 配置可用 AI，完成块首/中/尾、context budget、streaming、Tab/Esc、stale cancellation、block-local、预存长 Prompt caret、中文 IME 持续输入与关闭补全无自动请求的真机验证。
 - [x] P6-16 context identity 绑定 document generation + block + caret；不跨块。
 - [x] P6-17 块首/中/尾/单字符双向 context；streaming widget key 持续刷新。
 - [x] P6-18 `completionContextChars` 显式贯穿 Editor 并进入 identity。
@@ -157,7 +160,6 @@
 - [x] P6-20 **持续输入稳定性加固，不作为预存长文本根因：** debounce/cadence 分离、IME suppression、transient retry/Retry-After。
 - [x] P6-21 **预存长文本链根修：** bounded context scan、body sniff、删除 cross-context persistent cooldown、真实 error/recovery、blur/composition 清 ghost、cache fast-path。
 - [x] P6-22 删除 `completionSettingsKey()` 复合字符串 identity；补全设置变化直接依赖稳定不可变 `AiSettings` 对象 identity，不再每 render 拼接 Provider/URL/model/API Key。
-- [ ] P6-15 真实 Chrome 配置可用 AI，验证块首/中/尾、context budget、streaming growth、Tab/Esc、stale cancellation、block-local；独立验证 A：预存长 Prompt 不输入只点 caret；独立验证 B：中文 IME 持续输入不形成 request storm；关闭补全后无自动请求。最新 P6-16～P6-22 构建待复测。
 
 ---
 
@@ -165,14 +167,14 @@
 
 - [x] P7-01 轻量文档切换/列表/搜索/新建/删除。
 - [x] P7-02 最近文档恢复逻辑。
-- [ ] P7-03 当前最终构建 360px 窄 Side Panel 真机可用性。
-- [ ] P7-04 键盘可达性：Slash、Tab、Esc、SelectionActionBar。
-- [ ] P7-05 完整错误路径无假成功/静默失败；当前新增关注同 ID 导入覆盖与 stale autosave callback。
-- [ ] P7-06 Copy / Save 连续重复操作状态一致性；需验证快速输入时旧 save callback 不误报“已保存”。
-- [ ] P7-07 最终代码减法审查；已删除旧 SelectionContextMenu 实现/viewport rect/旧 CSS/重复 completion 裁剪/floatingPanels/header-only stream/persistent cooldown/hasBlockContext；**本轮又删除 SelectionContextMenu 兼容 alias、`completionSettingsKey()`、autosave 文档列表全量 `.sort()` 热路径**；待真机后最后反查。
+- [x] P7-03 当前最终构建在浏览器实际允许的窄 Side Panel 下真机可用；Chrome 当前真机测得 `sidepanel.html` `clientWidth ≈ 382px`，布局和核心操作正常。
+- [x] P7-04 键盘可达性完成：contextual Slash 支持方向键/Home/End/Enter/Esc，Tab/Esc completion 和 SelectionActionBar 主链正常。
+- [x] P7-05 完整错误路径无假成功/静默失败；同 ID 导入覆盖、Provider 错误恢复与 stale autosave callback 均已收口并完成真实验证。
+- [x] P7-06 Copy / Save 连续重复操作状态一致；快速输入后旧 save callback 不误报当前“已保存”。
+- [x] P7-07 最终代码减法审查完成：旧 SelectionContextMenu/viewport rect/旧 CSS/重复 completion 裁剪/floatingPanels/header-only stream/persistent cooldown/hasBlockContext/compat alias/`completionSettingsKey()` 均已删除；`LazyPromptEditor.tsx` 也已物理删除，App 直接 import `PromptEditor`。
 - [x] P7-08 Non-goals 反向搜索完成。
-- [ ] P7-09 权威文档最终实现态收口；本轮代码态已同步，待浏览器验收后最终证据复核。
-- [ ] P7-10 真实浏览器性能收口：代码侧已完成 bounded context、partial batching、Sheet lazy-load、**PromptEditor runtime lazy split**。构建从单一 sidepanel `616.97 kB / gzip 195.41 kB` 变为同步 shell `228.57 / 73.72` + async PromptEditor `388.80 / 122.57`，`>500KB` warning 因真实拆包消失且未调 warningLimit。该数据只证明首屏同步 chunk 大幅下降，不等同总 JS 删除 63%；仍需 Chrome/Edge 首开与输入体感验收。
+- [x] P7-09 权威文档最终实现态收口完成：UX / ARCHITECTURE / DECISIONS(D023) / AGENTS / TASKS / README / white-screen incident / V1 release notes 与当前实现一致。
+- [x] P7-10 真实浏览器性能收口：bounded context、partial batching、Sheet lazy-load 保留；PromptEditor runtime lazy split 曾在静态 CI 全绿后导致真实 Chrome 白屏，已由 D023 正式撤销并恢复同步 Editor。当前约 620 kB / gzip 196 kB 主包的 `>500KB` warning 明确保留，不调整阈值；同步构建已经完成 Chrome/Edge 真机稳定性验收。
 - [x] P7-11 D018 选区根修：ProseMirror selection 唯一权威，固定 SelectionActionBar。
 - [x] P7-12 第一组 5×代码审查/优化/减法/性能优化完成。
 - [x] P7-13 第一组 5×文档同步完成。
@@ -180,40 +182,42 @@
 - [x] P7-15 P6-20 第二组 5×文档同步完成。
 - [x] P7-16 P6-21 第三组（纠正预存文本前提后）5×代码收口完成。
 - [x] P7-17 P6-21 第三组 5×文档同步完成。
-- [x] P7-18 **本轮新的 5×代码审查/优化/减法/性能优化完成：** ①删除退役 `SelectionContextMenu` alias 并迁移 App；②修同 ID 显式导入被 revision guard 静默拒绝；③修同 ID 外部 content 无法刷新 Editor，并以 O(1) object identity 避免本地键入重灌；④删除包含 API Key 的 `completionSettingsKey()` 每 render 拼接；⑤Editor 真实 lazy split + stale autosave result guard + revision-aware 线性 document-list upsert。中间 lazy wrapper TS4023 被 CI 捕获后通过导出真实 Props 契约根修，未绕过类型检查。
-- [x] P7-19 **本轮 5×文档同步完成：** UX → ARCHITECTURE → DECISIONS/D022 → AGENTS → TASKS/README；不以 CI/fixture 冒充真实浏览器验收。
+- [x] P7-18 **历史第四组 5×代码审查/优化/减法/性能优化完成：** 删除 SelectionContextMenu alias、修同 ID 导入 revision、修外部 content 同步、删除 credential settings key、收口 autosave ownership。该轮同时尝试 Editor runtime lazy split，后续真实 Chrome 白屏证明该子方案不成立，已由 D023 supersede 并删除 LazyPromptEditor；其它收口项继续有效。
+- [x] P7-19 **历史第四组文档同步完成，并在 V1 最终收口中二次校正：** 旧 lazy-split 成功描述已被 D023、事故文档和最终权威文档 supersede，不以旧静态 CI 结果冒充浏览器事实。
 
 ---
 
 ## P8 — V1 最终验证与发布候选
 
-- [x] P8-01 GitHub Actions TypeScript/static check 通过。
-- [x] P8-02 GitHub Actions unit/focused tests 全集通过。
-- [x] P8-03 GitHub Actions Extension build 通过。
-- [ ] P8-04 Chrome 当前最终构建主链 E2E：编辑 → Slash/转换 → AI suggestion/补全 → lint → Preview → Copy → 文档操作；**新增验证 Editor lazy chunk 首次加载后可立即编辑。**
-- [ ] P8-05 Edge 当前最终构建 smoke。
-- [ ] P8-06 浏览器关闭/重启最近 Prompt 恢复；**新增同 ID 备份覆盖后重启仍保持覆盖内容。**
-- [ ] P8-07 AI 未配置/禁用/失败真实浏览器降级，补全关闭无自动请求。
-- [ ] P8-08 opt-in completion 真实 Provider E2E：block-local、任意 caret、context budget、预存长文本、IME 持续输入、streaming growth、错误恢复、stale error、completion model。
+- [x] P8-01 GitHub Actions TypeScript/static check 通过；V1 最终收口提交继续以最新 CI 为门禁。
+- [x] P8-02 GitHub Actions unit/focused tests 全集通过；V1 最终收口提交继续以最新 CI 为门禁。
+- [x] P8-03 GitHub Actions Extension build 通过；`>500KB` warning 明确保留，不作为假失败或通过调阈值隐藏。
+- [x] P8-04 Chrome 当前最终构建主链 E2E：编辑 → contextual Slash/转换 → AI suggestion/补全 → lint → Preview → Copy → 文档操作，Side Panel 持续稳定无白屏。
+- [x] P8-05 Edge 当前最终构建 smoke 通过。
+- [x] P8-06 浏览器关闭/重启最近 Prompt 恢复通过；同 ID 备份覆盖后重启仍保持覆盖内容。
+- [x] P8-07 AI 未配置/禁用/失败/timeout 真实浏览器降级通过，补全关闭无自动请求。
+- [x] P8-08 opt-in completion 真实 Provider E2E 通过：block-local、任意 caret、context budget、预存长文本、IME 持续输入、streaming、错误恢复、stale invalidation、completion model 主链正常。
 - [x] P8-09 Manifest 固定权限仅 `storage` / `sidePanel`；optional host 只服务 Provider。
 - [x] P8-10 依赖许可证审计与 CI 门禁。
-- [ ] P8-11 V1 release notes / Known Limitations。
-- [ ] P8-12 真实浏览器验证**快速连续输入 save badge**：旧 revision 晚到成功/失败不得把较新 revision 误标；验证导出 → 同 ID 导入 → 选择覆盖后 Editor 立即切换到备份内容，不出现假成功。
+- [x] P8-11 已建立 `docs/RELEASE-NOTES-V1.md`，记录 V1 能力、真实验收与 Known Limitations。
+- [x] P8-12 真实浏览器快速连续输入 save badge 与导出 → 同 ID 导入 → 覆盖即时刷新 Editor 验证通过，不出现假成功。
 
-**V1 完成定义：** `docs/PRODUCT.md` 成功标准全部有真实验证证据，且 P0-P8 所有未取消任务完成。
+**V1 完成定义：** `docs/PRODUCT.md` 成功标准全部有实现、测试与真实浏览器证据；P0-P8 无未取消的 open task。最终 HEAD 仍必须通过 GitHub Actions 全门禁，若最终 CI 失败则 V1 状态立即回退为未完成并修复。
 
 ---
 
 ## 当前状态
 
-当前代码已经完成第三次追加 5× 收口。除补全链之外，本轮从代码一致性和性能继续发现并关闭了三类此前未暴露的问题：**同 ID 备份显式覆盖可能被 Repository revision guard 静默拒绝；同 ID 外部内容即使持久化也可能不刷新当前 TipTap Editor；旧 autosave callback 可能晚到并误报当前 save badge / 回退文档列表。** D022 已统一规定版本所有权与覆盖语义。
+PromptNote V1 的实现、代码减法、权威文档和真实浏览器验收已经收口。
 
-性能侧不再只有“保留 >500KB warning”：TipTap/ProseMirror Editor 已真实拆成 async chunk。最新代码门禁中同步 sidepanel 约 `228.57 kB / gzip 73.72 kB`，PromptEditor async chunk 约 `388.80 / 122.57`，原 `>500KB` warning 自然消失；这代表首屏同步解析体积降低，不代表总 JavaScript 同比例删除。
+真实验证结论：
 
-当前最优先剩余工作：
+1. Chrome Side Panel 同步 PromptEditor 构建持续稳定，无“约 0.1 秒后白屏”；D023 已 supersede D022 的 Editor runtime lazy-split 子决定。
+2. Chrome 主链、AI suggestion、预存长文本/IME 内联补全、错误恢复、关闭补全、快速保存、同 ID 备份覆盖与浏览器重启恢复均已通过。
+3. contextual Slash 支持方向键/Home/End/Enter/Esc；普通 URL、日期、`A/B` 的 `/` 输入正常。
+4. Chrome Side Panel 自身 DevTools 实测 `location.href = chrome-extension://.../sidepanel.html`，实际窄宽 `clientWidth ≈ 382px`，核心布局和操作正常。
+5. Edge 当前 Manifest / 主链 smoke 已通过。
+6. 生产代码已删除 `LazyPromptEditor.tsx`，App 直接 import `PromptEditor`；Manifest 仍只有 `storage + sidePanel` 固定权限；Vite 未设置 `chunkSizeWarningLimit` 覆盖。
+7. V1 release notes / Known Limitations 已写入 `docs/RELEASE-NOTES-V1.md`。
 
-1. Chrome 拉最新构建后先确认 Side Panel 打开时 Editor lazy chunk 能正常出现并立即编辑；
-2. 快速连续输入 5～10 秒，观察“保存中/已保存”最终只跟最新正文一致；
-3. 导出当前 Prompt，再恢复同 ID 备份并选择“覆盖”，确认 Editor **立即**变为备份内容；关闭/重开后仍一致；
-4. 继续独立复测预存长文本 caret completion 与 IME 持续输入稳定性；
-5. Edge 最终 Manifest/360px/键盘、浏览器重启、AI 禁用/错误/超时降级、最后 release notes。
+V1 不再有功能或人工验收阻塞项。当前唯一机械门禁是：本次最终账本/文档/代码收口后的最新 HEAD 必须再次通过 GitHub Actions；若绿色，则 V1 正式完成，后续新工作进入 V1 之后的独立范围。
