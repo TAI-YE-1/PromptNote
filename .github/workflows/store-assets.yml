@@ -17,14 +17,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install CJK fonts
+      - name: Install CJK fonts and locale
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk locales
+          sudo locale-gen zh_CN.UTF-8
           fc-cache -f
           fc-match 'Noto Sans CJK SC'
+
+      - name: Force deterministic CJK font in store source
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('docs/store-assets/store-screenshots-render.html')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              ':root{font-family:Inter,"Segoe UI","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;',
+              ':root{font-family:"Noto Sans CJK SC",Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;'
+          )
+          text = text.replace(
+              'font:11px/1.62 ui-monospace,SFMono-Regular,Consolas,monospace;',
+              'font:11px/1.62 "Noto Sans CJK SC",ui-monospace,SFMono-Regular,Consolas,monospace;'
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
 
       - name: Locate Chrome
         id: chrome
@@ -38,8 +57,52 @@ jobs:
           fi
           echo "path=$CHROME" >> "$GITHUB_OUTPUT"
 
+      - name: Verify Chrome rasterizes distinct CJK glyphs
+        shell: bash
+        env:
+          LANG: zh_CN.UTF-8
+          LC_ALL: zh_CN.UTF-8
+        run: |
+          set -euo pipefail
+          cat > /tmp/promptnote-cjk-probe.html <<'EOF'
+          <!doctype html><meta charset="utf-8"><body><script>
+          const canvas = document.createElement('canvas');
+          canvas.width = 72; canvas.height = 72;
+          const ctx = canvas.getContext('2d', {willReadFrequently: true});
+          ctx.fillStyle = '#000';
+          ctx.textBaseline = 'alphabetic';
+          ctx.font = '48px "Noto Sans CJK SC"';
+          const chars = [...'中文测试目标背景任务约束复制预览'];
+          const hashes = [];
+          for (const ch of chars) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillText(ch, 8, 56);
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let h = 2166136261 >>> 0;
+            for (let i = 3; i < data.length; i += 4) {
+              h ^= data[i];
+              h = Math.imul(h, 16777619) >>> 0;
+            }
+            hashes.push(h.toString(16));
+          }
+          const unique = new Set(hashes).size;
+          document.body.dataset.fontLoaded = document.fonts.check('48px "Noto Sans CJK SC"', '中文测试') ? 'yes' : 'no';
+          document.body.dataset.uniqueGlyphs = String(unique);
+          document.body.dataset.glyphCheck = unique >= 8 ? 'ok' : 'failed';
+          document.body.textContent = `fontLoaded=${document.body.dataset.fontLoaded} uniqueGlyphs=${unique} glyphCheck=${document.body.dataset.glyphCheck}`;
+          </script></body>
+          EOF
+          CHROME='${{ steps.chrome.outputs.path }}'
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --lang=zh-CN \
+            --dump-dom file:///tmp/promptnote-cjk-probe.html | tee /tmp/promptnote-cjk-probe.txt
+          grep 'glyphCheck=ok' /tmp/promptnote-cjk-probe.txt
+          grep -E 'fontLoaded=(yes|no)' /tmp/promptnote-cjk-probe.txt
+
       - name: Render 1280x800 Edge store screenshots
         shell: bash
+        env:
+          LANG: zh_CN.UTF-8
+          LC_ALL: zh_CN.UTF-8
         run: |
           set -euo pipefail
           mkdir -p docs/store-assets/screenshots
@@ -51,6 +114,7 @@ jobs:
               --no-sandbox \
               --disable-gpu \
               --hide-scrollbars \
+              --lang=zh-CN \
               --force-device-scale-factor=1 \
               --window-size=1280,800 \
               --screenshot="$GITHUB_WORKSPACE/docs/store-assets/screenshots/$file" \
