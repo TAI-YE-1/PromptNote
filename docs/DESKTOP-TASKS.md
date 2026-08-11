@@ -38,7 +38,7 @@
 - [x] 迁移共享调用方后删除直接散落的 host-specific 访问；
 - [x] 反向搜索确认 `editor/`、`prompt/`、Compiler 不直接依赖 Chrome / Tauri；
 - [x] 现有 Browser 单测、typecheck、lint、build 全通过；
-- [ ] 真实 Edge / Chrome smoke 确认平台抽取没有回归 1.0 主链。
+- [x] 真实 Edge / Chrome smoke 确认平台抽取没有回归 1.0 主链。
 
 ### P1 实施证据 — 2026-08-11
 
@@ -49,18 +49,27 @@
 - `src/extension/background.ts` 的 `chrome.action` / `chrome.sidePanel` 生命周期调用保持在 Browser host 内，不为 Desktop 制造无调用方 wrapper。
 - 删除旧 `src/storage/aiSettingsRepository.ts`；共享真实调用方已改为依赖平台合同，Browser composition 只在 `src/main.tsx` 注入 Browser adapters。新增 `tests/platform-boundary.test.ts` 防止 `src/app`、`src/ai`、`src/editor`、`src/prompt`、`src/storage` 重新出现直接 `chrome.*` / Tauri API。
 - 自动验证基于 commit `0d191565cd82aaee6b163725e19890327a915ffe` 的 GitHub Actions `ci` run `#411`：license audit、typecheck、lint、25 个 test files / 114 tests、extension build、release artifact package/upload 全部通过。构建产物 digest：`sha256:132296e7bb8de0d7b27254ee621a3645cca614247804262d9a4ffdf4e0ce65f6`。
-- 真实 Browser smoke 尚未勾选：已下载上述 CI 产物并尝试在当前 Chromium 144 环境加载 unpacked extension，但运行环境管理员策略 `ExtensionInstallBlocklist: ["*"]` 明确阻止加载，Chromium 日志为 `Loading of unpacked extensions is disabled by the administrator.`。未修改系统策略绕过验证，因此仍需在真实可加载扩展的 Edge / Chrome 环境完成 1.0 主链 smoke 后才能关闭 P1。
+- 真实 Browser smoke 已于 Windows Edge 完成：用户基于当前 `main` 构建产物验证扩展可加载、Side Panel 与 1.0 主链可用；smoke 过程中发现“模块开头 `/` 更换类别会新增上方模块”的真实回归，随后以 commit `11ed32767ff8cab8db75c619fc424a99e6b5c425` 修复为块首原位转换，CI `#413` 的 typecheck、lint、unit tests、extension build 与发布产物打包均通过，用户重新加载 Edge 后确认问题已消失。至此 P1 平台抽取与真实宿主回归验证闭环。
 
 ## P2 — Tauri 2 Desktop Shell 基础
 
-- [ ] 初始化 `src-tauri/`，固定 Tauri 2；
-- [ ] Windows 10/11 x64 build target 可编译；
-- [ ] 配置单实例，第二次启动只唤起已有实例；
-- [ ] 建立最小 Tauri capabilities；
-- [ ] 明确禁止通用 shell execution 与无边界文件系统权限；
+- [x] 初始化 `src-tauri/`，固定 Tauri 2；
+- [x] Windows 10/11 x64 build target 可编译；
+- [x] 配置单实例，第二次启动只唤起已有实例；
+- [x] 建立最小 Tauri capabilities；
+- [x] 明确禁止通用 shell execution 与无边界文件系统权限；
 - [ ] 复用现有 React 入口与共享 Editor，不复制 Desktop Editor；
 - [ ] Full Window 首次启动可完成现有核心主链；
 - [ ] Windows 本机构建与启动 smoke 通过。
+
+### P2 宿主基础证据 — 2026-08-11
+
+- 新增独立 `src-tauri/` Tauri 2 crate、`desktop.html`、`src/desktop.tsx` 与 `vite.desktop.config.mjs`；Desktop 构建输出固定到 `dist-desktop`，Browser 继续使用 `sidepanel.html` / `src/main.tsx` / `dist`，两种宿主构建目录互不覆盖。
+- `tauri-plugin-single-instance` 是当前唯一 Desktop plugin；第二实例回调只查找 `main` WebView window 并执行 `show`、`unminimize`、`set_focus`，不创建第二份应用进程状态。
+- `src-tauri/capabilities/main-window.json` 当前只声明 `core:default`；Cargo 依赖不包含 `tauri-plugin-shell`、`tauri-plugin-fs`，也没有通用 shell command 或任意文件系统命令。
+- 新增 `tests/desktop-host-config.test.ts`，锁定 Tauri 2、单一 `main` window、单实例回调、最小 capability 与 Desktop entry 不依赖 Browser adapter；现有 Browser typecheck/lint/unit/build 继续通过。
+- 新增独立 `desktop-host-check` Windows workflow：`windows-latest` 上构建 Desktop shell 前端，并以 `x86_64-pc-windows-msvc` 对 `src-tauri/Cargo.toml` 执行真实 `cargo check`，当前 run 已通过；因此“Windows x64 build target 可编译”已有真实 Windows runner 证据。
+- 暂不勾选剩余 3 项：`src/desktop.tsx` 当前只承担真实 Tauri shell 启动边界，尚未接入 `PromptNoteApp`，避免为 P2 制造随后必须删除的内存/localStorage Repository、假 SecretStore 或假 AI Transport。完整共享 Editor 主链将在真实 Desktop adapters 到位后接回；Windows 本机启动/第二实例行为仍需真实 GUI smoke。
 
 ## P3 — Desktop Repository 与 SecretStore
 
