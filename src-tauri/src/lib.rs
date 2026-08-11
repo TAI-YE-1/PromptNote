@@ -2,6 +2,7 @@ mod credentials;
 #[cfg(target_os = "windows")]
 mod fullscreen;
 mod shell;
+mod startup;
 mod storage;
 
 #[cfg(test)]
@@ -12,6 +13,7 @@ use std::sync::Mutex;
 
 use serde_json::Value;
 use shell::{ShellController, ShellSnapshot};
+use startup::{StartupSnapshot, StartupState};
 use storage::PromptDocument;
 use tauri::Manager;
 
@@ -182,6 +184,16 @@ fn shell_set_orb_idle(
     shell.set_orb_idle(&app, idle)
 }
 
+#[tauri::command]
+fn startup_snapshot(app: tauri::AppHandle, state: tauri::State<'_, StartupState>) -> Result<StartupSnapshot, String> {
+    startup::snapshot(&app, &state)
+}
+
+#[tauri::command]
+fn startup_set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
+    startup::set_autostart(&app, enabled)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -194,6 +206,25 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed
+                        && shortcut == &startup::promptnote_shortcut()
+                    {
+                        if let Some(shell) = app.try_state::<ShellController>() {
+                            if let Err(error) = shell.toggle_compact(app) {
+                                eprintln!("PromptNote global shortcut failed: {error}");
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![startup::AUTOSTART_ARG]),
+        ))
         .plugin(tauri_plugin_http::init())
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()?;
@@ -208,8 +239,11 @@ pub fn run() {
                 credential_lock: Mutex::new(()),
             });
             app.manage(shell);
+            let startup_state = startup::register_global_shortcut(app.handle());
+            app.manage(startup_state);
+            let background_launch = startup::launched_from_autostart();
             app.state::<ShellController>()
-                .initialize(app.handle())
+                .initialize(app.handle(), background_launch)
                 .map_err(std::io::Error::other)?;
             #[cfg(target_os = "windows")]
             fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;
@@ -251,6 +285,8 @@ pub fn run() {
             shell_start_orb_drag,
             shell_snap_orb,
             shell_set_orb_idle,
+            startup_snapshot,
+            startup_set_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PromptNote Desktop");
