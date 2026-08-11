@@ -4,6 +4,7 @@ import {
   PromptNoteApp,
   type PromptNoteHostCommandRequest,
 } from './app/PromptNoteApp'
+import { DesktopSettings } from './DesktopSettings'
 import { RuntimeErrorBoundary } from './app/RuntimeErrorBoundary'
 import { DesktopAiTransport } from './platform/desktop/aiTransport'
 import { DesktopPreferencesRepository } from './platform/desktop/preferencesRepository'
@@ -34,6 +35,7 @@ function DesktopRoot() {
   const hostCommandSequence = useRef(0)
   const [shell, setShell] = useState<ShellSnapshot | null>(null)
   const [hostCommand, setHostCommand] = useState<PromptNoteHostCommandRequest | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [shellError, setShellError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -61,8 +63,12 @@ function DesktopRoot() {
 
     void onHostCommand((command) => {
       if (disposed) return
+      if (command === 'settings') {
+        setSettingsOpen(true)
+        return
+      }
       hostCommandSequence.current += 1
-      setHostCommand({ id: hostCommandSequence.current, command })
+      setHostCommand({ id: hostCommandSequence.current, command: 'new-prompt' })
     }).then((stop) => {
       if (disposed) stop()
       else unlistenHostCommand = stop
@@ -130,6 +136,7 @@ function DesktopRoot() {
         </div>
       )}
 
+      {settingsOpen && <DesktopSettings shell={shell} onClose={() => setSettingsOpen(false)} />}
       {shellError && <div className="desktop-shell-error">Desktop shell：{shellError}</div>}
     </>
   )
