@@ -28,17 +28,28 @@
 
 ## P1 — 共享核心平台边界
 
-- [ ] 搜索并列出 `src/` 中所有直接 `chrome.*`、extension storage、host permission、window lifecycle 依赖；
-- [ ] 将 Prompt 正文持久化语义收敛到 `PromptRepository` contract；
-- [ ] 将非正文设置收敛到 `PreferencesRepository` contract；
-- [ ] 定义 `SecretStore` contract，确保 credential 不进入 PromptDocument；
-- [ ] 定义 `AiTransport` 最小 contract；
-- [ ] Browser adapter 接回现有 `chrome.storage.local` 行为，保持 revision / backup 语义不变；
-- [ ] Browser AI transport 保持 optional host permission 与现有错误语义；
-- [ ] 迁移共享调用方后删除直接散落的 host-specific 访问；
-- [ ] 反向搜索确认 `editor/`、`prompt/`、Compiler 不直接依赖 Chrome / Tauri；
-- [ ] 现有 Browser 单测、typecheck、lint、build 全通过；
+- [x] 搜索并列出 `src/` 中所有直接 `chrome.*`、extension storage、host permission、window lifecycle 依赖；
+- [x] 将 Prompt 正文持久化语义收敛到 `PromptRepository` contract；
+- [x] 将非正文设置收敛到 `PreferencesRepository` contract；
+- [x] 定义 `SecretStore` contract，确保 credential 不进入 PromptDocument；
+- [x] 定义 `AiTransport` 最小 contract；
+- [x] Browser adapter 接回现有 `chrome.storage.local` 行为，保持 revision / backup 语义不变；
+- [x] Browser AI transport 保持 optional host permission 与现有错误语义；
+- [x] 迁移共享调用方后删除直接散落的 host-specific 访问；
+- [x] 反向搜索确认 `editor/`、`prompt/`、Compiler 不直接依赖 Chrome / Tauri；
+- [x] 现有 Browser 单测、typecheck、lint、build 全通过；
 - [ ] 真实 Edge / Chrome smoke 确认平台抽取没有回归 1.0 主链。
+
+### P1 实施证据 — 2026-08-11
+
+- 审查确认的 Browser 平台依赖集中在四类真实调用链：Prompt 持久化、AI 设置/credential 存储、AI 网络访问与 optional host permission、extension service worker / Side Panel 生命周期；`PromptEditor`、PromptDocument、Compiler、Prompt Check、AI suggestion 与 inline completion 业务规则继续作为共享核心保留。
+- `src/storage/promptRepository.ts` 只保留 `PromptRepository` contract；Browser 的 `chrome.storage.local` 实现迁移到 `src/platform/browser/promptRepository.ts`，继续使用 `promptnote.documents.v1` / `promptnote.currentDocumentId.v1`，并保留串行写入、revision stale-write reject 与 `ensureCurrent` 行为。
+- 非敏感 AI 设置由 `PreferencesRepository` 承载；credential 通过独立 `SecretStore` 访问。Browser 为保持 1.0 数据兼容，`ChromeAiSettingsStore` 仍读写原 `promptnote.aiSettings.v1` 结构；共享层不再直接访问 `chrome.storage.local`，Desktop 后续按 P3 实现独立安全 `SecretStore`。
+- `AiTransport` 只收敛宿主网络授权与 request；OpenAI-compatible / Anthropic 的 request body、streaming、timeout、abort、transient error 与 fallback 规则仍只有一份共享 provider 实现。Browser adapter 保留原 `origin/*` optional host permission 语义。
+- `src/extension/background.ts` 的 `chrome.action` / `chrome.sidePanel` 生命周期调用保持在 Browser host 内，不为 Desktop 制造无调用方 wrapper。
+- 删除旧 `src/storage/aiSettingsRepository.ts`；共享真实调用方已改为依赖平台合同，Browser composition 只在 `src/main.tsx` 注入 Browser adapters。新增 `tests/platform-boundary.test.ts` 防止 `src/app`、`src/ai`、`src/editor`、`src/prompt`、`src/storage` 重新出现直接 `chrome.*` / Tauri API。
+- 自动验证基于 commit `0d191565cd82aaee6b163725e19890327a915ffe` 的 GitHub Actions `ci` run `#411`：license audit、typecheck、lint、25 个 test files / 114 tests、extension build、release artifact package/upload 全部通过。构建产物 digest：`sha256:132296e7bb8de0d7b27254ee621a3645cca614247804262d9a4ffdf4e0ce65f6`。
+- 真实 Browser smoke 尚未勾选：已下载上述 CI 产物并尝试在当前 Chromium 144 环境加载 unpacked extension，但运行环境管理员策略 `ExtensionInstallBlocklist: ["*"]` 明确阻止加载，Chromium 日志为 `Loading of unpacked extensions is disabled by the administrator.`。未修改系统策略绕过验证，因此仍需在真实可加载扩展的 Edge / Chrome 环境完成 1.0 主链 smoke 后才能关闭 P1。
 
 ## P2 — Tauri 2 Desktop Shell 基础
 
