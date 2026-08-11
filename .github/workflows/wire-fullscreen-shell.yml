@@ -75,7 +75,7 @@ jobs:
             '            app.state::<ShellController>()',
             '                .initialize(app.handle())',
             '                .map_err(std::io::Error::other)?;',
-            '            #[cfg(target_os = "windows")]'.Replace('\"', '"'),
+            '            #[cfg(target_os = "windows")]'.Replace([char]92, ''),
             '            fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;',
             '            Ok(())'
           ) -join "`n"
