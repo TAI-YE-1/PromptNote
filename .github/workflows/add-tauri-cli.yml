@@ -1,0 +1,42 @@
+name: add-tauri-cli
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/add-tauri-cli.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Add exact Tauri CLI and installer script
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --save-dev --save-exact @tauri-apps/cli@2.11.0
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const path = 'package.json'
+          const packageJson = JSON.parse(fs.readFileSync(path, 'utf8'))
+          packageJson.scripts['build:desktop-installer'] = 'npm run build:desktop-shell && tauri build --target x86_64-pc-windows-msvc --bundles nsis'
+          fs.writeFileSync(path, `${JSON.stringify(packageJson, null, 2)}\n`)
+          NODE
+      - name: Commit locks and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/add-tauri-cli.yml
+          git add package.json package-lock.json
+          git commit -m "build(desktop): lock NSIS build toolchain"
+          git push
