@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         desktop: resolve(process.cwd(), 'desktop.html'),
+        orb: resolve(process.cwd(), 'orb.html'),
       },
     },
   },
