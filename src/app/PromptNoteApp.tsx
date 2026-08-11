@@ -46,11 +46,17 @@ import { useInlineCompletion } from './useInlineCompletion'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type AiPanel = 'menu' | 'settings' | null
 
+export interface PromptNoteHostCommandRequest {
+  id: number
+  command: 'new-prompt' | 'settings'
+}
+
 export interface PromptNoteAppProps {
   promptRepository: PromptRepository
   preferencesRepository: PreferencesRepository
   secretStore: SecretStore
   aiTransport: AiTransport
+  hostCommand?: PromptNoteHostCommandRequest | null
 }
 
 export function PromptNoteApp({
@@ -58,10 +64,12 @@ export function PromptNoteApp({
   preferencesRepository,
   secretStore,
   aiTransport,
+  hostCommand = null,
 }: PromptNoteAppProps) {
   const editorRef = useRef<PromptEditorHandle | null>(null)
   const currentRef = useRef<PromptDocument | null>(null)
   const deletedDocumentIds = useRef(new Set<string>())
+  const lastHostCommandIdRef = useRef<number | null>(null)
   const [documents, setDocuments] = useState<PromptDocument[]>([])
   const [current, setCurrent] = useState<PromptDocument | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -163,6 +171,16 @@ export function PromptNoteApp({
     window.addEventListener('keydown', dismissTopmost)
     return () => window.removeEventListener('keydown', dismissTopmost)
   }, [aiPanel, documentSheetOpen, previewOpen, selection, slashOpen])
+
+  useEffect(() => {
+  if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+  lastHostCommandIdRef.current = hostCommand.id
+  if (hostCommand.command === 'new-prompt') {
+    void createDocument()
+    return
+  }
+  openAi(true, 'settings')
+}, [hostCommand])
 
   const previewText = useMemo(
     () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
@@ -323,11 +341,11 @@ export function PromptNoteApp({
     setCompletionContext(null)
   }
 
-  function openAi(clearSelection = true) {
+  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {
     setAiDraft(aiSettings)
     setAiTestState('idle')
     setAiError(null)
-    setAiPanel(aiSettings.configured ? 'menu' : 'settings')
+    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))
     if (clearSelection) setSelection(null)
   }
 
