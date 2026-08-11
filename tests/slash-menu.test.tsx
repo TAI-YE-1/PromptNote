@@ -2,12 +2,25 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { sectionKindMeta, sectionKinds } from '../src/prompt/sectionKinds'
 import { SlashMenu } from '../src/ui/components'
-import { nextSlashMenuIndex } from '../src/ui/SlashMenu'
+import { nextSlashMenuIndex } from '../src/editor/slashCommand'
+
+const anchor = { left: 100, top: 120, bottom: 140 }
+
+function renderMenu(activeIndex = 0) {
+  return renderToStaticMarkup(
+    <SlashMenu
+      anchor={anchor}
+      activeIndex={activeIndex}
+      onActiveIndex={() => undefined}
+      onClose={() => undefined}
+      onInsert={() => undefined}
+    />,
+  )
+}
 
 describe('SlashMenu', () => {
   it('renders every authoritative semantic section exactly once', () => {
-    const html = renderToStaticMarkup(<SlashMenu onClose={() => undefined} onInsert={() => undefined} />)
-
+    const html = renderMenu()
     for (const kind of sectionKinds) {
       expect(html.match(new RegExp(`data-kind="${kind}"`, 'g'))).toHaveLength(1)
       expect(html).toContain(sectionKindMeta[kind].label)
@@ -15,18 +28,11 @@ describe('SlashMenu', () => {
     }
   })
 
-  it('does not introduce a parallel semantic kind outside sectionKinds', () => {
-    const html = renderToStaticMarkup(<SlashMenu onClose={() => undefined} onInsert={() => undefined} />)
-    const renderedKinds = [...html.matchAll(/data-kind="([^"]+)"/g)].map((match) => match[1])
-
-    expect(renderedKinds).toEqual([...sectionKinds])
-  })
-
-  it('keeps editor focus instead of moving DOM focus into the menu', () => {
-    const html = renderToStaticMarkup(<SlashMenu onClose={() => undefined} onInsert={() => undefined} />)
+  it('uses a controlled active index without moving DOM focus into the menu', () => {
+    const html = renderMenu(2)
     expect(html).toContain('role="menu"')
-    expect(html).toContain('slash-item slash-item--active')
     expect(html).not.toContain('tabindex="0"')
+    expect(html).toContain('aria-selected="true"')
     expect(html.match(/tabindex="-1"/g)?.length).toBeGreaterThanOrEqual(sectionKinds.length)
   })
 

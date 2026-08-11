@@ -2,7 +2,11 @@ import { getSchema } from '@tiptap/core'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { describe, expect, it } from 'vitest'
-import { shouldOpenSlashMenu } from '../src/editor/slashCommand'
+import {
+  isSlashMenuKey,
+  nextSlashMenuIndex,
+  shouldOpenSlashMenu,
+} from '../src/editor/slashCommand'
 import { PromptSection } from '../src/editor/promptSection'
 
 const schema = getSchema([StarterKit, PromptSection])
@@ -53,5 +57,21 @@ describe('Slash command trigger', () => {
 
   it('does not open while replacing a non-empty selection', () => {
     expect(shouldOpenSlashMenu(paragraphState('AB', 1, 2))).toBe(false)
+  })
+})
+
+
+describe('Slash menu keyboard contract', () => {
+  it('recognizes only menu-owned navigation/commit keys', () => {
+    expect(isSlashMenuKey('ArrowDown')).toBe(true)
+    expect(isSlashMenuKey('Enter')).toBe(true)
+    expect(isSlashMenuKey('Escape')).toBe(true)
+    expect(isSlashMenuKey('/')).toBe(false)
+    expect(isSlashMenuKey('a')).toBe(false)
+  })
+
+  it('wraps the controlled active index', () => {
+    expect(nextSlashMenuIndex(0, 'ArrowUp', 7)).toBe(6)
+    expect(nextSlashMenuIndex(6, 'ArrowDown', 7)).toBe(0)
   })
 })

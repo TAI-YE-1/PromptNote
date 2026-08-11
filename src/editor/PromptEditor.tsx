@@ -23,7 +23,12 @@ import {
   createAppendSectionTransaction,
   createSlashSectionTransaction,
 } from './sectionInsertion'
-import { shouldOpenSlashMenu } from './slashCommand'
+import {
+  isSlashMenuKey,
+  shouldOpenSlashMenu,
+  type SlashMenuAnchor,
+  type SlashMenuKey,
+} from './slashCommand'
 
 export type { EditorCompletionContext } from './completionContext'
 export type { EditorSelectionSnapshot } from './selectionSnapshot'
@@ -45,7 +50,8 @@ export interface PromptEditorProps {
   onChange(content: PromptNodeJSON): void
   onSelectionChange(selection: EditorSelectionSnapshot | null): void
   onCompletionContext(context: EditorCompletionContext | null): void
-  onSlashRequest(): void
+  onSlashRequest(anchor: SlashMenuAnchor): void
+  onSlashMenuKey(key: SlashMenuKey): boolean
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
@@ -58,8 +64,12 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const completionContextCharsRef = useRef(props.completionContextChars)
   const appliedDocumentIdRef = useRef(props.documentId)
   const appliedContentRef = useRef(props.content)
+  const onSlashRequestRef = useRef(props.onSlashRequest)
+  const onSlashMenuKeyRef = useRef(props.onSlashMenuKey)
   documentIdRef.current = props.documentId
   completionContextCharsRef.current = props.completionContextChars
+  onSlashRequestRef.current = props.onSlashRequest
+  onSlashMenuKeyRef.current = props.onSlashMenuKey
 
   const editor = useEditor({
     extensions: [StarterKit, PromptSection, GhostCompletion],
@@ -67,6 +77,12 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     editorProps: {
       attributes: { class: 'prompt-editor__content', spellcheck: 'false' },
       handleKeyDown: (view, event) => {
+        if (isSlashMenuKey(event.key) && onSlashMenuKeyRef.current(event.key)) {
+          event.preventDefault()
+          event.stopPropagation()
+          return true
+        }
+
         const slashCommandRequested =
           event.key === '/' &&
           !event.ctrlKey &&
@@ -77,11 +93,19 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           shouldOpenSlashMenu(view.state)
 
         if (slashCommandRequested) {
+          const caret = view.coordsAtPos(view.state.selection.from)
           event.preventDefault()
-          props.onSlashRequest()
+          event.stopPropagation()
+          onSlashRequestRef.current({ left: caret.left, top: caret.top, bottom: caret.bottom })
           return true
         }
         return false
+      },
+      handleTextInput: (view, _from, _to, text) => {
+        if (text !== '/' || view.composing || !shouldOpenSlashMenu(view.state)) return false
+        const caret = view.coordsAtPos(view.state.selection.from)
+        onSlashRequestRef.current({ left: caret.left, top: caret.top, bottom: caret.bottom })
+        return true
       },
     },
     onUpdate: ({ editor: current }) => {

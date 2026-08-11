@@ -1,44 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { placeSlashMenu, type SlashMenuAnchor } from '../src/ui/SlashMenu'
+import { placeSlashMenu } from '../src/ui/SlashMenu'
+import type { SlashMenuAnchor } from '../src/editor/slashCommand'
 
 const baseAnchor: SlashMenuAnchor = {
-  caretLeft: 120,
-  caretTop: 180,
-  caretBottom: 200,
-  viewportWidth: 360,
-  viewportHeight: 640,
+  left: 120,
+  top: 180,
+  bottom: 200,
 }
 
 describe('slash menu caret placement', () => {
-  it('opens below the caret when there is enough room', () => {
-    expect(placeSlashMenu(baseAnchor, 280, 260)).toEqual({ left: 72, top: 206 })
+  it('opens below the ProseMirror caret when there is enough room', () => {
+    expect(placeSlashMenu(baseAnchor, 280, 260, 360, 640)).toEqual({ left: 72, top: 206 })
   })
 
-  it('flips directly above the caret near the bottom of the viewport', () => {
-    const anchor = {
-      ...baseAnchor,
-      caretTop: 570,
-      caretBottom: 590,
-    }
-
-    expect(placeSlashMenu(anchor, 280, 260)).toEqual({ left: 72, top: 304 })
+  it('flips directly above the ProseMirror caret near the viewport bottom', () => {
+    expect(
+      placeSlashMenu({ left: 120, top: 570, bottom: 590 }, 280, 260, 360, 640),
+    ).toEqual({ left: 72, top: 304 })
   })
 
-  it('keeps the menu inside the right edge of the viewport', () => {
-    const anchor = {
-      ...baseAnchor,
-      caretLeft: 340,
-    }
-
-    expect(placeSlashMenu(anchor, 280, 260).left).toBe(72)
-  })
-
-  it('keeps the menu inside the left edge of the viewport', () => {
-    const anchor = {
-      ...baseAnchor,
-      caretLeft: 2,
-    }
-
-    expect(placeSlashMenu(anchor, 280, 260).left).toBe(8)
+  it('keeps the menu inside horizontal viewport bounds', () => {
+    expect(placeSlashMenu({ ...baseAnchor, left: 340 }, 280, 260, 360, 640).left).toBe(72)
+    expect(placeSlashMenu({ ...baseAnchor, left: 2 }, 280, 260, 360, 640).left).toBe(8)
   })
 })

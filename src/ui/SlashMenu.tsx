@@ -1,23 +1,10 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
+import type { SlashMenuAnchor } from '../editor/slashCommand'
 import './slashMenu.css'
 
 const MENU_GAP = 6
 const VIEWPORT_PADDING = 8
-
-export interface SlashMenuAnchor {
-  caretLeft: number
-  caretTop: number
-  caretBottom: number
-  viewportWidth: number
-  viewportHeight: number
-}
 
 export interface SlashMenuPosition {
   left: number
@@ -28,14 +15,16 @@ export function placeSlashMenu(
   anchor: SlashMenuAnchor,
   menuWidth: number,
   menuHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
 ): SlashMenuPosition {
   const minLeft = VIEWPORT_PADDING
-  const maxLeft = Math.max(minLeft, anchor.viewportWidth - VIEWPORT_PADDING - menuWidth)
-  const left = Math.min(Math.max(anchor.caretLeft, minLeft), maxLeft)
+  const maxLeft = Math.max(minLeft, viewportWidth - VIEWPORT_PADDING - menuWidth)
+  const left = Math.min(Math.max(anchor.left, minLeft), maxLeft)
 
-  const below = anchor.caretBottom + MENU_GAP
-  const above = anchor.caretTop - MENU_GAP - menuHeight
-  const maxTop = Math.max(VIEWPORT_PADDING, anchor.viewportHeight - VIEWPORT_PADDING - menuHeight)
+  const below = anchor.bottom + MENU_GAP
+  const above = anchor.top - MENU_GAP - menuHeight
+  const maxTop = Math.max(VIEWPORT_PADDING, viewportHeight - VIEWPORT_PADDING - menuHeight)
   const top =
     below <= maxTop
       ? below
@@ -46,82 +35,37 @@ export function placeSlashMenu(
   return { left, top }
 }
 
-export function nextSlashMenuIndex(currentIndex: number, key: string, itemCount: number): number {
-  if (itemCount <= 0) return -1
-  if (key === 'ArrowDown') return (currentIndex + 1) % itemCount
-  if (key === 'ArrowUp') return (currentIndex - 1 + itemCount) % itemCount
-  if (key === 'Home') return 0
-  if (key === 'End') return itemCount - 1
-  return currentIndex
-}
-
 interface SlashMenuProps {
+  anchor: SlashMenuAnchor
+  activeIndex: number
+  onActiveIndex(index: number): void
   onClose(): void
-  onEscape?(): void
   onInsert(kind: SectionKind): void
 }
 
 export function SlashMenu(props: SlashMenuProps) {
-  const [activeIndex, setActiveIndex] = useState(0)
   const [position, setPosition] = useState<SlashMenuPosition | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   useLayoutEffect(() => {
     const menu = menuRef.current
-    const selection = window.getSelection()
-    const editorRoot = document.querySelector('.prompt-editor__content')
-    if (!menu || !(editorRoot instanceof HTMLElement) || !selection || selection.rangeCount === 0) {
-      return
-    }
-
-    const range = selection.getRangeAt(0)
-    if (!editorRoot.contains(range.commonAncestorContainer)) return
-
-    const caretRect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+    if (!menu) return
     const menuRect = menu.getBoundingClientRect()
     setPosition(
       placeSlashMenu(
-        {
-          caretLeft: caretRect.left,
-          caretTop: caretRect.top,
-          caretBottom: caretRect.bottom,
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        },
+        props.anchor,
         menuRect.width,
         menuRect.height,
+        window.innerWidth,
+        window.innerHeight,
       ),
     )
-  }, [])
+  }, [props.anchor])
 
-  useEffect(() => {
-    function handleWindowKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        const handleEscape = props.onEscape ?? props.onClose
-        handleEscape()
-        return
-      }
-
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        event.stopPropagation()
-        props.onInsert(sectionKinds[activeIndex])
-        return
-      }
-
-      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-      event.preventDefault()
-      event.stopPropagation()
-      setActiveIndex((currentIndex) =>
-        nextSlashMenuIndex(currentIndex, event.key, sectionKinds.length),
-      )
-    }
-
-    window.addEventListener('keydown', handleWindowKeyDown, true)
-    return () => window.removeEventListener('keydown', handleWindowKeyDown, true)
-  }, [activeIndex, props.onClose, props.onEscape, props.onInsert])
+  useLayoutEffect(() => {
+    itemRefs.current[props.activeIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [props.activeIndex])
 
   const positionStyle: CSSProperties = {
     position: 'fixed',
@@ -155,13 +99,15 @@ export function SlashMenu(props: SlashMenuProps) {
         return (
           <button
             key={kind}
+            ref={(node) => { itemRefs.current[index] = node }}
             type="button"
             role="menuitem"
+            aria-selected={index === props.activeIndex}
             tabIndex={-1}
-            className={index === activeIndex ? 'slash-item slash-item--active' : 'slash-item'}
+            className={index === props.activeIndex ? 'slash-item slash-item--active' : 'slash-item'}
             data-kind={kind}
             onMouseDown={(event) => event.preventDefault()}
-            onMouseEnter={() => setActiveIndex(index)}
+            onMouseEnter={() => props.onActiveIndex(index)}
             onClick={() => props.onInsert(kind)}
           >
             <span className="slash-item__icon">{meta.icon}</span>

@@ -14,6 +14,12 @@ import {
   type PromptDocument,
   type PromptNodeJSON,
 } from '../prompt/schema'
+import { sectionKinds } from '../prompt/sectionKinds'
+import {
+  nextSlashMenuIndex,
+  type SlashMenuAnchor,
+  type SlashMenuKey,
+} from '../editor/slashCommand'
 import { ChromePromptRepository } from '../storage/promptRepository'
 import { ChromeAiSettingsRepository, defaultAiSettings } from '../storage/aiSettingsRepository'
 import { defaultBaseUrl, ensureAiHostPermission, getAiProvider } from '../ai/provider'
@@ -42,6 +48,11 @@ const aiSettingsRepository = new ChromeAiSettingsRepository()
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type AiPanel = 'menu' | 'settings' | null
 
+interface SlashMenuState {
+  anchor: SlashMenuAnchor
+  activeIndex: number
+}
+
 export function PromptNoteApp() {
   const editorRef = useRef<PromptEditorHandle | null>(null)
   const currentRef = useRef<PromptDocument | null>(null)
@@ -51,7 +62,7 @@ export function PromptNoteApp() {
   const [loaded, setLoaded] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [slashOpen, setSlashOpen] = useState(false)
+  const [slashMenu, setSlashMenu] = useState<SlashMenuState | null>(null)
   const [documentSheetOpen, setDocumentSheetOpen] = useState(false)
   const [selection, setSelection] = useState<EditorSelectionSnapshot | null>(null)
   const [completionContext, setCompletionContext] = useState<EditorCompletionContext | null>(null)
@@ -134,8 +145,10 @@ export function PromptNoteApp() {
       if (aiPanel) setAiPanel(null)
       else if (documentSheetOpen) setDocumentSheetOpen(false)
       else if (previewOpen) setPreviewOpen(false)
-      else if (slashOpen) setSlashOpen(false)
-      else if (selection) setSelection(null)
+      else if (slashMenu) {
+        editorRef.current?.insertText('/')
+        setSlashMenu(null)
+      } else if (selection) setSelection(null)
       else return
 
       event.preventDefault()
@@ -143,7 +156,7 @@ export function PromptNoteApp() {
 
     window.addEventListener('keydown', dismissTopmost)
     return () => window.removeEventListener('keydown', dismissTopmost)
-  }, [aiPanel, documentSheetOpen, previewOpen, selection, slashOpen])
+  }, [aiPanel, documentSheetOpen, previewOpen, selection, slashMenu])
 
   const previewText = useMemo(
     () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
@@ -299,10 +312,51 @@ export function PromptNoteApp() {
     }
   }
 
+  function openSlashMenu(anchor: SlashMenuAnchor) {
+    setSlashMenu({ anchor, activeIndex: 0 })
+    setSelection(null)
+  }
+
+  function insertSlashSection(index: number) {
+    const kind = sectionKinds[index]
+    if (!kind) return
+    editorRef.current?.insertSection(kind)
+    setSlashMenu(null)
+  }
+
+  function handleSlashMenuKey(key: SlashMenuKey): boolean {
+    if (!slashMenu) return false
+
+    if (key === 'Enter') {
+      insertSlashSection(slashMenu.activeIndex)
+      return true
+    }
+    if (key === 'Escape') {
+      editorRef.current?.insertText('/')
+      setSlashMenu(null)
+      return true
+    }
+
+    setSlashMenu((currentMenu) =>
+      currentMenu
+        ? {
+            ...currentMenu,
+            activeIndex: nextSlashMenuIndex(
+              currentMenu.activeIndex,
+              key,
+              sectionKinds.length,
+            ),
+          }
+        : currentMenu,
+    )
+    return true
+  }
+
   function resetTransientEditorState() {
     setSuggestion(null)
     setSelection(null)
     setCompletionContext(null)
+    setSlashMenu(null)
   }
 
   function openAi(clearSelection = true) {
@@ -505,18 +559,22 @@ export function PromptNoteApp() {
                 onChange={updateCurrentContent}
                 onSelectionChange={setSelection}
                 onCompletionContext={setCompletionContext}
-                onSlashRequest={() => { setSlashOpen(true); setSelection(null) }}
+                onSlashRequest={openSlashMenu}
+                onSlashMenuKey={handleSlashMenuKey}
               />
-              {slashOpen && (
+              {slashMenu && (
                 <SlashMenu
-                  onClose={() => setSlashOpen(false)}
-                  onEscape={() => {
-                    editorRef.current?.insertText('/')
-                    setSlashOpen(false)
-                  }}
+                  anchor={slashMenu.anchor}
+                  activeIndex={slashMenu.activeIndex}
+                  onActiveIndex={(activeIndex) =>
+                    setSlashMenu((currentMenu) =>
+                      currentMenu ? { ...currentMenu, activeIndex } : currentMenu,
+                    )
+                  }
+                  onClose={() => setSlashMenu(null)}
                   onInsert={(kind) => {
                     editorRef.current?.insertSection(kind)
-                    setSlashOpen(false)
+                    setSlashMenu(null)
                   }}
                 />
               )}
