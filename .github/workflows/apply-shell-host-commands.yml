@@ -84,22 +84,20 @@ jobs:
           assert text.count(anchor) == 1, 'PromptNoteApp preview anchor changed'
           text = text.replace(anchor, effect, 1)
 
-          old = """  function openAi(clearSelection = true) {
-            setAiDraft(aiSettings)
-            setAiTestState('idle')
-            setAiError(null)
-            setAiPanel(aiSettings.configured ? 'menu' : 'settings')
-            if (clearSelection) setSelection(null)
-          }"""
-          new = """  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {
-            setAiDraft(aiSettings)
-            setAiTestState('idle')
-            setAiError(null)
-            setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))
-            if (clearSelection) setSelection(null)
-          }"""
-          assert old in text, 'PromptNoteApp openAi anchor changed'
-          text = text.replace(old, new, 1)
+          signature = "  function openAi(clearSelection = true) {"
+          panel_line = "    setAiPanel(aiSettings.configured ? 'menu' : 'settings')"
+          assert text.count(signature) == 1, 'PromptNoteApp openAi signature changed'
+          assert text.count(panel_line) == 1, 'PromptNoteApp openAi panel line changed'
+          text = text.replace(
+            signature,
+            "  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {",
+            1,
+          )
+          text = text.replace(
+            panel_line,
+            "    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))",
+            1,
+          )
 
           path.write_text(text, encoding='utf-8')
       - name: Commit patch and remove one-shot workflow
