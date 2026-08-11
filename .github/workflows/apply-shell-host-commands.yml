@@ -1,0 +1,119 @@
+name: apply-shell-host-commands
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-shell-host-commands.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Patch shared PromptNoteApp host command input
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/app/PromptNoteApp.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          old = """export interface PromptNoteAppProps {
+            promptRepository: PromptRepository
+            preferencesRepository: PreferencesRepository
+            secretStore: SecretStore
+            aiTransport: AiTransport
+          }
+
+          export function PromptNoteApp({
+            promptRepository,
+            preferencesRepository,
+            secretStore,
+            aiTransport,
+          }: PromptNoteAppProps) {"""
+          new = """export interface PromptNoteHostCommandRequest {
+            id: number
+            command: 'new-prompt' | 'settings'
+          }
+
+          export interface PromptNoteAppProps {
+            promptRepository: PromptRepository
+            preferencesRepository: PreferencesRepository
+            secretStore: SecretStore
+            aiTransport: AiTransport
+            hostCommand?: PromptNoteHostCommandRequest | null
+          }
+
+          export function PromptNoteApp({
+            promptRepository,
+            preferencesRepository,
+            secretStore,
+            aiTransport,
+            hostCommand = null,
+          }: PromptNoteAppProps) {"""
+          assert old in text, 'PromptNoteApp props anchor changed'
+          text = text.replace(old, new, 1)
+
+          old = """  const currentRef = useRef<PromptDocument | null>(null)
+            const deletedDocumentIds = useRef(new Set<string>())"""
+          new = """  const currentRef = useRef<PromptDocument | null>(null)
+            const deletedDocumentIds = useRef(new Set<string>())
+            const lastHostCommandIdRef = useRef<number | null>(null)"""
+          assert old in text, 'PromptNoteApp refs anchor changed'
+          text = text.replace(old, new, 1)
+
+          anchor = """  const previewText = useMemo(
+            () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
+            [current, previewFormat, previewOpen],
+          )"""
+          effect = """  useEffect(() => {
+            if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+            lastHostCommandIdRef.current = hostCommand.id
+            if (hostCommand.command === 'new-prompt') {
+              void createDocument()
+              return
+            }
+            openAi(true, 'settings')
+          }, [hostCommand])
+
+          """ + anchor
+          assert anchor in text, 'PromptNoteApp host effect anchor changed'
+          text = text.replace(anchor, effect, 1)
+
+          old = """  function openAi(clearSelection = true) {
+            setAiDraft(aiSettings)
+            setAiTestState('idle')
+            setAiError(null)
+            setAiPanel(aiSettings.configured ? 'menu' : 'settings')
+            if (clearSelection) setSelection(null)
+          }"""
+          new = """  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {
+            setAiDraft(aiSettings)
+            setAiTestState('idle')
+            setAiError(null)
+            setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))
+            if (clearSelection) setSelection(null)
+          }"""
+          assert old in text, 'PromptNoteApp openAi anchor changed'
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+      - name: Commit patch and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-shell-host-commands.yml
+          git add src/app/PromptNoteApp.tsx
+          git commit -m "feat(desktop): consume tray host commands"
+          git push origin HEAD:main
