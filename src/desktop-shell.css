@@ -1,0 +1,56 @@
+html[data-desktop-shell-mode='docked-panel'] .topbar {
+  padding-right: 116px;
+}
+
+.desktop-panel-controls {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 40;
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(23, 53, 43, 0.12);
+  border-radius: 10px;
+  background: rgba(250, 252, 250, 0.94);
+  box-shadow: 0 4px 14px rgba(23, 53, 43, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.desktop-panel-control {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #36594c;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.desktop-panel-control:hover,
+.desktop-panel-control:focus-visible {
+  background: #edf3ef;
+  outline: none;
+}
+
+.desktop-panel-control[aria-pressed='true'] {
+  color: #246b4d;
+}
+
+.desktop-shell-error {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 60;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 9px 12px;
+  border: 1px solid #e5b9b2;
+  border-radius: 10px;
+  background: #fff5f3;
+  color: #8b352b;
+  font-size: 12px;
+  box-shadow: 0 8px 24px rgba(91, 42, 34, 0.12);
+}
