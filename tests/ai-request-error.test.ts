@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiRequestError, getAiProvider } from '../src/ai/provider'
 import type { AiSettings } from '../src/ai/types'
+import { fetchAiTransport } from './testAiTransport'
 
 const settings: AiSettings = {
   enabled: true,
@@ -32,7 +33,7 @@ describe('AiRequestError classification', () => {
     )
 
     try {
-      await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+      await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' })
       throw new Error('expected provider request to fail')
     } catch (error) {
       expect(error).toBeInstanceOf(AiRequestError)
@@ -49,7 +50,7 @@ describe('AiRequestError classification', () => {
     )
 
     try {
-      await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+      await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' })
       throw new Error('expected provider request to fail')
     } catch (error) {
       expect(error).toBeInstanceOf(AiRequestError)
@@ -64,7 +65,7 @@ describe('AiRequestError classification', () => {
     )
 
     try {
-      await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+      await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' })
       throw new Error('expected provider request to fail')
     } catch (error) {
       expect(error).toBeInstanceOf(AiRequestError)
@@ -83,7 +84,7 @@ describe('AiRequestError classification', () => {
     )
 
     await expect(
-      getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' }),
+      getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' }),
     ).rejects.toMatchObject({
       name: 'AiRequestError',
       status: 503,
@@ -96,7 +97,7 @@ describe('AiRequestError classification', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream unavailable', { status: 503 })))
 
     try {
-      await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
+      await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' })
       throw new Error('expected provider request to fail')
     } catch (error) {
       expect(error).toBeInstanceOf(AiRequestError)

@@ -1,4 +1,5 @@
 import { buildSystemInstruction } from './instructions'
+import type { AiTransport, AiTransportResponse } from './transport'
 import type { AiProvider, AiRequest, AiSettings } from './types'
 
 export const AI_REQUEST_TIMEOUT_MS = 30_000
@@ -83,7 +84,7 @@ function readableErrorBody(text: string): string {
   }
 }
 
-function retryAfterMs(response: Response): number | null {
+function retryAfterMs(response: AiTransportResponse): number | null {
   const value = response.headers.get('retry-after')?.trim()
   if (!value) return null
   const seconds = Number(value)
@@ -102,7 +103,7 @@ function isTransientHttpFailure(status: number, text: string): boolean {
   return status === 408 || status === 409 || status === 425 || status >= 500
 }
 
-function responseError(response: Response, text: string): AiRequestError {
+function responseError(response: AiTransportResponse, text: string): AiRequestError {
   const message = readableErrorBody(text) || `AI 请求失败：HTTP ${response.status}`
   return new AiRequestError(message, {
     status: response.status,
@@ -119,7 +120,7 @@ function responseBodyTransportError(error: unknown): AiRequestError {
   )
 }
 
-async function readResponseText(response: Response, signal?: AbortSignal): Promise<string> {
+async function readResponseText(response: AiTransportResponse, signal?: AbortSignal): Promise<string> {
   try {
     return await response.text()
   } catch (error) {
@@ -140,12 +141,17 @@ async function readStreamChunk(
   }
 }
 
-async function fetchAi(url: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+async function fetchAi(
+  transport: AiTransport,
+  url: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+): Promise<AiTransportResponse> {
   const timeoutSignal = AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
 
   try {
-    return await fetch(url, { ...init, signal: requestSignal })
+    return await transport.request(url, { ...init, signal: requestSignal })
   } catch (error) {
     if (signal?.aborted) throw error
     if (error && typeof error === 'object' && 'name' in error) {
@@ -172,7 +178,7 @@ function parseJsonText(text: string): unknown {
   }
 }
 
-async function readJson(response: Response, signal?: AbortSignal): Promise<unknown> {
+async function readJson(response: AiTransportResponse, signal?: AbortSignal): Promise<unknown> {
   const text = await readResponseText(response, signal)
   if (!response.ok) throw responseError(response, text)
   return parseJsonText(text)
@@ -257,7 +263,7 @@ function consumeCompleteSseEvents(buffer: string, onData: (data: string) => void
 type StreamBodyResult = { kind: 'sse' } | { kind: 'text'; text: string }
 
 async function readStreamingOrText(
-  response: Response,
+  response: AiTransportResponse,
   onData: (data: string) => void,
   signal?: AbortSignal,
 ): Promise<StreamBodyResult> {
@@ -328,12 +334,15 @@ async function fallbackCompletion(
 }
 
 class OpenAICompatibleProvider implements AiProvider {
+  constructor(private readonly transport: AiTransport) {}
+
   async testConnection(settings: AiSettings): Promise<void> {
     await this.generate(settings, { action: 'shorten', content: '测试连接。' })
   }
 
   async generate(settings: AiSettings, request: AiRequest, signal?: AbortSignal): Promise<string> {
     const response = await fetchAi(
+      this.transport,
       apiEndpoint(settings.baseUrl, '/v1/chat/completions'),
       {
         method: 'POST',
@@ -361,6 +370,7 @@ class OpenAICompatibleProvider implements AiProvider {
     }
 
     const response = await fetchAi(
+      this.transport,
       endpoint,
       {
         method: 'POST',
@@ -414,12 +424,15 @@ class OpenAICompatibleProvider implements AiProvider {
 }
 
 class AnthropicProvider implements AiProvider {
+  constructor(private readonly transport: AiTransport) {}
+
   async testConnection(settings: AiSettings): Promise<void> {
     await this.generate(settings, { action: 'shorten', content: '测试连接。' })
   }
 
   async generate(settings: AiSettings, request: AiRequest, signal?: AbortSignal): Promise<string> {
     const response = await fetchAi(
+      this.transport,
       apiEndpoint(settings.baseUrl, '/v1/messages'),
       {
         method: 'POST',
@@ -448,6 +461,7 @@ class AnthropicProvider implements AiProvider {
     }
 
     const response = await fetchAi(
+      this.transport,
       endpoint,
       {
         method: 'POST',
@@ -507,18 +521,11 @@ class AnthropicProvider implements AiProvider {
   }
 }
 
-export function getAiProvider(settings: AiSettings): AiProvider {
-  if (settings.provider === 'anthropic') return new AnthropicProvider()
-  return new OpenAICompatibleProvider()
+export function getAiProvider(settings: AiSettings, transport: AiTransport): AiProvider {
+  if (settings.provider === 'anthropic') return new AnthropicProvider(transport)
+  return new OpenAICompatibleProvider(transport)
 }
 
 export function defaultBaseUrl(provider: AiSettings['provider']): string {
   return provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com'
-}
-
-export async function ensureAiHostPermission(baseUrl: string): Promise<boolean> {
-  const url = new URL(baseUrl)
-  const originPattern = `${url.origin}/*`
-  if (await chrome.permissions.contains({ origins: [originPattern] })) return true
-  return chrome.permissions.request({ origins: [originPattern] })
 }

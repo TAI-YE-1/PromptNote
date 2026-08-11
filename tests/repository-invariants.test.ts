@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChromePromptRepository } from '../src/storage/promptRepository'
+import { ChromePromptRepository } from '../src/platform/browser/promptRepository'
 import type { PromptDocument } from '../src/prompt/schema'
 
 const store = new Map<string, unknown>()

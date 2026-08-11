@@ -14,9 +14,16 @@ import {
   type PromptDocument,
   type PromptNodeJSON,
 } from '../prompt/schema'
-import { ChromePromptRepository } from '../storage/promptRepository'
-import { ChromeAiSettingsRepository, defaultAiSettings } from '../storage/aiSettingsRepository'
-import { defaultBaseUrl, ensureAiHostPermission, getAiProvider } from '../ai/provider'
+import type { PromptRepository } from '../storage/promptRepository'
+import {
+  defaultAiSettings,
+  toAiPreferences,
+  withAiSecret,
+  type PreferencesRepository,
+} from '../storage/preferencesRepository'
+import { AI_API_KEY_SECRET, type SecretStore } from '../storage/secretStore'
+import { defaultBaseUrl, getAiProvider } from '../ai/provider'
+import type { AiTransport } from '../ai/transport'
 import { lintPrompt } from '../ai/lint'
 import {
   isSuggestionCurrent,
@@ -36,13 +43,22 @@ import {
 import { resolveImportedDocument } from './importDocument'
 import { useInlineCompletion } from './useInlineCompletion'
 
-const promptRepository = new ChromePromptRepository()
-const aiSettingsRepository = new ChromeAiSettingsRepository()
-
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type AiPanel = 'menu' | 'settings' | null
 
-export function PromptNoteApp() {
+export interface PromptNoteAppProps {
+  promptRepository: PromptRepository
+  preferencesRepository: PreferencesRepository
+  secretStore: SecretStore
+  aiTransport: AiTransport
+}
+
+export function PromptNoteApp({
+  promptRepository,
+  preferencesRepository,
+  secretStore,
+  aiTransport,
+}: PromptNoteAppProps) {
   const editorRef = useRef<PromptEditorHandle | null>(null)
   const currentRef = useRef<PromptDocument | null>(null)
   const deletedDocumentIds = useRef(new Set<string>())
@@ -76,6 +92,7 @@ export function PromptNoteApp() {
   const completionText = useInlineCompletion({
     settings: aiSettings,
     context: completionContext,
+    transport: aiTransport,
     onError: handleCompletionError,
   })
 
@@ -83,12 +100,14 @@ export function PromptNoteApp() {
     let cancelled = false
     void (async () => {
       try {
-        const [document, docs, settings] = await Promise.all([
+        const [document, docs, preferences, apiKey] = await Promise.all([
           promptRepository.ensureCurrent(),
           promptRepository.list(),
-          aiSettingsRepository.load(),
+          preferencesRepository.load(),
+          secretStore.get(AI_API_KEY_SECRET),
         ])
         if (cancelled) return
+        const settings = withAiSecret(preferences, apiKey)
         setCurrent(document)
         setDocuments(docs)
         setAiSettings(settings)
@@ -101,7 +120,7 @@ export function PromptNoteApp() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [preferencesRepository, promptRepository, secretStore])
 
   useEffect(() => {
     if (!loaded || !current) return
@@ -119,7 +138,7 @@ export function PromptNoteApp() {
     }
     window.addEventListener('pagehide', flush)
     return () => window.removeEventListener('pagehide', flush)
-  }, [current, loaded])
+  }, [current, loaded, promptRepository])
 
   useEffect(() => {
     if (!toast) return
@@ -162,8 +181,7 @@ export function PromptNoteApp() {
     try {
       await promptRepository.save(document)
       const latest = currentRef.current
-      const superseded =
-        latest?.id === document.id && latest.revision > document.revision
+      const superseded = latest?.id === document.id && latest.revision > document.revision
       if (!superseded) setDocuments((previous) => upsertDocument(previous, document))
       if (isSameDocumentVersion(latest, document)) setSaveState('saved')
     } catch (saveError) {
@@ -326,12 +344,18 @@ export function PromptNoteApp() {
     })
   }
 
+  async function persistAiConfiguration(settings: AiSettings) {
+    await preferencesRepository.save(toAiPreferences(settings))
+    if (settings.apiKey) await secretStore.set(AI_API_KEY_SECRET, settings.apiKey)
+    else await secretStore.remove(AI_API_KEY_SECRET)
+  }
+
   async function saveAiSettings() {
     setAiError(null)
     try {
       if (!aiDraft.enabled) {
         const next = { ...aiDraft, completionEnabled: false }
-        await aiSettingsRepository.save(next)
+        await persistAiConfiguration(next)
         setAiSettings(next)
         setAiDraft(next)
         setAiPanel(null)
@@ -339,11 +363,11 @@ export function PromptNoteApp() {
         return
       }
       validateAiSettings(aiDraft)
-      if (!(await ensureAiHostPermission(aiDraft.baseUrl))) {
+      if (!(await aiTransport.ensureAccess(aiDraft.baseUrl))) {
         throw new Error('没有授予该 AI 地址的网络访问权限。')
       }
       const next = { ...aiDraft, configured: true }
-      await aiSettingsRepository.save(next)
+      await persistAiConfiguration(next)
       setAiSettings(next)
       setAiDraft(next)
       setAiPanel('menu')
@@ -359,10 +383,10 @@ export function PromptNoteApp() {
     setAiTestState('idle')
     try {
       validateAiSettings(aiDraft)
-      if (!(await ensureAiHostPermission(aiDraft.baseUrl))) {
+      if (!(await aiTransport.ensureAccess(aiDraft.baseUrl))) {
         throw new Error('没有授予该 AI 地址的网络访问权限。')
       }
-      await getAiProvider(aiDraft).testConnection(aiDraft)
+      await getAiProvider(aiDraft, aiTransport).testConnection(aiDraft)
       setAiDraft((previous) => ({ ...previous, configured: true }))
       setAiTestState('ok')
     } catch (testError) {
@@ -382,7 +406,7 @@ export function PromptNoteApp() {
     setAiBusy(true)
     setAiError(null)
     try {
-      const result = await getAiProvider(aiSettings).generate(aiSettings, {
+      const result = await getAiProvider(aiSettings, aiTransport).generate(aiSettings, {
         action,
         content: selection.text,
         surroundingContext: aiSettings.scope === 'context' ? compilePrompt(current, 'plain') : undefined,
@@ -414,7 +438,7 @@ export function PromptNoteApp() {
     setAiBusy(true)
     setAiError(null)
     try {
-      const result = await getAiProvider(aiSettings).generate(aiSettings, {
+      const result = await getAiProvider(aiSettings, aiTransport).generate(aiSettings, {
         action,
         content: compilePrompt(current, 'plain'),
       })

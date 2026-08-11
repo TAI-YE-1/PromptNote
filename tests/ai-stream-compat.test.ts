@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getAiProvider } from '../src/ai/provider'
 import type { AiSettings } from '../src/ai/types'
+import { fetchAiTransport } from './testAiTransport'
 
 function settings(model: string): AiSettings {
   return {
@@ -41,9 +42,10 @@ describe('OpenAI-compatible streaming compatibility', () => {
     )
 
     const partials: string[] = []
+    const current = settings('fast-a')
     await expect(
-      getAiProvider(settings('fast-a')).streamCompletion(
-        settings('fast-a'),
+      getAiProvider(current, fetchAiTransport).streamCompletion(
+        current,
         { action: 'complete', content: '写' },
         (text) => partials.push(text),
       ),
@@ -63,9 +65,10 @@ describe('OpenAI-compatible streaming compatibility', () => {
     )
 
     const partials: string[] = []
+    const current = settings('mislabeled-json')
     await expect(
-      getAiProvider(settings('mislabeled-json')).streamCompletion(
-        settings('mislabeled-json'),
+      getAiProvider(current, fetchAiTransport).streamCompletion(
+        current,
         { action: 'complete', content: '现有较长文本' },
         (text) => partials.push(text),
       ),
@@ -89,8 +92,9 @@ describe('OpenAI-compatible streaming compatibility', () => {
       ),
     )
 
-    const error = await getAiProvider(settings('broken-stream'))
-      .streamCompletion(settings('broken-stream'), { action: 'complete', content: '较长上下文' }, () => {})
+    const current = settings('broken-stream')
+    const error = await getAiProvider(current, fetchAiTransport)
+      .streamCompletion(current, { action: 'complete', content: '较长上下文' }, () => {})
       .catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ name: 'AiRequestError', transient: true, status: null })
@@ -119,9 +123,9 @@ describe('OpenAI-compatible streaming compatibility', () => {
 
     const modelA = settings('model-a')
     const modelB = settings('model-b')
-    await getAiProvider(modelA).streamCompletion(modelA, { action: 'complete', content: 'A' }, () => {})
+    await getAiProvider(modelA, fetchAiTransport).streamCompletion(modelA, { action: 'complete', content: 'A' }, () => {})
     await expect(
-      getAiProvider(modelB).streamCompletion(modelB, { action: 'complete', content: 'B' }, () => {}),
+      getAiProvider(modelB, fetchAiTransport).streamCompletion(modelB, { action: 'complete', content: 'B' }, () => {}),
     ).resolves.toBe('B stream')
 
     expect(fetchMock).toHaveBeenCalledTimes(3)

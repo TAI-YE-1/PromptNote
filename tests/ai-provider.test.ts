@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getAiProvider } from '../src/ai/provider'
 import type { AiSettings } from '../src/ai/types'
+import { fetchAiTransport } from './testAiTransport'
 
 const openAiSettings: AiSettings = {
   enabled: true,
@@ -35,7 +36,7 @@ describe('AI providers', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await getAiProvider(openAiSettings).generate(openAiSettings, {
+    const result = await getAiProvider(openAiSettings, fetchAiTransport).generate(openAiSettings, {
       action: 'clarify',
       content: '尽量改好',
     })
@@ -54,7 +55,7 @@ describe('AI providers', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      getAiProvider(openAiSettings).generate(openAiSettings, {
+      getAiProvider(openAiSettings, fetchAiTransport).generate(openAiSettings, {
         action: 'complete',
         content: 'Only change the current issue',
       }),
@@ -78,8 +79,8 @@ describe('AI providers', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await getAiProvider(settings).generate(settings, { action: 'complete', content: '继续' })
-    await getAiProvider(settings).generate(settings, { action: 'clarify', content: '说清楚' })
+    await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '继续' })
+    await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'clarify', content: '说清楚' })
 
     const completionBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>
     const clarifyBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as Record<string, unknown>
@@ -105,7 +106,7 @@ describe('AI providers', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const partials: string[] = []
-    const result = await getAiProvider(settings).streamCompletion(
+    const result = await getAiProvider(settings, fetchAiTransport).streamCompletion(
       settings,
       { action: 'complete', content: '你' },
       (text) => partials.push(text),
@@ -138,7 +139,7 @@ describe('AI providers', () => {
 
     const partials: string[] = []
     await expect(
-      getAiProvider(settings).streamCompletion(
+      getAiProvider(settings, fetchAiTransport).streamCompletion(
         settings,
         { action: 'complete', content: '继续' },
         (text) => partials.push(text),
@@ -162,7 +163,7 @@ describe('AI providers', () => {
 
     const partials: string[] = []
     await expect(
-      getAiProvider(settings).streamCompletion(
+      getAiProvider(settings, fetchAiTransport).streamCompletion(
         settings,
         { action: 'complete', content: '继续' },
         (text) => partials.push(text),
@@ -186,7 +187,7 @@ describe('AI providers', () => {
       ...openAiSettings,
       instructionOverrides: { complete: '只补全一个非常短的短语。' },
     }
-    await getAiProvider(settings).generate(settings, { action: 'complete', content: '你是' })
+    await getAiProvider(settings, fetchAiTransport).generate(settings, { action: 'complete', content: '你是' })
 
     const init = fetchMock.mock.calls[0]?.[1]
     const body = JSON.parse(String(init?.body)) as {
@@ -209,7 +210,7 @@ describe('AI providers', () => {
     )
 
     await expect(
-      getAiProvider(anthropicSettings).generate(anthropicSettings, {
+      getAiProvider(anthropicSettings, fetchAiTransport).generate(anthropicSettings, {
         action: 'draft_acceptance',
         content: '任务内容',
       }),
@@ -243,7 +244,7 @@ describe('AI providers', () => {
 
     const partials: string[] = []
     await expect(
-      getAiProvider(settings).streamCompletion(
+      getAiProvider(settings, fetchAiTransport).streamCompletion(
         settings,
         { action: 'complete', content: '请' },
         (text) => partials.push(text),
@@ -261,7 +262,7 @@ describe('AI providers', () => {
     )
 
     await expect(
-      getAiProvider(openAiSettings).generate(openAiSettings, {
+      getAiProvider(openAiSettings, fetchAiTransport).generate(openAiSettings, {
         action: 'shorten',
         content: '测试',
       }),
@@ -277,7 +278,7 @@ describe('AI providers', () => {
     )
 
     await expect(
-      getAiProvider(openAiSettings).generate(openAiSettings, {
+      getAiProvider(openAiSettings, fetchAiTransport).generate(openAiSettings, {
         action: 'shorten',
         content: '测试',
       }),
@@ -292,7 +293,7 @@ describe('AI providers', () => {
     )
 
     await expect(
-      getAiProvider(openAiSettings).generate(openAiSettings, {
+      getAiProvider(openAiSettings, fetchAiTransport).generate(openAiSettings, {
         action: 'shorten',
         content: '测试',
       }),
@@ -312,7 +313,7 @@ describe('AI providers', () => {
       ),
     )
 
-    const request = getAiProvider(openAiSettings).generate(
+    const request = getAiProvider(openAiSettings, fetchAiTransport).generate(
       openAiSettings,
       { action: 'complete', content: '继续输入' },
       controller.signal,

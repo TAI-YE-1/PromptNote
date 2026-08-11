@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  ChromeAiSettingsRepository,
-  defaultAiSettings,
-} from '../src/storage/aiSettingsRepository'
 import type { AiSettings } from '../src/ai/types'
+import { ChromeAiSettingsStore } from '../src/platform/browser/aiSettingsStore'
+import {
+  defaultAiPreferences,
+  toAiPreferences,
+  withAiSecret,
+} from '../src/storage/preferencesRepository'
+import { AI_API_KEY_SECRET } from '../src/storage/secretStore'
 
 const store = new Map<string, unknown>()
 
@@ -22,23 +25,23 @@ function installChromeStorageMock() {
   })
 }
 
-describe('ChromeAiSettingsRepository', () => {
+describe('ChromeAiSettingsStore', () => {
   beforeEach(() => {
     store.clear()
     vi.unstubAllGlobals()
     installChromeStorageMock()
   })
 
-  it('defaults inline completion to off with balanced tuning when no AI settings exist', async () => {
-    const repository = new ChromeAiSettingsRepository()
-    await expect(repository.load()).resolves.toEqual(defaultAiSettings)
-    expect(defaultAiSettings.completionEnabled).toBe(false)
-    expect(defaultAiSettings.completionContextChars).toBe(320)
-    expect(defaultAiSettings.completionDelayMs).toBe(300)
-    expect(defaultAiSettings.completionModel).toBe('')
+  it('defaults inline completion to off and exposes no secret when settings do not exist', async () => {
+    const repository = new ChromeAiSettingsStore()
+    await expect(repository.load()).resolves.toEqual(defaultAiPreferences)
+    await expect(repository.get(AI_API_KEY_SECRET)).resolves.toBeNull()
+    expect(defaultAiPreferences.completionEnabled).toBe(false)
+    expect(defaultAiPreferences.completionContextChars).toBe(320)
+    expect(defaultAiPreferences.completionDelayMs).toBe(300)
   })
 
-  it('requires re-verification for settings saved before completion existed', async () => {
+  it('keeps the legacy Chrome key layout while requiring re-verification for pre-completion settings', async () => {
     store.set('promptnote.aiSettings.v1', {
       enabled: true,
       configured: true,
@@ -49,15 +52,16 @@ describe('ChromeAiSettingsRepository', () => {
       scope: 'selection',
     })
 
-    const repository = new ChromeAiSettingsRepository()
-    const loaded = await repository.load()
+    const repository = new ChromeAiSettingsStore()
+    const preferences = await repository.load()
 
-    expect(loaded.configured).toBe(false)
-    expect(loaded.completionEnabled).toBe(false)
-    expect(loaded.completionContextChars).toBe(320)
-    expect(loaded.completionDelayMs).toBe(300)
-    expect(loaded.completionModel).toBe('')
-    expect(loaded.instructionOverrides).toEqual({})
+    expect(preferences.configured).toBe(false)
+    expect(preferences.completionEnabled).toBe(false)
+    expect(preferences.completionContextChars).toBe(320)
+    expect(preferences.completionDelayMs).toBe(300)
+    expect(preferences.completionModel).toBe('')
+    expect(preferences.instructionOverrides).toEqual({})
+    await expect(repository.get(AI_API_KEY_SECRET)).resolves.toBe('legacy-secret')
   })
 
   it('keeps verified settings while adding tuning defaults to a recent completion config', async () => {
@@ -72,31 +76,34 @@ describe('ChromeAiSettingsRepository', () => {
       scope: 'selection',
     })
 
-    const loaded = await new ChromeAiSettingsRepository().load()
-    expect(loaded.configured).toBe(true)
-    expect(loaded.completionEnabled).toBe(true)
-    expect(loaded.completionContextChars).toBe(320)
-    expect(loaded.completionDelayMs).toBe(300)
-    expect(loaded.completionModel).toBe('')
+    const repository = new ChromeAiSettingsStore()
+    const preferences = await repository.load()
+    expect(preferences.configured).toBe(true)
+    expect(preferences.completionEnabled).toBe(true)
+    expect(preferences.completionContextChars).toBe(320)
+    expect(preferences.completionDelayMs).toBe(300)
+    expect(preferences.completionModel).toBe('')
+    await expect(repository.get(AI_API_KEY_SECRET)).resolves.toBe('secret')
   })
 
   it('falls back from invalid persisted tuning values without losing connection state', async () => {
     store.set('promptnote.aiSettings.v1', {
-      ...defaultAiSettings,
+      ...defaultAiPreferences,
       configured: true,
       completionEnabled: true,
       completionContextChars: 999_999,
       completionDelayMs: 0,
+      apiKey: 'secret',
     })
 
-    const loaded = await new ChromeAiSettingsRepository().load()
+    const loaded = await new ChromeAiSettingsStore().load()
     expect(loaded.configured).toBe(true)
     expect(loaded.completionContextChars).toBe(320)
     expect(loaded.completionDelayMs).toBe(300)
   })
 
-  it('stores custom completion tuning, model and action instructions separately from PromptDocument content', async () => {
-    const repository = new ChromeAiSettingsRepository()
+  it('stores preferences and credential through separate contracts without changing the Browser storage shape', async () => {
+    const repository = new ChromeAiSettingsStore()
     const settings: AiSettings = {
       enabled: true,
       configured: true,
@@ -115,9 +122,29 @@ describe('ChromeAiSettingsRepository', () => {
       scope: 'selection',
     }
 
-    await repository.save(settings)
+    await repository.save(toAiPreferences(settings))
+    await repository.set(AI_API_KEY_SECRET, settings.apiKey)
 
-    await expect(repository.load()).resolves.toEqual(settings)
+    const preferences = await repository.load()
+    const apiKey = await repository.get(AI_API_KEY_SECRET)
+    expect(withAiSecret(preferences, apiKey)).toEqual(settings)
     expect([...store.keys()]).toEqual(['promptnote.aiSettings.v1'])
+    expect(store.get('promptnote.aiSettings.v1')).toEqual(settings)
+  })
+
+  it('clears only the credential while preserving non-sensitive preferences', async () => {
+    const repository = new ChromeAiSettingsStore()
+    const settings: AiSettings = {
+      ...withAiSecret(defaultAiPreferences, 'secret'),
+      configured: true,
+      model: 'test-model',
+    }
+    await repository.save(toAiPreferences(settings))
+    await repository.set(AI_API_KEY_SECRET, 'secret')
+    await repository.remove(AI_API_KEY_SECRET)
+
+    await expect(repository.load()).resolves.toEqual(toAiPreferences(settings))
+    await expect(repository.get(AI_API_KEY_SECRET)).resolves.toBe('')
+    expect(store.get('promptnote.aiSettings.v1')).toEqual({ ...toAiPreferences(settings), apiKey: '' })
   })
 })

@@ -5,6 +5,7 @@ import {
   computeCompletionTransientRetryDelayMs,
 } from '../ai/completionTuning'
 import { AiRequestError, getAiProvider } from '../ai/provider'
+import type { AiTransport } from '../ai/transport'
 import type { AiSettings } from '../ai/types'
 import { sectionKindMeta } from '../prompt/sectionKinds'
 import type {
@@ -20,6 +21,7 @@ const PARTIAL_RENDER_INTERVAL_MS = 48
 interface InlineCompletionInput {
   settings: AiSettings
   context: EditorCompletionContext | null
+  transport: AiTransport
   onError(message: string | null): void
 }
 
@@ -36,6 +38,7 @@ export function useInlineCompletion(
   const currentContextKeyRef = useRef<string | null>(null)
   const context = input.context
   const settings = input.settings
+  const transport = input.transport
   currentContextKeyRef.current = context?.key ?? null
 
   const ready = settings.enabled && settings.configured && settings.completionEnabled
@@ -49,7 +52,7 @@ export function useInlineCompletion(
     cacheRef.current.clear()
     setCompletion(null)
     input.onError(null)
-  }, [input.onError, settings])
+  }, [input.onError, settings, transport])
 
   useEffect(() => {
     if (!ready || !context || context.contextChars !== settings.completionContextChars) {
@@ -82,7 +85,7 @@ export function useInlineCompletion(
 
     setCompletion(null)
     const request = { action: 'complete' as const, content: completionPrompt(contextSnapshot) }
-    const provider = getAiProvider(settings)
+    const provider = getAiProvider(settings, transport)
     const controller = new AbortController()
     const requestSequence = ++requestSequenceRef.current
     const isCurrent = () =>
@@ -195,7 +198,7 @@ export function useInlineCompletion(
       if (renderTimer !== null) window.clearTimeout(renderTimer)
       controller.abort()
     }
-  }, [context, input.onError, ready, settings])
+  }, [context, input.onError, ready, settings, transport])
 
   return completion
 }
