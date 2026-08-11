@@ -79,9 +79,20 @@ PromptNote 支持 OpenAI-compatible / Anthropic Provider。用户自行配置 Pr
 
 内联补全默认关闭。
 
-### 备份
+### 备份与 Browser / Desktop 迁移
 
-Prompt 文档默认保存在浏览器扩展本地存储。重要 Prompt 建议定期导出 JSON 备份。恢复同 ID 备份时，可以明确覆盖现有文档或另存副本。
+Prompt 文档默认保存在当前宿主自己的本地存储中。Browser 使用扩展本地存储；Windows Desktop V1 使用独立本地 SQLite。**两边数据彼此独立，不会自动同步。**
+
+Browser 与 Windows Desktop 使用同一份 Prompt JSON backup contract。需要在两边迁移 Prompt 时，使用手动 JSON 备份即可：
+
+1. 在来源端的 Prompt 列表中导出 JSON 备份；
+2. 在目标端选择导入该 JSON；
+3. 如果目标端已有相同 ID，PromptNote 会询问是覆盖还是另存为导入副本；
+4. 选择覆盖时会重新提升 revision，避免较旧备份以较低 revision 覆盖当前版本。
+
+因此 Browser 导出的备份可以导入 Desktop，Desktop 导出的备份也可以导回 Browser。JSON 备份只包含 PromptDocument，不包含 AI API Key、Windows 设置或其它 SecretStore 内容。
+
+PromptNote V1 没有 PromptNote 账号、云端数据后端，也没有 Browser / Desktop 自动同步。跨宿主迁移始终由用户明确导出、导入。
 
 ## 隐私与权限
 
@@ -100,7 +111,7 @@ AI 自定义地址使用 optional host permission。PromptNote 不需要 `active
 
 ## 已知限制
 
-- 当前没有账号、云同步或多设备同步；
+- 当前没有账号、云同步、多设备同步或 Browser / Desktop 自动同步；
 - `chrome.storage.local` 不是专用加密保险库；
 - AI 效果、速度与可用性取决于用户配置的 Provider、Model、网络和额度；
 - Side Panel 可用宽度由浏览器宿主控制。
