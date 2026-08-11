@@ -69,10 +69,7 @@ jobs:
           assert old in text, 'PromptNoteApp refs anchor changed'
           text = text.replace(old, new, 1)
 
-          anchor = """  const previewText = useMemo(
-            () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
-            [current, previewFormat, previewOpen],
-          )"""
+          anchor = "  const previewText = useMemo("
           effect = """  useEffect(() => {
             if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
             lastHostCommandIdRef.current = hostCommand.id
@@ -84,7 +81,7 @@ jobs:
           }, [hostCommand])
 
           """ + anchor
-          assert anchor in text, 'PromptNoteApp host effect anchor changed'
+          assert text.count(anchor) == 1, 'PromptNoteApp preview anchor changed'
           text = text.replace(anchor, effect, 1)
 
           old = """  function openAi(clearSelection = true) {
