@@ -5,9 +5,9 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::webview::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri::window::{Monitor, PhysicalPosition, PhysicalSize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::webview::{WebviewWindow, WebviewWindowBuilder};
+use tauri::window::Monitor;
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl};
 
 use crate::storage;
 
@@ -90,7 +90,7 @@ pub struct ShellController {
 
 impl ShellController {
     pub fn load(database_path: PathBuf) -> Result<Self, String> {
-        let preferences = storage::load_shell_preferences(&database_path)?
+        let preferences: ShellPreferences = storage::load_shell_preferences(&database_path)?
             .map(serde_json::from_value)
             .transpose()
             .map_err(|error| error.to_string())?
