@@ -11,7 +11,7 @@ function read(path: string) {
 }
 
 describe('Desktop host boundary', () => {
-  it('pins the Desktop runtime to Tauri 2 with one main window and valid Windows icon', () => {
+  it('pins the Desktop runtime to Tauri 2 with one shared main window and valid Windows icon', () => {
     const cargo = read('src-tauri/Cargo.toml')
     const config = JSON.parse(read('src-tauri/tauri.conf.json')) as {
       identifier: string
@@ -20,7 +20,7 @@ describe('Desktop host boundary', () => {
     }
     const iconPath = resolve(root, 'src-tauri/icons/icon.ico')
 
-    expect(cargo).toContain('tauri = "=2.11.5"')
+    expect(cargo).toContain('tauri = { version = "=2.11.5", features = ["tray-icon"] }')
     expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
     expect(cargo).toContain('tauri-plugin-http = "=2.5.9"')
     expect(config.identifier).toBe('com.promptnote.desktop')
@@ -68,6 +68,7 @@ describe('Desktop host boundary', () => {
   it('wakes and focuses the existing main window on a second launch', () => {
     const host = read('src-tauri/src/lib.rs')
 
+    expect(host).toContain('show_full_window(app)')
     expect(host).toContain('get_webview_window("main")')
     expect(host).toContain('window.show()')
     expect(host).toContain('window.unminimize()')
@@ -77,11 +78,13 @@ describe('Desktop host boundary', () => {
   it('mounts the shared PromptNote app with Desktop adapters only', () => {
     const entry = read('src/desktop.tsx')
 
-    expect(entry).toContain("import { PromptNoteApp } from './app/PromptNoteApp'")
+    expect(entry).toContain('PromptNoteApp')
+    expect(entry).toContain("from './app/PromptNoteApp'")
     expect(entry).toContain("./platform/desktop/promptRepository")
     expect(entry).toContain("./platform/desktop/preferencesRepository")
     expect(entry).toContain("./platform/desktop/secretStore")
     expect(entry).toContain("./platform/desktop/aiTransport")
+    expect(entry).toContain('hostCommand={hostCommand}')
     expect(entry).not.toContain('platform/browser')
     expect(entry).not.toMatch(/\bchrome\./)
   })
