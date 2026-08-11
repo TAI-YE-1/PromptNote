@@ -1,6 +1,7 @@
-.slash-item--active {
-  border-color: #d6e1d8;
-  background: #f1f5f1;
+.slash-item.slash-item--active {
+  border-color: #b8cdbd;
+  background: #e9f1eb;
+  box-shadow: inset 3px 0 0 #315f47;
 }
 
 .slash-item:focus-visible {
