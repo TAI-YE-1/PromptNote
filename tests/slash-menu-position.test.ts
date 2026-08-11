@@ -5,10 +5,8 @@ const baseAnchor: SlashMenuAnchor = {
   caretLeft: 120,
   caretTop: 180,
   caretBottom: 200,
-  viewportLeft: 0,
-  viewportTop: 0,
-  viewportRight: 360,
-  viewportBottom: 640,
+  viewportWidth: 360,
+  viewportHeight: 640,
 }
 
 describe('slash menu caret placement', () => {
@@ -16,7 +14,7 @@ describe('slash menu caret placement', () => {
     expect(placeSlashMenu(baseAnchor, 280, 260)).toEqual({ left: 72, top: 206 })
   })
 
-  it('flips above the caret near the bottom of the editor viewport', () => {
+  it('flips directly above the caret near the bottom of the viewport', () => {
     const anchor = {
       ...baseAnchor,
       caretTop: 570,
@@ -26,7 +24,7 @@ describe('slash menu caret placement', () => {
     expect(placeSlashMenu(anchor, 280, 260)).toEqual({ left: 72, top: 304 })
   })
 
-  it('keeps the menu inside the right edge of the editor viewport', () => {
+  it('keeps the menu inside the right edge of the viewport', () => {
     const anchor = {
       ...baseAnchor,
       caretLeft: 340,
@@ -35,14 +33,12 @@ describe('slash menu caret placement', () => {
     expect(placeSlashMenu(anchor, 280, 260).left).toBe(72)
   })
 
-  it('keeps the menu inside the left edge of a scrolled editor viewport', () => {
+  it('keeps the menu inside the left edge of the viewport', () => {
     const anchor = {
       ...baseAnchor,
-      caretLeft: 14,
-      viewportLeft: 20,
-      viewportRight: 380,
+      caretLeft: 2,
     }
 
-    expect(placeSlashMenu(anchor, 280, 260).left).toBe(28)
+    expect(placeSlashMenu(anchor, 280, 260).left).toBe(8)
   })
 })

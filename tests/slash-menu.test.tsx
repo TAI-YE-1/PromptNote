@@ -22,11 +22,12 @@ describe('SlashMenu', () => {
     expect(renderedKinds).toEqual([...sectionKinds])
   })
 
-  it('exposes the first item as the initial keyboard target', () => {
+  it('keeps editor focus instead of moving DOM focus into the menu', () => {
     const html = renderToStaticMarkup(<SlashMenu onClose={() => undefined} onInsert={() => undefined} />)
     expect(html).toContain('role="menu"')
     expect(html).toContain('slash-item slash-item--active')
-    expect(html).toContain('tabindex="0"')
+    expect(html).not.toContain('tabindex="0"')
+    expect(html.match(/tabindex="-1"/g)?.length).toBeGreaterThanOrEqual(sectionKinds.length)
   })
 
   it('moves keyboard selection with wrapping and Home/End', () => {

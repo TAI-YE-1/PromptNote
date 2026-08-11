@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent,
 } from 'react'
 import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
 import './slashMenu.css'
@@ -16,10 +15,8 @@ export interface SlashMenuAnchor {
   caretLeft: number
   caretTop: number
   caretBottom: number
-  viewportLeft: number
-  viewportTop: number
-  viewportRight: number
-  viewportBottom: number
+  viewportWidth: number
+  viewportHeight: number
 }
 
 export interface SlashMenuPosition {
@@ -32,14 +29,19 @@ export function placeSlashMenu(
   menuWidth: number,
   menuHeight: number,
 ): SlashMenuPosition {
-  const minLeft = anchor.viewportLeft + VIEWPORT_PADDING
-  const maxLeft = Math.max(minLeft, anchor.viewportRight - VIEWPORT_PADDING - menuWidth)
+  const minLeft = VIEWPORT_PADDING
+  const maxLeft = Math.max(minLeft, anchor.viewportWidth - VIEWPORT_PADDING - menuWidth)
   const left = Math.min(Math.max(anchor.caretLeft, minLeft), maxLeft)
 
   const below = anchor.caretBottom + MENU_GAP
-  const maxTop = anchor.viewportBottom - VIEWPORT_PADDING - menuHeight
   const above = anchor.caretTop - MENU_GAP - menuHeight
-  const top = below <= maxTop ? below : Math.max(anchor.viewportTop + VIEWPORT_PADDING, above)
+  const maxTop = Math.max(VIEWPORT_PADDING, anchor.viewportHeight - VIEWPORT_PADDING - menuHeight)
+  const top =
+    below <= maxTop
+      ? below
+      : above >= VIEWPORT_PADDING
+        ? above
+        : Math.min(Math.max(below, VIEWPORT_PADDING), maxTop)
 
   return { left, top }
 }
@@ -63,62 +65,66 @@ export function SlashMenu(props: SlashMenuProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [position, setPosition] = useState<SlashMenuPosition | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useLayoutEffect(() => {
     const menu = menuRef.current
     const selection = window.getSelection()
-    const container = menu?.offsetParent
-    if (!menu || !(container instanceof HTMLElement) || !selection || selection.rangeCount === 0) {
+    const editorRoot = document.querySelector('.prompt-editor__content')
+    if (!menu || !(editorRoot instanceof HTMLElement) || !selection || selection.rangeCount === 0) {
       return
     }
 
     const range = selection.getRangeAt(0)
-    if (!container.contains(range.commonAncestorContainer)) return
+    if (!editorRoot.contains(range.commonAncestorContainer)) return
 
     const caretRect = range.getClientRects()[0] ?? range.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    const anchor: SlashMenuAnchor = {
-      caretLeft: caretRect.left - containerRect.left + container.scrollLeft,
-      caretTop: caretRect.top - containerRect.top + container.scrollTop,
-      caretBottom: caretRect.bottom - containerRect.top + container.scrollTop,
-      viewportLeft: container.scrollLeft,
-      viewportTop: container.scrollTop,
-      viewportRight: container.scrollLeft + container.clientWidth,
-      viewportBottom: container.scrollTop + container.clientHeight,
-    }
     const menuRect = menu.getBoundingClientRect()
-    setPosition(placeSlashMenu(anchor, menuRect.width, menuRect.height))
+    setPosition(
+      placeSlashMenu(
+        {
+          caretLeft: caretRect.left,
+          caretTop: caretRect.top,
+          caretBottom: caretRect.bottom,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        },
+        menuRect.width,
+        menuRect.height,
+      ),
+    )
   }, [])
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    itemRefs.current[0]?.focus({ preventScroll: true })
-    return () => previousFocusRef.current?.focus({ preventScroll: true })
-  }, [])
+    function handleWindowKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        const handleEscape = props.onEscape ?? props.onClose
+        handleEscape()
+        return
+      }
 
-  function focusItem(index: number) {
-    setActiveIndex(index)
-    itemRefs.current[index]?.focus({ preventScroll: true })
-  }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        props.onInsert(sectionKinds[activeIndex])
+        return
+      }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Escape') {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
       event.preventDefault()
       event.stopPropagation()
-      const handleEscape = props.onEscape ?? props.onClose
-      handleEscape()
-      return
+      setActiveIndex((currentIndex) =>
+        nextSlashMenuIndex(currentIndex, event.key, sectionKinds.length),
+      )
     }
 
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-    event.preventDefault()
-    event.stopPropagation()
-    focusItem(nextSlashMenuIndex(activeIndex, event.key, sectionKinds.length))
-  }
+    window.addEventListener('keydown', handleWindowKeyDown, true)
+    return () => window.removeEventListener('keydown', handleWindowKeyDown, true)
+  }, [activeIndex, props.onClose, props.onEscape, props.onInsert])
 
   const positionStyle: CSSProperties = {
+    position: 'fixed',
     left: position?.left ?? 0,
     top: position?.top ?? 0,
     visibility: position ? 'visible' : 'hidden',
@@ -131,24 +137,30 @@ export function SlashMenu(props: SlashMenuProps) {
       role="menu"
       aria-label="Prompt 结构"
       style={positionStyle}
-      onKeyDown={handleKeyDown}
     >
       <div className="slash-menu__head">
         <span>Prompt 结构</span>
-        <button type="button" aria-label="关闭 Prompt 结构菜单" onClick={props.onClose}>×</button>
+        <button
+          type="button"
+          aria-label="关闭 Prompt 结构菜单"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={props.onClose}
+        >
+          ×
+        </button>
       </div>
       {sectionKinds.map((kind, index) => {
         const meta = sectionKindMeta[kind]
         return (
           <button
             key={kind}
-            ref={(node) => { itemRefs.current[index] = node }}
             type="button"
             role="menuitem"
-            tabIndex={index === activeIndex ? 0 : -1}
+            tabIndex={-1}
             className={index === activeIndex ? 'slash-item slash-item--active' : 'slash-item'}
             data-kind={kind}
-            onFocus={() => setActiveIndex(index)}
+            onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => setActiveIndex(index)}
             onClick={() => props.onInsert(kind)}
           >
