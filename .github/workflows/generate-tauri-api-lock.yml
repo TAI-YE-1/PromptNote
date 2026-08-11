@@ -1,0 +1,37 @@
+name: generate-tauri-api-lock
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/generate-tauri-api-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Generate exact npm lock
+        run: npm install --package-lock-only --ignore-scripts --save-exact @tauri-apps/api@2.11.1
+      - name: Commit lock and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/generate-tauri-api-lock.yml
+          git add package.json package-lock.json
+          git commit -m "build(desktop): lock Tauri JavaScript API"
+          git push origin HEAD:main
