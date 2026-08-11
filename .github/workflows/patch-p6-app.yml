@@ -1,0 +1,43 @@
+name: patch-p6-app
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/patch-p6-app.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Patch shared app host command
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('src/app/PromptNoteApp.tsx')
+          s=p.read_text()
+          s=s.replace("  command: 'new-prompt' | 'settings'", "  command: 'new-prompt'", 1)
+          marker='if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id)'
+          m=s.index(marker); a=s.rfind('  useEffect(() => {',0,m); b=s.index('  const previewText = useMemo(',m)
+          s=s[:a]+'''  useEffect(() => {
+            if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+            lastHostCommandIdRef.current = hostCommand.id
+            void createDocument()
+          }, [hostCommand])
+
+'''+s[b:]
+          s=s.replace("  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {", '  function openAi(clearSelection = true) {', 1)
+          s=s.replace("    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))", "    setAiPanel(aiSettings.configured ? 'menu' : 'settings')", 1)
+          p.write_text(s)
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/patch-p6-app.yml
+          git add src/app/PromptNoteApp.tsx
+          git commit -m "refactor(desktop): separate Windows and AI settings"
+          git push
