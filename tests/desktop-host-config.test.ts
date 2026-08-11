@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -11,7 +11,7 @@ function read(path: string) {
 }
 
 describe('Desktop host boundary', () => {
-  it('pins the Desktop runtime to Tauri 2 with one main window', () => {
+  it('pins the Desktop runtime to Tauri 2 with one main window and Windows icon', () => {
     const cargo = read('src-tauri/Cargo.toml')
     const config = JSON.parse(read('src-tauri/tauri.conf.json')) as {
       identifier: string
@@ -22,6 +22,7 @@ describe('Desktop host boundary', () => {
     expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
     expect(config.identifier).toBe('com.promptnote.desktop')
     expect(config.app.windows.map((window) => window.label)).toEqual(['main'])
+    expect(existsSync(resolve(root, 'src-tauri/icons/icon.ico'))).toBe(true)
   })
 
   it('keeps capabilities minimal and does not enable shell or filesystem plugins', () => {
