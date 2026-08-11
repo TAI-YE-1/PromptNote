@@ -176,13 +176,22 @@
 
 ## P7 — Backup 兼容与 Browser 共存
 
-- [ ] Desktop 导出沿用现有 Prompt JSON backup contract；
-- [ ] Browser 导出的 backup 可导入 Desktop；
-- [ ] Desktop 导出的 backup 可导入 Browser；
-- [ ] 同 ID 覆盖继续执行 revision rebase；
-- [ ] 明确无自动 Browser/Desktop sync；
-- [ ] README / 用户文档说明 Browser 与 Desktop 数据独立、可手动迁移；
-- [ ] 不引入 PromptNote account / cloud backend。
+- [x] Desktop 导出沿用现有 Prompt JSON backup contract；
+- [x] Browser 导出的 backup 可导入 Desktop；
+- [x] Desktop 导出的 backup 可导入 Browser；
+- [x] 同 ID 覆盖继续执行 revision rebase；
+- [x] 明确无自动 Browser/Desktop sync；
+- [x] README / 用户文档说明 Browser 与 Desktop 数据独立、可手动迁移；
+- [x] 不引入 PromptNote account / cloud backend。
+
+### P7 实施证据 — 2026-08-11
+
+- Browser 与 Desktop 都挂载同一个 `PromptNoteApp`；导出统一使用 `createPromptDocumentExport()`，导入统一使用 `parsePromptDocumentExport()`，宿主 Repository 不实现第二套 backup serializer。
+- `resolveImportedDocument()` 继续保持同 ID 覆盖的 `max(imported.revision, existing.revision) + 1` rebase；跨宿主测试以 existing=21 / imported=6 验证结果 revision=22。
+- Browser persistence 仍是 `chrome.storage.local`，Desktop persistence 仍是 Tauri commands → appLocalDataDir 下独立 `promptnote.sqlite3`；两边不共享存储，也没有自动 sync bridge。
+- README 已新增 Browser / Desktop 手动迁移说明：JSON backup 双向兼容、同 ID 覆盖行为、数据彼此独立、API Key / Windows settings / SecretStore 不进入备份，并明确 V1 没有 PromptNote account、cloud backend 或自动同步。
+- `tests/backup-cross-host.test.ts` 直接 round-trip 同一 PromptDocumentExport、验证双向 JSON 合同、revision rebase、共享 App 调用链、两种本地存储隔离与无云后端依赖。
+- 正式 CI `#510`（commit `9040b9706e1f04c303ffa69ed4468098642a61be`）完整通过：license audit、typecheck、lint、全部 unit tests、Browser build/package/upload，以及 Windows `desktop-host` 的真实 `dist-desktop → cargo test --locked` 均为 success。
 
 ## P8 — Windows 打包、CI 与发布闭环
 
