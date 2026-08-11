@@ -59,18 +59,19 @@
 - [x] 配置单实例，第二次启动只唤起已有实例；
 - [x] 建立最小 Tauri capabilities；
 - [x] 明确禁止通用 shell execution 与无边界文件系统权限；
-- [ ] 复用现有 React 入口与共享 Editor，不复制 Desktop Editor；
+- [x] 复用现有 React 入口与共享 Editor，不复制 Desktop Editor；
 - [ ] Full Window 首次启动可完成现有核心主链；
 - [ ] Windows 本机构建与启动 smoke 通过。
 
 ### P2 宿主基础证据 — 2026-08-11
 
 - 新增独立 `src-tauri/` Tauri 2 crate、`desktop.html`、`src/desktop.tsx` 与 `vite.desktop.config.mjs`；Desktop 构建输出固定到 `dist-desktop`，Browser 继续使用 `sidepanel.html` / `src/main.tsx` / `dist`，两种宿主构建目录互不覆盖。
-- `tauri-plugin-single-instance` 是当前唯一 Desktop plugin；第二实例回调只查找 `main` WebView window 并执行 `show`、`unminimize`、`set_focus`，不创建第二份应用进程状态。
-- `src-tauri/capabilities/main-window.json` 当前只声明 `core:default`；Cargo 依赖不包含 `tauri-plugin-shell`、`tauri-plugin-fs`，也没有通用 shell command 或任意文件系统命令。
-- `tests/desktop-host-config.test.ts` 锁定 Tauri 2、单一 `main` window、单实例回调、最小 capability、有效 Windows ICO 与 Desktop entry 不依赖 Browser adapter；现有 Browser typecheck/lint/unit/build 继续通过。
-- Windows 验证已收敛到主 `.github/workflows/ci.yml` 的 `desktop-host` job：`windows-latest` 构建 `dist-desktop`，并以 `x86_64-pc-windows-msvc` 执行 Rust 测试；早期独立 `desktop-host-check.yml` 已删除，避免重复验证链。
-- 暂不勾选剩余 3 项：`src/desktop.tsx` 当前只承担真实 Tauri shell 启动边界，尚未接入 `PromptNoteApp`，避免为 P2 制造随后必须删除的内存/localStorage Repository、假 SecretStore 或假 AI Transport。完整共享 Editor 主链将在真实 Desktop adapters 到位后接回；Windows 本机启动/第二实例行为仍需真实 GUI smoke。
+- `tauri-plugin-single-instance` 负责第二实例唤起；P4 新增官方 `tauri-plugin-http` 作为唯一 AI 网络宿主适配。没有 shell / fs 通用插件。
+- `src-tauri/capabilities/main-window.json` 保留 `core:default`，仅额外开放 AI 所需的 HTTPS 与 `localhost` / `127.0.0.1` HTTP scope；Cargo 依赖不包含 `tauri-plugin-shell`、`tauri-plugin-fs`，也没有通用 shell command 或任意文件系统命令。
+- `src/desktop.tsx` 已直接挂载同一个 `PromptNoteApp`，并注入 Desktop `PromptRepository`、`PreferencesRepository`、`SecretStore`、`AiTransport`；`PromptEditor`、Compiler、Check、Preview、Copy、AI suggestion / completion 都继续复用共享实现，没有 Desktop Editor 副本。
+- P4 审查发现 `src-tauri/src/main.rs` 仍残留早期第二套 `tauri::Builder`，导致真实 exe 会绕开 `lib.rs` 中的 SQLite / Credential Manager / commands / HTTP plugin。该平行旧链已删除：`main.rs` 现在只调用 `promptnote_desktop::run()`；`tests/desktop-host-config.test.ts` 明确禁止 `main.rs` 再出现第二套 Builder。
+- Windows 验证已收敛到主 `.github/workflows/ci.yml` 的 `desktop-host` job：`windows-latest` 构建完整 `dist-desktop`，并以 `x86_64-pc-windows-msvc` 执行 `cargo test --locked`；早期独立 `desktop-host-check.yml` 已删除，避免重复验证链。
+- 剩余 2 项继续不勾选：代码与 Windows CI 已证明共享 Full Window 可构建，但“首次启动完整主链”和“Windows 本机构建与启动”仍要求真实 GUI smoke，不能用构建成功替代。
 
 ## P3 — Desktop Repository 与 SecretStore
 
@@ -95,17 +96,28 @@
 - JSON backup 继续只使用既有 `PromptDocumentExport { exportedAt, document }`，没有 Preferences/SecretStore 字段，因此 API Key 无结构性入口进入备份。
 - `src-tauri/Cargo.lock` 由 Cargo 自动生成并正式入库；主 Windows CI 使用 `cargo test --locked`，避免每次重新解析未锁定的 Rust 依赖。
 - GitHub Actions `ci` run `#433`（commit `d3a4882153f88ac167f9c84119ce5762a1dcb58c`）在 Windows Server 2025 / `x86_64-pc-windows-msvc` 完整通过：Desktop shell frontend build 成功；Rust `cargo test` 6/6 通过，包括 `windows_credential_manager_round_trip`、SQLite schema version、stale-write、preferences+API key reject、revision 越界拒绝、documents/current-id reopen 恢复。Browser verify 同一 run 也全部通过。
+- P4 期间删除了实际 exe 的早期平行 Builder，当前 `src-tauri/src/main.rs → promptnote_desktop::run()` 已确保上述 P3 commands、SQLite 与 Credential Manager 真正进入唯一运行时，而不是只存在于可测试的 library 中。
 
 ## P4 — Desktop AI Transport
 
-- [ ] Desktop `AiTransport` 支持现有 OpenAI-compatible；
-- [ ] Desktop `AiTransport` 支持现有 Anthropic；
-- [ ] 复用共享 provider request / error semantics，不复制 AI 业务逻辑；
-- [ ] timeout / abort / transient retry 保持现有语义；
-- [ ] inline completion 仍要求 `configured && enabled && completionEnabled`；
-- [ ] localhost / 127.0.0.1 本地 Provider 可按 Desktop 规则访问；
-- [ ] AI 失败不阻断编辑 / 保存 / Check / Preview / Copy；
+- [x] Desktop `AiTransport` 支持现有 OpenAI-compatible；
+- [x] Desktop `AiTransport` 支持现有 Anthropic；
+- [x] 复用共享 provider request / error semantics，不复制 AI 业务逻辑；
+- [x] timeout / abort / transient retry 保持现有语义；
+- [x] inline completion 仍要求 `configured && enabled && completionEnabled`；
+- [x] localhost / 127.0.0.1 本地 Provider 可按 Desktop 规则访问；
+- [x] AI 失败不阻断编辑 / 保存 / Check / Preview / Copy；
 - [ ] 真实 HTTPS Provider 与本地 Provider smoke 有证据。
+
+### P4 实施证据 — 2026-08-11
+
+- Desktop 网络适配使用官方 `@tauri-apps/plugin-http` / `tauri-plugin-http` `2.5.9`；`DesktopAiTransport` 只负责宿主访问策略和 `request()`，不重新实现 OpenAI-compatible / Anthropic 的 endpoint、headers、body、SSE、错误分类或 fallback。
+- Desktop 允许任意 HTTPS Provider；明文 HTTP 只允许 `localhost` 与 `127.0.0.1`。这一限制同时存在于 `DesktopAiTransport.ensureAccess/request` 与 Tauri capability scope；远程/LAN 明文 HTTP 不开放。
+- `src/desktop.tsx` 把 `DesktopAiTransport` 注入同一个 `PromptNoteApp`。`getAiProvider()`、OpenAI-compatible `/v1/chat/completions`、Anthropic `/v1/messages`、30 秒 timeout、AbortSignal、SSE streaming、transient retry / fallback 都继续使用共享实现。
+- `useInlineCompletion` 的 gate 仍是 `settings.enabled && settings.configured && settings.completionEnabled`；未为 Desktop 增加旁路。AI selection/global action 的异常仍只写 `aiError`，不会把应用切回 boot error，因此编辑、autosave、Check、Preview、Copy 主链不依赖 AI 成功。
+- `tests/desktop-ai-transport.test.ts` 覆盖 HTTPS、自定义 HTTPS port、localhost/127.0.0.1、拒绝远程 HTTP/非法 scheme、AbortSignal 透传，并实际调用共享 `getAiProvider()` 验证 OpenAI-compatible 与 Anthropic 都经过 Desktop transport；CI `#447` 的 Browser verify 为 29 个 test files / 137 tests 全通过。
+- GitHub Actions `ci` run `#446`（commit `8a291037187d651cbfde3e8b22c86521bfad32fb`）在 Windows Server 2025 上执行真实本地网络 smoke：测试启动 `127.0.0.1` 临时 OpenAI-compatible HTTP 服务，HTTP backend 实际 POST `/v1/chat/completions` 并读取 JSON 响应；Rust tests 7/7 通过，同时继续通过 Credential Manager 与全部 SQLite tests。
+- 最后一项保持未完成：本地 Provider 已有真实 Windows round-trip，但尚未用真实 HTTPS AI Provider + 有效 API Key 在 Windows Desktop GUI 中完成连接/请求 smoke。不得用 mock、公共 HTTPS 请求或“理论可达”替代。
 
 ## P5 — Shell 状态机：Tray / Orb / Panel / Window
 
