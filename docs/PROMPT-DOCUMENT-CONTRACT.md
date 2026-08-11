@@ -54,6 +54,8 @@ interface PromptDocumentExport {
 }
 ```
 
+该导出结构必须保持宿主中立：Browser 与 Desktop 使用同一个 PromptDocument Schema，宿主设置、认证信息和 shell 状态不得进入标准 Prompt 备份。
+
 ## 3. 内容模型
 
 普通文档节点可以包括 paragraph、heading、bulletList、orderedList、listItem、codeBlock、blockquote、hardBreak、text 等 TipTap 节点。
@@ -88,7 +90,8 @@ Repository 是 PromptDocument 的唯一持久化入口。
 - autosave 的异步结果只有在 document id + revision 仍对应当前 snapshot 时才能更新保存状态；
 - 用户明确恢复同 ID 备份并选择覆盖时，导入文档 revision 必须提升为 `max(local.revision, backup.revision) + 1` 后再走正常 `save()`；
 - 拒绝覆盖时生成新的 document id；
-- 不增加绕过 revision 校验的 force-save / bypass 写路径。
+- 不增加绕过 revision 校验的 force-save / bypass 写路径；
+- Browser / Desktop 只能替换 Repository 实现，不能替换 revision 语义或正文 Schema。
 
 ## 6. Editor 外部替换
 
@@ -117,9 +120,17 @@ Inline completion 与 PromptSuggestion 分离：它不产生 PromptDocument revi
 
 Lint finding 同样是派生数据，不持久化为正文，也不阻止编译。
 
-## 9. Extension Preferences
+## 9. Host Preferences 与 Secrets
 
-AI Provider、Model、Base URL、API Key、AI 总开关、补全开关、补全上下文、延迟、补全模型和指令覆盖使用独立设置存储，不得混入 PromptDocument。
+Provider、Model、Base URL、AI 总开关、补全开关、补全上下文、延迟、补全模型和指令覆盖使用独立宿主设置存储，不得混入 PromptDocument。
+
+Browser 与 Desktop 可以使用不同的 PreferencesRepository / SecretStore 实现，但必须满足：
+
+- 设置语义一致；
+- API Key 等认证信息不进入 PromptDocument；
+- API Key 不进入标准 Prompt JSON 备份；
+- Desktop credential 按 `DESKTOP.md` 使用独立安全存储，不作为明文业务字段写入 Desktop SQLite；
+- shell 状态、窗口位置、悬浮球位置等 Desktop 专属状态不进入 PromptDocument。
 
 ## 10. Schema 变化规则
 
