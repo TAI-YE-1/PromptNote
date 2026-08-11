@@ -104,9 +104,13 @@ impl ShellController {
         })
     }
 
-    pub fn initialize(&self, app: &AppHandle) -> Result<(), String> {
+    pub fn initialize(&self, app: &AppHandle, background_launch: bool) -> Result<(), String> {
         self.ensure_orb_window(app)?;
         self.install_tray(app)?;
+
+        if background_launch {
+            return self.show_background_launch(app);
+        }
 
         let first_launch = {
             let mut preferences = self.lock_preferences()?;
@@ -175,7 +179,11 @@ impl ShellController {
         if let Some(bounds) = saved {
             main.set_size(bounds.size).map_err(error_message)?;
             if let Some(position) = bounds.position {
-                main.set_position(position).map_err(error_message)?;
+                if saved_bounds_visible(&main, position, bounds.size)? {
+                    main.set_position(position).map_err(error_message)?;
+                } else {
+                    main.center().map_err(error_message)?;
+                }
             } else {
                 main.center().map_err(error_message)?;
             }
@@ -347,6 +355,26 @@ impl ShellController {
         app.exit(0);
     }
 
+    fn show_background_launch(&self, app: &AppHandle) -> Result<(), String> {
+        hide_window(app, MAIN_LABEL)?;
+        let preferences = self.lock_preferences()?.clone();
+        if preferences.orb_enabled {
+            *self.lock_mode()? = ShellMode::Orb;
+            let orb = orb_window(app)?;
+            if crate::fullscreen::is_suppressed() {
+                hide_window(app, ORB_LABEL)?;
+            } else {
+                let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
+                self.position_orb(&orb, &monitor, false)?;
+                orb.show().map_err(error_message)?;
+            }
+        } else {
+            *self.lock_mode()? = ShellMode::TrayBackground;
+            hide_window(app, ORB_LABEL)?;
+        }
+        self.emit_snapshot(app)
+    }
+
     fn show_orb_or_tray(&self, app: &AppHandle) -> Result<(), String> {
         if self.lock_preferences()?.orb_enabled {
             self.show_orb(app)
@@ -417,6 +445,8 @@ impl ShellController {
             .closable(false)
             .decorations(false)
             .transparent(true)
+            .focusable(false)
+            .focused(false)
             .always_on_top(true)
             .skip_taskbar(true)
             .visible(false)
@@ -585,6 +615,24 @@ fn select_monitor(window: &WebviewWindow, preferred_name: Option<&str>) -> Resul
         .ok_or_else(|| "没有可用显示器。".to_string())
 }
 
+fn saved_bounds_visible(window: &WebviewWindow, position: PhysicalPosition<i32>, size: PhysicalSize<u32>) -> Result<bool, String> {
+    let monitors = window.available_monitors().map_err(error_message)?;
+    Ok(monitors.iter().any(|monitor| {
+        let work = monitor.work_area();
+        rectangles_have_safe_overlap(position, size, work.position, work.size)
+    }))
+}
+
+fn rectangles_have_safe_overlap(position: PhysicalPosition<i32>, size: PhysicalSize<u32>, work_position: PhysicalPosition<i32>, work_size: PhysicalSize<u32>) -> bool {
+    let left = position.x.max(work_position.x);
+    let top = position.y.max(work_position.y);
+    let right = (position.x + size.width as i32).min(work_position.x + work_size.width as i32);
+    let bottom = (position.y + size.height as i32).min(work_position.y + work_size.height as i32);
+    let visible_width = right.saturating_sub(left) as u32;
+    let visible_height = bottom.saturating_sub(top) as u32;
+    visible_width >= 64.min(size.width) && visible_height >= 48.min(size.height)
+}
+
 fn logical_to_physical(value: f64, scale: f64) -> u32 {
     (value * scale).round().max(1.0) as u32
 }
@@ -606,6 +654,16 @@ mod tests {
         assert_eq!(preferences.y_ratio, 0.5);
         assert_eq!(preferences.last_mode, ShellMode::Orb);
         assert!(!preferences.launched_once);
+    }
+
+    #[test]
+    fn offscreen_window_bounds_require_safe_visible_area() {
+        let size = PhysicalSize::new(1080, 720);
+        let work_position = PhysicalPosition::new(0, 0);
+        let work_size = PhysicalSize::new(1920, 1080);
+        assert!(rectangles_have_safe_overlap(PhysicalPosition::new(100, 100), size, work_position, work_size));
+        assert!(!rectangles_have_safe_overlap(PhysicalPosition::new(1910, 1070), size, work_position, work_size));
+        assert!(!rectangles_have_safe_overlap(PhysicalPosition::new(-2000, 0), size, work_position, work_size));
     }
 
     #[test]
