@@ -207,7 +207,7 @@ fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<PromptDocument> 
     let content_json: String = row.get(4)?;
     let content = serde_json::from_str(&content_json).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
-            content_json.len(),
+            4,
             rusqlite::types::Type::Text,
             Box::new(error),
         )
