@@ -50,6 +50,7 @@
 - 删除旧 `src/storage/aiSettingsRepository.ts`；共享真实调用方已改为依赖平台合同，Browser composition 只在 `src/main.tsx` 注入 Browser adapters。新增 `tests/platform-boundary.test.ts` 防止 `src/app`、`src/ai`、`src/editor`、`src/prompt`、`src/storage` 重新出现直接 `chrome.*` / Tauri API。
 - 自动验证基于 commit `0d191565cd82aaee6b163725e19890327a915ffe` 的 GitHub Actions `ci` run `#411`：license audit、typecheck、lint、25 个 test files / 114 tests、extension build、release artifact package/upload 全部通过。构建产物 digest：`sha256:132296e7bb8de0d7b27254ee621a3645cca614247804262d9a4ffdf4e0ce65f6`。
 - 真实 Browser smoke 已于 Windows Edge 完成：用户基于当前 `main` 构建产物验证扩展可加载、Side Panel 与 1.0 主链可用；smoke 过程中发现“模块开头 `/` 更换类别会新增上方模块”的真实回归，随后以 commit `11ed32767ff8cab8db75c619fc424a99e6b5c425` 修复为块首原位转换，CI `#413` 的 typecheck、lint、unit tests、extension build 与发布产物打包均通过，用户重新加载 Edge 后确认问题已消失。至此 P1 平台抽取与真实宿主回归验证闭环。
+- 后续 Edge smoke 又暴露 `Inserted content deeper than insertion position`：Slash 菜单在空白后、hard break 或嵌套 textblock 中仍可能把 block node 插入 inline depth。`sectionInsertion.ts` 已统一改为 block-depth transaction：合法块首 `setNodeMarkup`，其余先 `splitBlock` 再 `setBlockType`；AI append 改为 document depth `tr.insert`。CI `#426` 的 typecheck、lint、27 个 test files / 125 tests、extension build 与发布产物全部通过，覆盖块首、空白后、hard break、嵌套 list 与 append 场景。
 
 ## P2 — Tauri 2 Desktop Shell 基础
 
@@ -67,23 +68,33 @@
 - 新增独立 `src-tauri/` Tauri 2 crate、`desktop.html`、`src/desktop.tsx` 与 `vite.desktop.config.mjs`；Desktop 构建输出固定到 `dist-desktop`，Browser 继续使用 `sidepanel.html` / `src/main.tsx` / `dist`，两种宿主构建目录互不覆盖。
 - `tauri-plugin-single-instance` 是当前唯一 Desktop plugin；第二实例回调只查找 `main` WebView window 并执行 `show`、`unminimize`、`set_focus`，不创建第二份应用进程状态。
 - `src-tauri/capabilities/main-window.json` 当前只声明 `core:default`；Cargo 依赖不包含 `tauri-plugin-shell`、`tauri-plugin-fs`，也没有通用 shell command 或任意文件系统命令。
-- 新增 `tests/desktop-host-config.test.ts`，锁定 Tauri 2、单一 `main` window、单实例回调、最小 capability 与 Desktop entry 不依赖 Browser adapter；现有 Browser typecheck/lint/unit/build 继续通过。
-- 新增独立 `desktop-host-check` Windows workflow：`windows-latest` 上构建 Desktop shell 前端，并以 `x86_64-pc-windows-msvc` 对 `src-tauri/Cargo.toml` 执行真实 `cargo check`，当前 run 已通过；因此“Windows x64 build target 可编译”已有真实 Windows runner 证据。
+- `tests/desktop-host-config.test.ts` 锁定 Tauri 2、单一 `main` window、单实例回调、最小 capability、有效 Windows ICO 与 Desktop entry 不依赖 Browser adapter；现有 Browser typecheck/lint/unit/build 继续通过。
+- Windows 验证已收敛到主 `.github/workflows/ci.yml` 的 `desktop-host` job：`windows-latest` 构建 `dist-desktop`，并以 `x86_64-pc-windows-msvc` 执行 Rust 测试；早期独立 `desktop-host-check.yml` 已删除，避免重复验证链。
 - 暂不勾选剩余 3 项：`src/desktop.tsx` 当前只承担真实 Tauri shell 启动边界，尚未接入 `PromptNoteApp`，避免为 P2 制造随后必须删除的内存/localStorage Repository、假 SecretStore 或假 AI Transport。完整共享 Editor 主链将在真实 Desktop adapters 到位后接回；Windows 本机启动/第二实例行为仍需真实 GUI smoke。
 
 ## P3 — Desktop Repository 与 SecretStore
 
-- [ ] 建立单个应用本地 SQLite 数据库；
-- [ ] 实现 Desktop `PromptRepository`；
-- [ ] revision 单调 / stale write reject 与 Browser 合同一致；
-- [ ] 实现文档列表、current id、创建、删除、恢复；
-- [ ] 实现 Desktop `PreferencesRepository`；
-- [ ] 选择并实现 Windows 安全凭据存储作为 `SecretStore`；
-- [ ] API Key 不写入 SQLite Prompt / preferences 业务字段；
-- [ ] API Key 不进入 JSON backup；
-- [ ] 数据库 schema / migration 有显式版本；
-- [ ] 应用重启后文档、当前文档与非敏感设置恢复测试通过；
-- [ ] credential 保存 / 读取 / 删除真实 Windows 验证通过。
+- [x] 建立单个应用本地 SQLite 数据库；
+- [x] 实现 Desktop `PromptRepository`；
+- [x] revision 单调 / stale write reject 与 Browser 合同一致；
+- [x] 实现文档列表、current id、创建、删除、恢复；
+- [x] 实现 Desktop `PreferencesRepository`；
+- [x] 选择并实现 Windows 安全凭据存储作为 `SecretStore`；
+- [x] API Key 不写入 SQLite Prompt / preferences 业务字段；
+- [x] API Key 不进入 JSON backup；
+- [x] 数据库 schema / migration 有显式版本；
+- [x] 应用重启后文档、当前文档与非敏感设置恢复测试通过；
+- [x] credential 保存 / 读取 / 删除真实 Windows 验证通过。
+
+### P3 实施证据 — 2026-08-11
+
+- `src-tauri/src/storage.rs` 在 Tauri `appLocalDataDir` 下维护唯一 `promptnote.sqlite3`。schema v1 只包含 `prompt_documents`、`app_state`、`preferences`，使用 `PRAGMA user_version = 1` 做显式迁移版本；没有 credential/secret 表。
+- Desktop `PromptRepository` / `PreferencesRepository` 由 `src/platform/desktop/` 通过官方 `@tauri-apps/api/core` 的 `invoke` 映射到窄 Tauri commands；共享 PromptDocument、默认 AI preferences、解析规则与 Browser 使用同一份定义，没有 Desktop 平行业务模型。
+- stale write 在 SQLite 边界原子执行：`ON CONFLICT(id) ... WHERE prompt_documents.revision <= excluded.revision`；revision 仍保持共享合同的非负整数语义，在 SQLite 边界执行 `u64 ↔ i64` 受检转换，超出 INTEGER 上限明确拒绝。
+- SecretStore 使用 `keyring-core` + `windows-native-keyring-store`，生产只接受 `ai.apiKey`，后端为 Windows Credential Manager；credential 调用串行化。API Key 不进入 SQLite，`preferences_save` 也显式拒绝 `apiKey` 字段。
+- JSON backup 继续只使用既有 `PromptDocumentExport { exportedAt, document }`，没有 Preferences/SecretStore 字段，因此 API Key 无结构性入口进入备份。
+- `src-tauri/Cargo.lock` 由 Cargo 自动生成并正式入库；主 Windows CI 使用 `cargo test --locked`，避免每次重新解析未锁定的 Rust 依赖。
+- GitHub Actions `ci` run `#433`（commit `d3a4882153f88ac167f9c84119ce5762a1dcb58c`）在 Windows Server 2025 / `x86_64-pc-windows-msvc` 完整通过：Desktop shell frontend build 成功；Rust `cargo test` 6/6 通过，包括 `windows_credential_manager_round_trip`、SQLite schema version、stale-write、preferences+API key reject、revision 越界拒绝、documents/current-id reopen 恢复。Browser verify 同一 run 也全部通过。
 
 ## P4 — Desktop AI Transport
 
