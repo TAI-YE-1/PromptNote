@@ -15,7 +15,8 @@ describe('Desktop host boundary', () => {
     const cargo = read('src-tauri/Cargo.toml')
     const config = JSON.parse(read('src-tauri/tauri.conf.json')) as {
       identifier: string
-      app: { windows: Array<{ label: string }> }
+      build: { frontendDist: string }
+      app: { windows: Array<{ label: string; url: string }> }
     }
     const iconPath = resolve(root, 'src-tauri/icons/icon.ico')
 
@@ -23,7 +24,11 @@ describe('Desktop host boundary', () => {
     expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
     expect(cargo).toContain('tauri-plugin-http = "=2.5.9"')
     expect(config.identifier).toBe('com.promptnote.desktop')
-    expect(config.app.windows.map((window) => window.label)).toEqual(['main'])
+    expect(config.build.frontendDist).toBe('../dist-desktop')
+    expect(config.app.windows).toEqual([
+      expect.objectContaining({ label: 'main', url: 'desktop.html' }),
+    ])
+    expect(existsSync(resolve(root, 'src-tauri/frontend/index.html'))).toBe(false)
     expect(existsSync(iconPath)).toBe(true)
     expect([...readFileSync(iconPath).subarray(0, 6)]).toEqual([0, 0, 1, 0, 1, 0])
   })
