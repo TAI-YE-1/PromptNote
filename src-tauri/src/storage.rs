@@ -9,6 +9,7 @@ const DATABASE_SCHEMA_VERSION: i64 = 1;
 const PROMPT_SCHEMA_VERSION: u32 = 1;
 const CURRENT_DOCUMENT_KEY: &str = "current_document_id";
 const AI_PREFERENCES_KEY: &str = "ai";
+const SHELL_PREFERENCES_KEY: &str = "desktop_shell";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -121,11 +122,29 @@ pub fn set_current_id(path: &Path, id: &str) -> Result<(), String> {
 }
 
 pub fn load_preferences(path: &Path) -> Result<Option<Value>, String> {
+    load_named_preferences(path, AI_PREFERENCES_KEY)
+}
+
+pub fn save_preferences(path: &Path, preferences: &Value) -> Result<(), String> {
+    validate_preferences(preferences)?;
+    save_named_preferences(path, AI_PREFERENCES_KEY, preferences)
+}
+
+pub fn load_shell_preferences(path: &Path) -> Result<Option<Value>, String> {
+    load_named_preferences(path, SHELL_PREFERENCES_KEY)
+}
+
+pub fn save_shell_preferences(path: &Path, preferences: &Value) -> Result<(), String> {
+    validate_preferences(preferences)?;
+    save_named_preferences(path, SHELL_PREFERENCES_KEY, preferences)
+}
+
+fn load_named_preferences(path: &Path, key: &str) -> Result<Option<Value>, String> {
     let connection = open_initialized(path)?;
     let raw = connection
         .query_row(
             "SELECT value_json FROM preferences WHERE key = ?1",
-            [AI_PREFERENCES_KEY],
+            [key],
             |row| row.get::<_, String>(0),
         )
         .optional()
@@ -134,15 +153,14 @@ pub fn load_preferences(path: &Path) -> Result<Option<Value>, String> {
         .transpose()
 }
 
-pub fn save_preferences(path: &Path, preferences: &Value) -> Result<(), String> {
-    validate_preferences(preferences)?;
+fn save_named_preferences(path: &Path, key: &str, preferences: &Value) -> Result<(), String> {
     let value_json = serde_json::to_string(preferences).map_err(error_message)?;
     let connection = open_initialized(path)?;
     connection
         .execute(
             "INSERT INTO preferences (key, value_json) VALUES (?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json",
-            params![AI_PREFERENCES_KEY, value_json],
+            params![key, value_json],
         )
         .map_err(error_message)?;
     Ok(())
@@ -342,6 +360,21 @@ mod tests {
         initialize(&path).unwrap();
         assert_eq!(load_preferences(&path).unwrap(), Some(preferences));
         assert!(save_preferences(&path, &json!({ "apiKey": "secret" })).is_err());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn persists_shell_preferences_separately_from_ai_preferences() {
+        let path = temp_database();
+        initialize(&path).unwrap();
+        let ai = json!({ "enabled": true, "provider": "openai-compatible" });
+        let shell = json!({ "orbEnabled": true, "edge": "right", "yRatio": 0.5 });
+        save_preferences(&path, &ai).unwrap();
+        save_shell_preferences(&path, &shell).unwrap();
+
+        initialize(&path).unwrap();
+        assert_eq!(load_preferences(&path).unwrap(), Some(ai));
+        assert_eq!(load_shell_preferences(&path).unwrap(), Some(shell));
         fs::remove_file(path).unwrap();
     }
 
