@@ -75,8 +75,8 @@ describe('Desktop startup boundary', () => {
 
   it('does not let background launch overwrite the last manual shell preference', () => {
     const shell = read('src-tauri/src/shell.rs')
-    const start = shell.index('fn show_background_launch')
-    const end = shell.index('fn show_orb_or_tray', start)
+    const start = shell.indexOf('fn show_background_launch')
+    const end = shell.indexOf('fn show_orb_or_tray', start)
     const background = shell.slice(start, end)
 
     expect(background).toContain('*self.lock_mode()? = ShellMode::Orb')
