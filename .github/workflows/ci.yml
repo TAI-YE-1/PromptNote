@@ -46,7 +46,7 @@ jobs:
 
   desktop-host:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -73,3 +73,80 @@ jobs:
       - name: Test Windows x64 Desktop host
         shell: pwsh
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - name: Build NSIS installer
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: npm run build:desktop-installer
+      - name: Smoke install, same-version reinstall, and uninstall
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem 'src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\*-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not generated.' }
+
+          function Invoke-Installer {
+            param([string]$Path)
+            $process = Start-Process -FilePath $Path -ArgumentList '/S' -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Installer exited with code $($process.ExitCode)." }
+          }
+
+          function Get-PromptNoteUninstallEntry {
+            Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+              Where-Object { $_.DisplayName -eq 'PromptNote' } |
+              Select-Object -First 1
+          }
+
+          Invoke-Installer $installer.FullName
+          $entry = Get-PromptNoteUninstallEntry
+          if (-not $entry) { throw 'PromptNote uninstall registry entry was not created.' }
+
+          Invoke-Installer $installer.FullName
+          $entryAfterReinstall = Get-PromptNoteUninstallEntry
+          if (-not $entryAfterReinstall) { throw 'Same-version reinstall removed the uninstall registry entry.' }
+
+          $installLocation = [string]$entryAfterReinstall.InstallLocation
+          if (-not $installLocation) {
+            $uninstallCommand = [string]$entryAfterReinstall.UninstallString
+            if ($uninstallCommand -match '^"([^"]+)"') {
+              $installLocation = Split-Path -Parent $Matches[1]
+            }
+          }
+          if (-not $installLocation -or -not (Test-Path $installLocation)) {
+            throw 'Installed PromptNote location could not be resolved.'
+          }
+
+          $installedExe = Get-ChildItem $installLocation -Filter '*.exe' -File |
+            Where-Object { $_.Name -ne 'uninstall.exe' } |
+            Select-Object -First 1
+          if (-not $installedExe) { throw 'Installed PromptNote executable was not found.' }
+
+          $uninstaller = Join-Path $installLocation 'uninstall.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'NSIS uninstaller was not found.' }
+          $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($uninstallProcess.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstallProcess.ExitCode)." }
+
+          Start-Sleep -Seconds 2
+          if (Get-PromptNoteUninstallEntry) { throw 'PromptNote uninstall registry entry still exists.' }
+          if (Test-Path $installedExe.FullName) { throw 'PromptNote executable still exists after uninstall.' }
+
+          "installer=$($installer.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - name: Verify installer has no build-machine paths or test credentials
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\*-setup.exe' | Select-Object -First 1
+          $bytes = [System.IO.File]::ReadAllBytes($installer.FullName)
+          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+          $forbidden = @('D:\a\PromptNote', '/home/runner/work/PromptNote', 'test-key', 'OPENAI_API_KEY=')
+          foreach ($needle in $forbidden) {
+            if ($ascii.Contains($needle)) { throw "Installer contains forbidden build/test value: $needle" }
+          }
+      - name: Upload Windows installer artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptnote-desktop-0.1.0-windows-x64
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 30
