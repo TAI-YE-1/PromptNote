@@ -15,6 +15,8 @@
 - 根目录保留完整 MPL-2.0 `LICENSE`，README 中的授权说明与之保持一致；
 - 只上传经过 CI 验证的发行包，不从未验证的本地工作树临时打包。
 
+CI 的发行 artifact 名称直接读取 `public/manifest.json` 的版本号，避免 manifest 与 ZIP / artifact 名称漂移。
+
 ## 当前技术边界
 
 - 固定权限：`storage`、`sidePanel`；

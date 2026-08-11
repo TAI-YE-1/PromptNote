@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PromptNote / 提词笺",
   "short_name": "PromptNote",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "像写文档一样写 Prompt：结构化编辑、检查、预览、复制，并提供可选 AI 辅助与内联补全。",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "sidePanel"],

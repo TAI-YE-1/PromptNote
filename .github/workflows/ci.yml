@@ -30,16 +30,19 @@ jobs:
         run: npm test
       - name: Build extension
         run: npm run build
+      - name: Read extension version
+        if: github.event_name == 'push'
+        run: echo "EXTENSION_VERSION=$(node -p 'JSON.parse(require(\"node:fs\").readFileSync(\"public/manifest.json\", \"utf8\")).version')" >> "$GITHUB_ENV"
       - name: Package release artifact
         if: github.event_name == 'push'
         run: |
           cd dist
-          zip -qr ../promptnote-1.0.0.zip .
+          zip -qr "../promptnote-${EXTENSION_VERSION}.zip" .
       - name: Upload release artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: promptnote-1.0.0
-          path: promptnote-1.0.0.zip
+          name: promptnote-${{ env.EXTENSION_VERSION }}
+          path: promptnote-${{ env.EXTENSION_VERSION }}.zip
           if-no-files-found: error
           retention-days: 30

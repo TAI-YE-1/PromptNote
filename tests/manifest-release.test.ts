@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import manifest from '../public/manifest.json'
 
 describe('release manifest', () => {
-  it('keeps the published extension version and least-privilege fixed permissions', () => {
-    expect(manifest.version).toBe('1.0.0')
+  it('keeps the release extension version and least-privilege fixed permissions', () => {
+    expect(manifest.version).toBe('1.0.1')
     expect(manifest.permissions).toEqual(['storage', 'sidePanel'])
   })
 

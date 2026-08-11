@@ -1,25 +1,39 @@
-# PromptNote 1.0.0 — Microsoft Edge Add-ons 提交材料
+# PromptNote 1.0.1 — Microsoft Edge Add-ons 提交材料
 
-本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo、商店截图和其余提交字段均已按 PromptNote 1.0.0 的真实行为准备好，可直接使用。
+本文件用于 Microsoft Partner Center 的 Edge 扩展提交。正式 Logo、商店截图和其余提交字段均已按 PromptNote 1.0.1 的真实行为准备好，可直接使用。
 
-最后核对：2026-08-10
+最后核对：2026-08-11
 
 ## 1. 上传包
 
-GitHub Actions 下载 `promptnote-1.0.0` artifact 后，先解压外层 artifact，再上传其中真正的：
+GitHub Actions 下载 `promptnote-1.0.1` artifact 后，先解压外层 artifact，再上传其中真正的：
 
 ```text
-promptnote-1.0.0.zip
+promptnote-1.0.1.zip
 ```
 
 ZIP 根目录必须直接包含 `manifest.json`、`sidepanel.html`、`icons/` 和构建后的 JS/CSS 文件，不要把外层 artifact ZIP 直接提交到 Partner Center。
+
+### 1.1 本次更新说明
+
+中文：
+
+```text
+1.0.1 修复了 Prompt 编辑器与 Slash Command 的稳定性和交互问题：结构块切换不再创建多余模块，修复部分 ProseMirror 块插入异常，Slash Menu 现在跟随真实编辑光标定位，并改进键盘方向键选择的可见反馈。本次更新不新增权限、数据用途或后台服务。
+```
+
+English:
+
+```text
+Version 1.0.1 fixes Prompt editor and Slash Command stability and interaction issues. Semantic block switching no longer creates extra blocks, a ProseMirror block insertion error is fixed, the Slash Menu now follows the actual editor caret, and keyboard selection feedback is clearer. This update adds no new permissions, data uses, or backend services.
+```
 
 ## 2. Availability
 
 - Visibility：`Public`
 - Markets：`All markets`
 
-PromptNote 的核心编辑能力不依赖地区性账号或 PromptNote 自有服务器，因此第一版没有必要限制市场。
+PromptNote 的核心编辑能力不依赖地区性账号或 PromptNote 自有服务器，因此当前版本没有必要限制市场。
 
 ## 3. Properties
 
@@ -155,7 +169,7 @@ AI 辅助
 
 ### YouTube video
 
-第一版留空。
+当前版本留空。
 
 ## 6. 视觉素材
 
@@ -180,7 +194,7 @@ public/icons/icon-128.png
 
 ### 商店截图
 
-第一版使用 4 张已经提交到仓库的 `1280 × 800` PNG：
+当前版本继续使用 4 张已经提交到仓库的 `1280 × 800` PNG：
 
 ```text
 docs/store-assets/screenshots/screenshot-01-editor.png
@@ -200,7 +214,7 @@ docs/store-assets/store-screenshots-render.html
 
 修改渲染源后，GitHub Actions 会重新生成并提交 4 张商店 PNG，当前仓库不再依赖聊天附件保存发行素材。
 
-Small promotional tile（`440 × 280`）和 Large promotional tile（`1400 × 560`）第一版均可不提交。
+Small promotional tile（`440 × 280`）和 Large promotional tile（`1400 × 560`）当前版本均可不提交。
 
 ## 7. Notes for certification
 
@@ -226,8 +240,8 @@ https://github.com/TAI-YE-1/PromptNote
 
 ## 8. 提交前最终检查
 
-- [ ] 使用最新成功 CI 生成的 `promptnote-1.0.0.zip`；
-- [ ] 上传包后确认 manifest 显示版本 `1.0.0`；
+- [ ] 使用最新成功 CI 生成的 `promptnote-1.0.1.zip`；
+- [ ] 上传包后确认 manifest 显示版本 `1.0.1`；
 - [ ] Category = Productivity；
 - [ ] Public + All markets；
 - [ ] Mature content = No；
