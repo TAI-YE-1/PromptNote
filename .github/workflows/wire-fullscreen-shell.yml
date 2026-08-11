@@ -75,10 +75,11 @@ jobs:
             '            app.state::<ShellController>()',
             '                .initialize(app.handle())',
             '                .map_err(std::io::Error::other)?;',
-            '            #[cfg(target_os = "windows")]'.Replace([char]92, ''),
+            '            #[cfg(target_os = "windows")]',
             '            fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;',
             '            Ok(())'
           ) -join "`n"
+          $setupReplacement = $setupReplacement.Replace('\', '')
           if (-not $lib.Contains($setupAnchor)) { throw 'lib setup anchor changed' }
           $lib = $lib.Replace($setupAnchor, $setupReplacement)
           [System.IO.File]::WriteAllText($libPath, $lib, [System.Text.UTF8Encoding]::new($false))
