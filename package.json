@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "license:audit": "node scripts/audit-licenses.mjs"
+    "license:audit": "node scripts/audit-licenses.mjs",
+    "build:desktop-installer": "npm run build:desktop-shell && tauri build --target x86_64-pc-windows-msvc --bundles nsis"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",
@@ -26,6 +27,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.11.0",
     "@types/chrome": "0.2.2",
     "@types/node": "22.20.1",
     "@types/react": "19.2.17",
