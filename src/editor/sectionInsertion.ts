@@ -30,17 +30,19 @@ export function createSlashSectionTransaction(
     return state.tr.setNodeMarkup(selection.$from.before(), promptSection, { kind })
   }
 
-  let splitTransaction: Transaction | null = null
+  const splitTransactions: Transaction[] = []
   const didSplit = splitBlock(state, (transaction) => {
-    splitTransaction = transaction
+    splitTransactions.push(transaction)
   })
+  const splitTransaction = splitTransactions[0]
   if (!didSplit || !splitTransaction) return null
 
   const afterSplit = state.apply(splitTransaction)
-  let conversionTransaction: Transaction | null = null
+  const conversionTransactions: Transaction[] = []
   const didConvert = setBlockType(promptSection, { kind })(afterSplit, (transaction) => {
-    conversionTransaction = transaction
+    conversionTransactions.push(transaction)
   })
+  const conversionTransaction = conversionTransactions[0]
   if (!didConvert || !conversionTransaction) return null
 
   for (const step of conversionTransaction.steps) splitTransaction.step(step)

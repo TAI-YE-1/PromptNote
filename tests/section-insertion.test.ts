@@ -61,14 +61,14 @@ describe('section insertion transactions', () => {
       doc,
       selection: TextSelection.create(doc, 3),
     })
-    const transaction = createSlashSectionTransaction(state, 'task')
+    const transaction = createSlashSectionTransaction(state, 'instruction')
 
     expect(transaction).not.toBeNull()
     const next = state.apply(transaction!)
     expect(next.doc.childCount).toBe(2)
     expect(next.doc.child(0).type.name).toBe('paragraph')
     expect(next.doc.child(1).type.name).toBe('promptSection')
-    expect(next.doc.child(1).attrs.kind).toBe('task')
+    expect(next.doc.child(1).attrs.kind).toBe('instruction')
     expect(next.doc.child(1).textContent).toBe('B')
   })
 
