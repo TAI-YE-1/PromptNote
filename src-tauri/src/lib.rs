@@ -1,6 +1,9 @@
 mod credentials;
 mod storage;
 
+#[cfg(test)]
+mod http_smoke;
+
 use std::path::PathBuf;
 use std::sync::Mutex;
 
