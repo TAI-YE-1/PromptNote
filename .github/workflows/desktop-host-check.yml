@@ -1,0 +1,39 @@
+name: desktop-host-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'src/desktop.tsx'
+      - 'desktop.html'
+      - 'vite.desktop.config.mjs'
+      - 'package.json'
+      - '.github/workflows/desktop-host-check.yml'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'src/desktop.tsx'
+      - 'desktop.html'
+      - 'vite.desktop.config.mjs'
+      - 'package.json'
+      - '.github/workflows/desktop-host-check.yml'
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build Desktop shell frontend
+        run: npm run build:desktop-shell
+      - name: Check Tauri host for Windows x64
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
