@@ -91,6 +91,8 @@ describe('Desktop startup boundary', () => {
     expect(shell).toContain('saved_bounds_visible(&main, position, bounds.size)?')
     expect(shell).toContain('main.center().map_err(error_message)?')
     expect(shell).toContain('fn rectangles_have_safe_overlap')
+    expect(shell).toContain('if right <= left || bottom <= top')
+    expect(shell).toContain('let visible_width = (right - left) as u32;')
     expect(shell).toContain('visible_width >= 64.min(size.width)')
     expect(shell).toContain('visible_height >= 48.min(size.height)')
     expect(shell).toContain('fn offscreen_window_bounds_require_safe_visible_area()')
