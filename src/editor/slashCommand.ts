@@ -1,5 +1,5 @@
 import type { EditorState } from '@tiptap/pm/state'
-import { getActiveBlockFormat } from './blockConversion'
+import { canConvertCurrentBlockToSection } from './sectionInsertion'
 
 export function shouldOpenSlashMenu(state: EditorState): boolean {
   const { selection } = state
@@ -17,7 +17,5 @@ export function shouldOpenSlashMenu(state: EditorState): boolean {
 }
 
 export function shouldConvertCurrentBlockOnSlash(state: EditorState): boolean {
-  const { selection } = state
-  if (!selection.empty || selection.$from.parentOffset !== 0) return false
-  return getActiveBlockFormat(state) !== null
+  return canConvertCurrentBlockToSection(state)
 }
