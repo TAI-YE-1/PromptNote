@@ -48,7 +48,7 @@ type AiPanel = 'menu' | 'settings' | null
 
 export interface PromptNoteHostCommandRequest {
   id: number
-  command: 'new-prompt' | 'settings'
+  command: 'new-prompt'
 }
 
 export interface PromptNoteAppProps {
@@ -173,14 +173,10 @@ export function PromptNoteApp({
   }, [aiPanel, documentSheetOpen, previewOpen, selection, slashOpen])
 
   useEffect(() => {
-  if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
-  lastHostCommandIdRef.current = hostCommand.id
-  if (hostCommand.command === 'new-prompt') {
+    if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+    lastHostCommandIdRef.current = hostCommand.id
     void createDocument()
-    return
-  }
-  openAi(true, 'settings')
-}, [hostCommand])
+  }, [hostCommand])
 
   const previewText = useMemo(
     () => (previewOpen && current ? compilePrompt(current, previewFormat) : ''),
@@ -341,11 +337,11 @@ export function PromptNoteApp({
     setCompletionContext(null)
   }
 
-  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {
+  function openAi(clearSelection = true) {
     setAiDraft(aiSettings)
     setAiTestState('idle')
     setAiError(null)
-    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))
+    setAiPanel(aiSettings.configured ? 'menu' : 'settings')
     if (clearSelection) setSelection(null)
   }
 
