@@ -104,6 +104,24 @@ describe('Desktop shell architecture', () => {
     expect(orb).not.toContain("addEventListener('pointerenter', showDockedPanel")
   })
 
+  it('hides Orb for external fullscreen geometry without sensitive input hooks', () => {
+    const host = read('src-tauri/src/lib.rs')
+    const shell = read('src-tauri/src/shell.rs')
+    const fullscreen = read('src-tauri/src/fullscreen.rs')
+
+    expect(host).toContain('#[cfg(target_os = "windows")]\nmod fullscreen;')
+    expect(host).toContain('fullscreen::start(app.handle().clone())')
+    expect(shell).toContain('crate::fullscreen::is_suppressed()')
+    expect(fullscreen).toContain('GetForegroundWindow')
+    expect(fullscreen).toContain('GetWindowThreadProcessId')
+    expect(fullscreen).toContain('GetWindowRect')
+    expect(fullscreen).toContain('MonitorFromWindow')
+    expect(fullscreen).toContain('GetMonitorInfoW')
+    expect(fullscreen).toContain('IsZoomed')
+    expect(fullscreen).toContain('process_id == std::process::id()')
+    expect(fullscreen).not.toMatch(/clipboard|GetAsyncKeyState|SetWindowsHookEx|UIAutomation|Accessibility/i)
+  })
+
   it('separates main AI network capability from the minimal Orb capability', () => {
     const mainCapability = JSON.parse(read('src-tauri/capabilities/main-window.json')) as {
       windows: string[]
