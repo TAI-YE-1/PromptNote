@@ -11,18 +11,20 @@ function read(path: string) {
 }
 
 describe('Desktop host boundary', () => {
-  it('pins the Desktop runtime to Tauri 2 with one main window and Windows icon', () => {
+  it('pins the Desktop runtime to Tauri 2 with one main window and valid Windows icon', () => {
     const cargo = read('src-tauri/Cargo.toml')
     const config = JSON.parse(read('src-tauri/tauri.conf.json')) as {
       identifier: string
       app: { windows: Array<{ label: string }> }
     }
+    const iconPath = resolve(root, 'src-tauri/icons/icon.ico')
 
     expect(cargo).toContain('tauri = "=2.11.5"')
     expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
     expect(config.identifier).toBe('com.promptnote.desktop')
     expect(config.app.windows.map((window) => window.label)).toEqual(['main'])
-    expect(existsSync(resolve(root, 'src-tauri/icons/icon.ico'))).toBe(true)
+    expect(existsSync(iconPath)).toBe(true)
+    expect([...readFileSync(iconPath).subarray(0, 6)]).toEqual([0, 0, 1, 0, 1, 0])
   })
 
   it('keeps capabilities minimal and does not enable shell or filesystem plugins', () => {
