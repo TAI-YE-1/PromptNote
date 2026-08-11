@@ -12,12 +12,19 @@ permissions:
 jobs:
   finalize:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
-      - name: Apply narrow Rust fixes
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: npm ci --ignore-scripts
+      - name: Apply narrow source fixes
         shell: pwsh
         run: |
           $path = 'src-tauri/src/shell.rs'
@@ -34,10 +41,45 @@ jobs:
             $text = $text.Replace($pair[0], $pair[1])
           }
           [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))
+
+          $appPath = 'src/app/PromptNoteApp.tsx'
+          $app = [System.IO.File]::ReadAllText($appPath)
+          $bad = @'
+  useEffect(() => {
+  if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+  lastHostCommandIdRef.current = hostCommand.id
+  if (hostCommand.command === 'new-prompt') {
+    void createDocument()
+    return
+  }
+  openAi(true, 'settings')
+}, [hostCommand])
+'@
+          $good = @'
+  useEffect(() => {
+    if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
+    lastHostCommandIdRef.current = hostCommand.id
+    if (hostCommand.command === 'new-prompt') {
+      void createDocument()
+      return
+    }
+    openAi(true, 'settings')
+  }, [hostCommand])
+'@
+          if (-not $app.Contains($bad)) { throw 'PromptNoteApp host-command formatting anchor changed' }
+          $app = $app.Replace($bad, $good)
+          [System.IO.File]::WriteAllText($appPath, $app, [System.Text.UTF8Encoding]::new($false))
+      - name: Verify frontend and produce Tauri frontendDist
+        shell: pwsh
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build:desktop-shell
       - name: Regenerate locked tray dependency graph
         shell: pwsh
         run: cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
-      - name: Check Windows x64 Desktop host
+      - name: Check Windows x64 Desktop host against built frontend
         shell: pwsh
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
       - name: Commit validated shell fixes
@@ -49,6 +91,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/finalize-shell-rust.yml
-          git add src-tauri/src/shell.rs src-tauri/Cargo.lock
+          git add src-tauri/src/shell.rs src-tauri/Cargo.lock src/app/PromptNoteApp.tsx
           git commit -m "fix(desktop): validate shell runtime boundary"
           git push origin HEAD:main
