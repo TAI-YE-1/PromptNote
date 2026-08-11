@@ -46,17 +46,25 @@ jobs:
 
   desktop-host:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Build Desktop shell frontend
+        run: npm run build:desktop-shell
       - name: Verify Rust toolchain
         shell: pwsh
         run: |
           rustc --version
           cargo --version
-      - name: Check Windows x64 Desktop host
+      - name: Test Windows x64 Desktop host
         shell: pwsh
-        run: cargo check --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+        run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
       - name: Upload generated Cargo lock
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
