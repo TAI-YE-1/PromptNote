@@ -1,6 +1,48 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react'
 import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
 import './slashMenu.css'
+
+const MENU_GAP = 6
+const VIEWPORT_PADDING = 8
+
+export interface SlashMenuAnchor {
+  caretLeft: number
+  caretTop: number
+  caretBottom: number
+  viewportLeft: number
+  viewportTop: number
+  viewportRight: number
+  viewportBottom: number
+}
+
+export interface SlashMenuPosition {
+  left: number
+  top: number
+}
+
+export function placeSlashMenu(
+  anchor: SlashMenuAnchor,
+  menuWidth: number,
+  menuHeight: number,
+): SlashMenuPosition {
+  const minLeft = anchor.viewportLeft + VIEWPORT_PADDING
+  const maxLeft = Math.max(minLeft, anchor.viewportRight - VIEWPORT_PADDING - menuWidth)
+  const left = Math.min(Math.max(anchor.caretLeft, minLeft), maxLeft)
+
+  const below = anchor.caretBottom + MENU_GAP
+  const maxTop = anchor.viewportBottom - VIEWPORT_PADDING - menuHeight
+  const above = anchor.caretTop - MENU_GAP - menuHeight
+  const top = below <= maxTop ? below : Math.max(anchor.viewportTop + VIEWPORT_PADDING, above)
+
+  return { left, top }
+}
 
 export function nextSlashMenuIndex(currentIndex: number, key: string, itemCount: number): number {
   if (itemCount <= 0) return -1
@@ -19,8 +61,36 @@ interface SlashMenuProps {
 
 export function SlashMenu(props: SlashMenuProps) {
   const [activeIndex, setActiveIndex] = useState(0)
+  const [position, setPosition] = useState<SlashMenuPosition | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
   const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    const selection = window.getSelection()
+    const container = menu?.offsetParent
+    if (!menu || !(container instanceof HTMLElement) || !selection || selection.rangeCount === 0) {
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    if (!container.contains(range.commonAncestorContainer)) return
+
+    const caretRect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const anchor: SlashMenuAnchor = {
+      caretLeft: caretRect.left - containerRect.left + container.scrollLeft,
+      caretTop: caretRect.top - containerRect.top + container.scrollTop,
+      caretBottom: caretRect.bottom - containerRect.top + container.scrollTop,
+      viewportLeft: container.scrollLeft,
+      viewportTop: container.scrollTop,
+      viewportRight: container.scrollLeft + container.clientWidth,
+      viewportBottom: container.scrollTop + container.clientHeight,
+    }
+    const menuRect = menu.getBoundingClientRect()
+    setPosition(placeSlashMenu(anchor, menuRect.width, menuRect.height))
+  }, [])
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -48,8 +118,21 @@ export function SlashMenu(props: SlashMenuProps) {
     focusItem(nextSlashMenuIndex(activeIndex, event.key, sectionKinds.length))
   }
 
+  const positionStyle: CSSProperties = {
+    left: position?.left ?? 0,
+    top: position?.top ?? 0,
+    visibility: position ? 'visible' : 'hidden',
+  }
+
   return (
-    <div className="slash-menu" role="menu" aria-label="Prompt 结构" onKeyDown={handleKeyDown}>
+    <div
+      ref={menuRef}
+      className="slash-menu"
+      role="menu"
+      aria-label="Prompt 结构"
+      style={positionStyle}
+      onKeyDown={handleKeyDown}
+    >
       <div className="slash-menu__head">
         <span>Prompt 结构</span>
         <button type="button" aria-label="关闭 Prompt 结构菜单" onClick={props.onClose}>×</button>
