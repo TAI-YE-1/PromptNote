@@ -24,18 +24,16 @@ jobs:
 
           shell_path = Path('src-tauri/src/shell.rs')
           shell = shell_path.read_text(encoding='utf-8')
-          shell = shell.replace(
-              '    pub fn initialize(&self, app: &AppHandle) -> Result<(), String> {\n        self.ensure_orb_window(app)?;\n        self.install_tray(app)?;\n',
-              '    pub fn initialize(&self, app: &AppHandle, background_launch: bool) -> Result<(), String> {\n        self.ensure_orb_window(app)?;\n        self.install_tray(app)?;\n\n        if background_launch {\n            return self.show_background_launch(app);\n        }\n',
-              1,
-          )
+
+          init_old = '    pub fn initialize(&self, app: &AppHandle) -> Result<(), String> {\n        self.ensure_orb_window(app)?;\n        self.install_tray(app)?;\n'
+          init_new = '    pub fn initialize(&self, app: &AppHandle, background_launch: bool) -> Result<(), String> {\n        self.ensure_orb_window(app)?;\n        self.install_tray(app)?;\n\n        if background_launch {\n            return self.show_background_launch(app);\n        }\n'
+          assert shell.count(init_old) == 1
+          shell = shell.replace(init_old, init_new, 1)
+
           orb_anchor = '            .transparent(true)\n            .always_on_top(true)'
           assert shell.count(orb_anchor) == 1
-          shell = shell.replace(
-              orb_anchor,
-              '            .transparent(true)\n            .focusable(false)\n            .focused(false)\n            .always_on_top(true)',
-              1,
-          )
+          shell = shell.replace(orb_anchor, '            .transparent(true)\n            .focusable(false)\n            .focused(false)\n            .always_on_top(true)', 1)
+
           background_anchor = '    fn show_orb_or_tray(&self, app: &AppHandle) -> Result<(), String> {'
           assert shell.count(background_anchor) == 1
           background = '''    fn show_background_launch(&self, app: &AppHandle) -> Result<(), String> {
@@ -61,22 +59,19 @@ jobs:
           '''
           shell = shell.replace(background_anchor, background + background_anchor, 1)
 
-          old_position = '''            if let Some(position) = bounds.position {
+          position_start = shell.index('            if let Some(position) = bounds.position {')
+          position_end = shell.index('            if bounds.maximized {', position_start)
+          position_block = '''            if let Some(position) = bounds.position {
+              if saved_bounds_visible(&main, position, bounds.size)? {
                   main.set_position(position).map_err(error_message)?;
               } else {
                   main.center().map_err(error_message)?;
-              }'''
-          new_position = '''            if let Some(position) = bounds.position {
-                  if saved_bounds_visible(&main, position, bounds.size)? {
-                      main.set_position(position).map_err(error_message)?;
-                  } else {
-                      main.center().map_err(error_message)?;
-                  }
-              } else {
-                  main.center().map_err(error_message)?;
-              }'''
-          assert shell.count(old_position) == 1
-          shell = shell.replace(old_position, new_position, 1)
+              }
+          } else {
+              main.center().map_err(error_message)?;
+          }
+'''
+          shell = shell[:position_start] + position_block + shell[position_end:]
 
           helper_anchor = 'fn logical_to_physical(value: f64, scale: f64) -> u32 {'
           assert shell.count(helper_anchor) == 1
@@ -100,10 +95,8 @@ jobs:
           ) -> bool {
               let left = position.x.max(work_position.x);
               let top = position.y.max(work_position.y);
-              let right = (position.x + size.width as i32)
-                  .min(work_position.x + work_size.width as i32);
-              let bottom = (position.y + size.height as i32)
-                  .min(work_position.y + work_size.height as i32);
+              let right = (position.x + size.width as i32).min(work_position.x + work_size.width as i32);
+              let bottom = (position.y + size.height as i32).min(work_position.y + work_size.height as i32);
               let visible_width = right.saturating_sub(left) as u32;
               let visible_height = bottom.saturating_sub(top) as u32;
               visible_width >= 64.min(size.width) && visible_height >= 48.min(size.height)
@@ -114,50 +107,30 @@ jobs:
 
           test_anchor = '    #[test]\n    fn logical_sizes_scale_for_high_dpi() {'
           assert shell.count(test_anchor) == 1
-          new_test = '''    #[test]
+          test = '''    #[test]
               fn offscreen_window_bounds_require_safe_visible_area() {
                   let size = PhysicalSize::new(1080, 720);
                   let work_position = PhysicalPosition::new(0, 0);
                   let work_size = PhysicalSize::new(1920, 1080);
-                  assert!(rectangles_have_safe_overlap(
-                      PhysicalPosition::new(100, 100),
-                      size,
-                      work_position,
-                      work_size,
-                  ));
-                  assert!(!rectangles_have_safe_overlap(
-                      PhysicalPosition::new(1910, 1070),
-                      size,
-                      work_position,
-                      work_size,
-                  ));
-                  assert!(!rectangles_have_safe_overlap(
-                      PhysicalPosition::new(-2000, 0),
-                      size,
-                      work_position,
-                      work_size,
-                  ));
+                  assert!(rectangles_have_safe_overlap(PhysicalPosition::new(100, 100), size, work_position, work_size));
+                  assert!(!rectangles_have_safe_overlap(PhysicalPosition::new(1910, 1070), size, work_position, work_size));
+                  assert!(!rectangles_have_safe_overlap(PhysicalPosition::new(-2000, 0), size, work_position, work_size));
               }
 
               '''
-          shell = shell.replace(test_anchor, new_test + test_anchor, 1)
+          shell = shell.replace(test_anchor, test + test_anchor, 1)
           shell_path.write_text(shell, encoding='utf-8')
 
           lib_path = Path('src-tauri/src/lib.rs')
           lib = lib_path.read_text(encoding='utf-8')
+          assert lib.count('mod shell;\nmod storage;') == 1
           lib = lib.replace('mod shell;\nmod storage;', 'mod shell;\nmod startup;\nmod storage;', 1)
-          lib = lib.replace(
-              'use shell::{ShellController, ShellSnapshot};\nuse storage::PromptDocument;',
-              'use shell::{ShellController, ShellSnapshot};\nuse startup::{StartupSnapshot, StartupState};\nuse storage::PromptDocument;',
-              1,
-          )
-          command_anchor = '#[cfg_attr(mobile, tauri::mobile_entry_point)]\npub fn run() {'
-          assert lib.count(command_anchor) == 1
+          assert lib.count('use shell::{ShellController, ShellSnapshot};\nuse storage::PromptDocument;') == 1
+          lib = lib.replace('use shell::{ShellController, ShellSnapshot};\nuse storage::PromptDocument;', 'use shell::{ShellController, ShellSnapshot};\nuse startup::{StartupSnapshot, StartupState};\nuse storage::PromptDocument;', 1)
+
+          run_anchor = '#[cfg_attr(mobile, tauri::mobile_entry_point)]\npub fn run() {'
           commands = '''#[tauri::command]
-          fn startup_snapshot(
-              app: tauri::AppHandle,
-              state: tauri::State<'_, StartupState>,
-          ) -> Result<StartupSnapshot, String> {
+          fn startup_snapshot(app: tauri::AppHandle, state: tauri::State<'_, StartupState>) -> Result<StartupSnapshot, String> {
               startup::snapshot(&app, &state)
           }
 
@@ -167,9 +140,10 @@ jobs:
           }
 
           '''
-          lib = lib.replace(command_anchor, commands + command_anchor, 1)
+          assert lib.count(run_anchor) == 1
+          lib = lib.replace(run_anchor, commands + run_anchor, 1)
+
           plugin_anchor = '        .plugin(tauri_plugin_http::init())\n        .setup(|app| {'
-          assert lib.count(plugin_anchor) == 1
           plugins = '''        .plugin(
               tauri_plugin_global_shortcut::Builder::new()
                   .with_handler(|app, shortcut, event| {
@@ -191,52 +165,46 @@ jobs:
           ))
           .plugin(tauri_plugin_http::init())
           .setup(|app| {'''
+          assert lib.count(plugin_anchor) == 1
           lib = lib.replace(plugin_anchor, plugins, 1)
-          manage_anchor = '''            app.manage(shell);
-              app.state::<ShellController>()
-                  .initialize(app.handle())
-                  .map_err(std::io::Error::other)?;'''
-          assert lib.count(manage_anchor) == 1
+
+          manage_start = lib.index('            app.manage(shell);')
+          manage_end = lib.index('            #[cfg(target_os = "windows")]', manage_start)
           manage = '''            app.manage(shell);
               let startup_state = startup::register_global_shortcut(app.handle());
               app.manage(startup_state);
               let background_launch = startup::launched_from_autostart();
               app.state::<ShellController>()
                   .initialize(app.handle(), background_launch)
-                  .map_err(std::io::Error::other)?;'''
-          lib = lib.replace(manage_anchor, manage, 1)
+                  .map_err(std::io::Error::other)?;
+'''
+          lib = lib[:manage_start] + manage + lib[manage_end:]
+
           handler_anchor = '            shell_set_orb_idle,\n        ])'
           assert lib.count(handler_anchor) == 1
-          lib = lib.replace(
-              handler_anchor,
-              '            shell_set_orb_idle,\n            startup_snapshot,\n            startup_set_autostart,\n        ])',
-              1,
-          )
+          lib = lib.replace(handler_anchor, '            shell_set_orb_idle,\n            startup_snapshot,\n            startup_set_autostart,\n        ])', 1)
           lib_path.write_text(lib, encoding='utf-8')
 
           app_path = Path('src/app/PromptNoteApp.tsx')
           app = app_path.read_text(encoding='utf-8')
+          assert app.count("  command: 'new-prompt' | 'settings'") == 1
           app = app.replace("  command: 'new-prompt' | 'settings'", "  command: 'new-prompt'", 1)
-          effect_start = app.index('  useEffect(() => {\n', app.index('lastHostCommandIdRef'))
-          preview_anchor = app.index('  const previewText = useMemo(', effect_start)
-          replacement_effect = '''  useEffect(() => {
+          marker = 'if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id)'
+          marker_pos = app.index(marker)
+          effect_start = app.rfind('  useEffect(() => {', 0, marker_pos)
+          effect_end = app.index('  const previewText = useMemo(', marker_pos)
+          effect = '''  useEffect(() => {
               if (!hostCommand || lastHostCommandIdRef.current === hostCommand.id) return
               lastHostCommandIdRef.current = hostCommand.id
               void createDocument()
             }, [hostCommand])
 
           '''
-          app = app[:effect_start] + replacement_effect + app[preview_anchor:]
-          app = app.replace(
-              "  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {",
-              '  function openAi(clearSelection = true) {',
-              1,
-          )
-          app = app.replace(
-              "    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))",
-              "    setAiPanel(aiSettings.configured ? 'menu' : 'settings')",
-              1,
-          )
+          app = app[:effect_start] + effect + app[effect_end:]
+          assert app.count("  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {") == 1
+          app = app.replace("  function openAi(clearSelection = true, panel?: 'menu' | 'settings') {", '  function openAi(clearSelection = true) {', 1)
+          assert app.count("    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))") == 1
+          app = app.replace("    setAiPanel(panel ?? (aiSettings.configured ? 'menu' : 'settings'))", "    setAiPanel(aiSettings.configured ? 'menu' : 'settings')", 1)
           app_path.write_text(app, encoding='utf-8')
       - name: Commit source wiring and remove one-shot workflow
         shell: bash
