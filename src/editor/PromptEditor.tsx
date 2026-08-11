@@ -19,7 +19,7 @@ import {
   createBlockConversionTransaction,
   type EditableBlockFormat,
 } from './blockConversion'
-import { shouldOpenSlashMenu } from './slashCommand'
+import { shouldConvertCurrentBlockOnSlash, shouldOpenSlashMenu } from './slashCommand'
 
 export type { EditorCompletionContext } from './completionContext'
 export type { EditorSelectionSnapshot } from './selectionSnapshot'
@@ -182,8 +182,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     ref,
     () => ({
       insertSection(kind, text = '') {
+        if (!editor) return
+        if (!text && shouldConvertCurrentBlockOnSlash(editor.state)) {
+          const transaction = createBlockConversionTransaction(editor.state, kind)
+          if (transaction) editor.view.dispatch(transaction.scrollIntoView())
+          editor.commands.focus()
+          props.onSelectionChange(null)
+          return
+        }
         editor
-          ?.chain()
+          .chain()
           .focus()
           .insertContent({
             type: 'promptSection',

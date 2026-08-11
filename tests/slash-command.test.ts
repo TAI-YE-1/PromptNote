@@ -2,7 +2,10 @@ import { getSchema } from '@tiptap/core'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { describe, expect, it } from 'vitest'
-import { shouldOpenSlashMenu } from '../src/editor/slashCommand'
+import {
+  shouldConvertCurrentBlockOnSlash,
+  shouldOpenSlashMenu,
+} from '../src/editor/slashCommand'
 import { PromptSection } from '../src/editor/promptSection'
 
 const schema = getSchema([StarterKit, PromptSection])
@@ -20,9 +23,31 @@ function paragraphState(text: string, from: number, to = from) {
   })
 }
 
+function sectionState(text: string, from: number, kind = 'context') {
+  const section = schema.nodes.promptSection.create(
+    { kind },
+    text ? schema.text(text) : undefined,
+  )
+  const doc = schema.nodes.doc.create(null, [section])
+  return EditorState.create({
+    schema,
+    doc,
+    selection: TextSelection.create(doc, from),
+  })
+}
+
 describe('Slash command trigger', () => {
   it('opens at the start of a text block', () => {
     expect(shouldOpenSlashMenu(paragraphState('正文', 1))).toBe(true)
+  })
+
+  it('treats a block-start slash as conversion of the current block', () => {
+    expect(shouldConvertCurrentBlockOnSlash(paragraphState('正文', 1))).toBe(true)
+    expect(shouldConvertCurrentBlockOnSlash(sectionState('背景', 1))).toBe(true)
+  })
+
+  it('keeps slash after whitespace as insertion behavior', () => {
+    expect(shouldConvertCurrentBlockOnSlash(paragraphState('A ', 3))).toBe(false)
   })
 
   it('opens after whitespace', () => {
