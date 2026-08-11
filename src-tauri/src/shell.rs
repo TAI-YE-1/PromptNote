@@ -156,8 +156,14 @@ impl ShellController {
         main.set_skip_taskbar(false).map_err(error_message)?;
         main.set_always_on_top(false).map_err(error_message)?;
         main.set_min_size(Some(PhysicalSize::new(
-            logical_to_physical(FULL_WINDOW_MIN_WIDTH_LOGICAL, main.scale_factor().map_err(error_message)?),
-            logical_to_physical(FULL_WINDOW_MIN_HEIGHT_LOGICAL, main.scale_factor().map_err(error_message)?),
+            logical_to_physical(
+                FULL_WINDOW_MIN_WIDTH_LOGICAL,
+                main.scale_factor().map_err(error_message)?,
+            ),
+            logical_to_physical(
+                FULL_WINDOW_MIN_HEIGHT_LOGICAL,
+                main.scale_factor().map_err(error_message)?,
+            ),
         )))
         .map_err(error_message)?;
 
@@ -250,7 +256,10 @@ impl ShellController {
         };
 
         if enabled {
-            if matches!(*self.lock_mode()?, ShellMode::TrayBackground | ShellMode::Orb) {
+            if matches!(
+                *self.lock_mode()?,
+                ShellMode::TrayBackground | ShellMode::Orb
+            ) {
                 self.show_orb(app)?;
             }
         } else {
@@ -349,27 +358,34 @@ impl ShellController {
     }
 
     fn show_orb(&self, app: &AppHandle) -> Result<(), String> {
-    let orb = orb_window(app)?;
-    self.set_mode_and_persist(ShellMode::Orb)?;
-    if crate::fullscreen::is_suppressed() {
-        hide_window(app, ORB_LABEL)?;
-        return self.emit_snapshot(app);
+        let orb = orb_window(app)?;
+        self.set_mode_and_persist(ShellMode::Orb)?;
+        if crate::fullscreen::is_suppressed() {
+            hide_window(app, ORB_LABEL)?;
+            return self.emit_snapshot(app);
+        }
+        let preferences = self.lock_preferences()?.clone();
+        let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
+        self.position_orb(&orb, &monitor, false)?;
+        orb.show().map_err(error_message)?;
+        self.emit_snapshot(app)
     }
-    let preferences = self.lock_preferences()?.clone();
-    let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
-    self.position_orb(&orb, &monitor, false)?;
-    orb.show().map_err(error_message)?;
-    self.emit_snapshot(app)
-}
 
-    fn position_orb(&self, orb: &WebviewWindow, monitor: &Monitor, idle: bool) -> Result<(), String> {
+    fn position_orb(
+        &self,
+        orb: &WebviewWindow,
+        monitor: &Monitor,
+        idle: bool,
+    ) -> Result<(), String> {
         let preferences = self.lock_preferences()?.clone();
         let work = monitor.work_area();
         let scale = monitor.scale_factor();
-        let size = logical_to_physical(ORB_SIZE_LOGICAL, scale).min(work.size.width.min(work.size.height));
+        let size =
+            logical_to_physical(ORB_SIZE_LOGICAL, scale).min(work.size.width.min(work.size.height));
         let visible = logical_to_physical(ORB_IDLE_VISIBLE_LOGICAL, scale).min(size);
         let travel = work.size.height.saturating_sub(size);
-        let y = work.position.y + (travel as f64 * preferences.y_ratio.clamp(0.0, 1.0)).round() as i32;
+        let y =
+            work.position.y + (travel as f64 * preferences.y_ratio.clamp(0.0, 1.0)).round() as i32;
         let edge_x = match preferences.edge {
             DockEdge::Left => work.position.x,
             DockEdge::Right => work.position.x + work.size.width as i32 - size as i32,
@@ -382,8 +398,10 @@ impl ShellController {
         } else {
             edge_x
         };
-        orb.set_size(PhysicalSize::new(size, size)).map_err(error_message)?;
-        orb.set_position(PhysicalPosition::new(x, y)).map_err(error_message)
+        orb.set_size(PhysicalSize::new(size, size))
+            .map_err(error_message)?;
+        orb.set_position(PhysicalPosition::new(x, y))
+            .map_err(error_message)
     }
 
     fn ensure_orb_window(&self, app: &AppHandle) -> Result<(), String> {
@@ -477,7 +495,9 @@ impl ShellController {
     }
 
     fn capture_full_window_bounds_if_needed(&self, main: &WebviewWindow) -> Result<(), String> {
-        if *self.lock_mode()? != ShellMode::FullWindow || !main.is_visible().map_err(error_message)? {
+        if *self.lock_mode()? != ShellMode::FullWindow
+            || !main.is_visible().map_err(error_message)?
+        {
             return Ok(());
         }
         let bounds = FullWindowBounds {

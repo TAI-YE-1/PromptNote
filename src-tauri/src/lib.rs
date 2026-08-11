@@ -52,10 +52,7 @@ fn prompt_get_current_id(state: tauri::State<'_, DesktopState>) -> Result<Option
 }
 
 #[tauri::command]
-fn prompt_set_current_id(
-    state: tauri::State<'_, DesktopState>,
-    id: String,
-) -> Result<(), String> {
+fn prompt_set_current_id(state: tauri::State<'_, DesktopState>, id: String) -> Result<(), String> {
     storage::set_current_id(&state.database_path, &id)
 }
 
@@ -73,7 +70,10 @@ fn preferences_save(
 }
 
 #[tauri::command]
-fn secret_get(state: tauri::State<'_, DesktopState>, name: String) -> Result<Option<String>, String> {
+fn secret_get(
+    state: tauri::State<'_, DesktopState>,
+    name: String,
+) -> Result<Option<String>, String> {
     let _guard = state
         .credential_lock
         .lock()
@@ -201,7 +201,8 @@ pub fn run() {
             let database_path = data_dir.join("promptnote.sqlite3");
             storage::initialize(&database_path).map_err(std::io::Error::other)?;
             credentials::initialize().map_err(std::io::Error::other)?;
-            let shell = ShellController::load(database_path.clone()).map_err(std::io::Error::other)?;
+            let shell =
+                ShellController::load(database_path.clone()).map_err(std::io::Error::other)?;
             app.manage(DesktopState {
                 database_path,
                 credential_lock: Mutex::new(()),
