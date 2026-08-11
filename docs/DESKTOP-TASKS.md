@@ -121,22 +121,33 @@
 
 ## P5 — Shell 状态机：Tray / Orb / Panel / Window
 
-- [ ] 建立唯一 Desktop shell state controller；
-- [ ] System Tray 菜单完成 Open / New Prompt / Show-Hide Orb / Settings / Exit；
-- [ ] Orb 使用正式 PromptNote 森林绿图标；
+- [x] 建立唯一 Desktop shell state controller；
+- [x] System Tray 菜单完成 Open / New Prompt / Show-Hide Orb / Settings / Exit；
+- [x] Orb 使用正式 PromptNote 森林绿图标；
 - [ ] Orb 单击展开 / 收起，不使用 hover 自动展开；
 - [ ] Orb 可拖动并吸附左右屏幕边缘；
-- [ ] Orb 记忆显示器、边缘、纵向相对位置；
+- [x] Orb 记忆显示器、边缘、纵向相对位置；
 - [ ] Orb 空闲半隐藏但仍可发现 / 点击；
-- [ ] Docked Panel 默认 420 px 且不覆盖 Taskbar；
-- [ ] Panel 与 Full Window 切换复用同一编辑状态；
-- [ ] Panel Always-on-top 可关闭；
-- [ ] Full Window 使用正常最大化 / 最小化行为；
-- [ ] 普通 close 回 Orb / Tray；
-- [ ] 只有明确 Exit 才终止进程；
-- [ ] Orb 可永久隐藏，仅保留 Tray / Shortcut；
+- [x] Docked Panel 默认 420 px 且不覆盖 Taskbar；
+- [x] Panel 与 Full Window 切换复用同一编辑状态；
+- [x] Panel Always-on-top 可关闭；
+- [x] Full Window 使用正常最大化 / 最小化行为；
+- [x] 普通 close 回 Orb / Tray；
+- [x] 只有明确 Exit 才终止进程；
+- [x] Orb 可永久隐藏，仅保留 Tray / Shortcut；
 - [ ] 独占 / 全屏内容时 Orb 默认隐藏；
-- [ ] shell 切换期间 autosave、selection、ghost 不产生平行状态或丢失。
+- [x] shell 切换期间 autosave、selection、ghost 不产生平行状态或丢失。
+
+### P5 实施证据 — 2026-08-11
+
+- `src-tauri/src/shell.rs` 是唯一 Desktop shell controller，统一持有 `TrayBackground / Orb / DockedPanel / FullWindow` 四种状态。Panel 与 Full Window 始终复用同一个 `main` WebView；Orb 只是加载 `orb.html` 的轻量入口，不挂第二份 `PromptNoteApp`，因此没有 Desktop Editor / Panel Editor 平行状态链。
+- Tray 菜单固定为 Open PromptNote / New Prompt / Show-Hide Floating Orb / Settings / Exit PromptNote。New Prompt 与 Settings 通过宿主事件进入同一个共享 `PromptNoteApp`，分别复用既有 `createDocument()` 与 AI Settings 状态；`app.exit(0)` 只存在于明确 Exit 路径，普通窗口关闭被拦截并回到 Orb / Tray。
+- Orb 使用现有正式 `icon-48.png`，独立 capability 只有 `core:default`；实现 48 logical px、点击打开 Panel、5 px 拖动阈值、Tauri 原生拖窗、松手按最近左右屏幕边缘吸附，并把 monitor / edge / yRatio 保存到同一 SQLite `preferences` 表的 `desktop_shell` key。空闲 1600 ms 后仅保留 20 logical px 可见，pointer enter 只恢复可见状态，不触发展开。
+- Docked Panel 使用 monitor `work_area()` 而不是完整显示器高度，默认宽度 420 logical px，因而避开 Taskbar；Panel Always-on-top 默认开启但可在 UI 中关闭。Full Window 恢复正常 decorations / resizable / maximize / minimize / taskbar 行为并关闭 Always-on-top。
+- 审查还发现 P2 早期 `src-tauri/frontend/index.html` 占位页仍是实际 Tauri frontend。该旧链已删除，`tauri.conf.json` 现在把唯一 `frontendDist` 指向 `../dist-desktop`，Vite 同时构建 `desktop.html + orb.html`；Windows 验证必须先生成真实 frontendDist，Tauri `generate_context!()` 才允许 Rust host 编译，避免再次出现“前端单独绿但 exe 没加载”的假闭环。
+- `src-tauri/src/fullscreen.rs` 只使用 Win32 前台窗口/进程 ID/窗口矩形/显示器矩形判断外部独占全屏：排除 PromptNote 自身与普通最大化窗口，不读取键盘、剪贴板、选区，也不使用 OCR / Accessibility / UI Automation。全屏期间只临时隐藏 Orb，不修改 `orbEnabled` 或 shell mode；退出全屏后按原状态恢复。
+- Windows finalizer `finalize-fullscreen-lock` 已用真实 `dist-desktop` 生成新 Cargo.lock，并在 `x86_64-pc-windows-msvc` 执行 `cargo test --locked` 成功后才提交 commit `b6c623f88832af94b0307693b9510ddaa0b8ee3c`。`tests/desktop-shell-boundary.test.ts` 继续锁定唯一 controller、Tray surface、Panel/Full 同 WebView、420px/work-area、AOT、Orb 行为、能力隔离与全屏检测安全边界。
+- 4 个交互项继续保持未完成：Orb 实际点击展开/收起、真实拖动吸边、空闲半隐藏的可发现性、以及外部全屏应用中的自动隐藏/恢复。它们已有实现和自动测试，但根据本账本完成规则仍要求真实 Windows GUI smoke，不能用静态断言或 CI 编译替代。
 
 ## P6 — Global Shortcut、启动与窗口恢复
 
