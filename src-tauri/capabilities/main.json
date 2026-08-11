@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "PromptNote Desktop main window. P2 exposes no frontend IPC commands.",
+  "windows": ["main"],
+  "platforms": ["windows"],
+  "permissions": []
+}

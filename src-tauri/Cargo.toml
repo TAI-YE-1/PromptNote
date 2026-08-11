@@ -1,0 +1,13 @@
+[package]
+name = "promptnote-desktop"
+version = "0.1.0"
+description = "PromptNote Windows Desktop host"
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = "=2.6.3"
+
+[dependencies]
+tauri = "=2.11.5"
+tauri-plugin-single-instance = "=2.4.3"

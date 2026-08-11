@@ -43,3 +43,25 @@ jobs:
           path: promptnote-1.0.0.zip
           if-no-files-found: error
           retention-days: 30
+
+  desktop-host:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify Rust toolchain
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
+      - name: Check Windows x64 Desktop host
+        shell: pwsh
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - name: Upload generated Cargo lock
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptnote-desktop-cargo-lock
+          path: src-tauri/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
