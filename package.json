@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:desktop-shell": "vite --config vite.desktop.config.mjs --host 127.0.0.1 --port 1420 --strictPort",
     "build": "tsc -b && vite build",
+    "build:desktop-shell": "tsc -b && vite build --config vite.desktop.config.mjs",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
     "format": "prettier --write .",
