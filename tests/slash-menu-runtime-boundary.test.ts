@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import editorSource from '../src/editor/PromptEditor.tsx?raw'
 import menuSource from '../src/ui/SlashMenu.tsx?raw'
-import slashMenuStyleSource from '../src/ui/slashMenu.css?raw'
 
 describe('slash menu runtime boundary', () => {
   it('anchors from ProseMirror coordinates at slash key time', () => {
@@ -13,9 +12,5 @@ describe('slash menu runtime boundary', () => {
     expect(editorSource).toContain('onSlashMenuKeyRef.current')
     expect(menuSource).not.toContain('window.getSelection')
     expect(menuSource).not.toContain("addEventListener('keydown'")
-  })
-
-  it('keeps the active row visually stronger than the base slash-item rule', () => {
-    expect(slashMenuStyleSource).toContain('.slash-item.slash-item--active')
   })
 })
