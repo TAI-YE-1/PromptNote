@@ -19,13 +19,17 @@ import {
   createBlockConversionTransaction,
   type EditableBlockFormat,
 } from './blockConversion'
+import {
+  createAppendSectionTransaction,
+  createSlashSectionTransaction,
+} from './sectionInsertion'
 import { shouldOpenSlashMenu } from './slashCommand'
 
 export type { EditorCompletionContext } from './completionContext'
 export type { EditorSelectionSnapshot } from './selectionSnapshot'
 
 export interface PromptEditorHandle {
-  insertSection(kind: SectionKind, text?: string): void
+  insertSection(kind: SectionKind): void
   insertText(text: string): void
   replaceRange(from: number, to: number, text: string): void
   appendSection(kind: SectionKind, text: string): void
@@ -181,16 +185,13 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   useImperativeHandle(
     ref,
     () => ({
-      insertSection(kind, text = '') {
-        editor
-          ?.chain()
-          .focus()
-          .insertContent({
-            type: 'promptSection',
-            attrs: { kind },
-            content: text ? [{ type: 'text', text }] : [],
-          })
-          .run()
+      insertSection(kind) {
+        if (!editor) return
+        const transaction = createSlashSectionTransaction(editor.state, kind)
+        if (!transaction) return
+        editor.view.dispatch(transaction.scrollIntoView())
+        editor.commands.focus()
+        props.onSelectionChange(null)
       },
       insertText(text) {
         editor?.chain().focus().insertContent(text).run()
@@ -199,11 +200,11 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         editor?.chain().focus().insertContentAt({ from, to }, text).run()
       },
       appendSection(kind, text) {
-        editor
-          ?.chain()
-          .focus('end')
-          .insertContent({ type: 'promptSection', attrs: { kind }, content: [{ type: 'text', text }] })
-          .run()
+        if (!editor) return
+        const transaction = createAppendSectionTransaction(editor.state, kind, text)
+        if (!transaction) return
+        editor.view.dispatch(transaction.scrollIntoView())
+        editor.commands.focus()
       },
       convertSelectedBlock,
       focus() {
