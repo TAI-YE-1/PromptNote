@@ -1,0 +1,578 @@
+from pathlib import Path
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    file = Path(path)
+    text = file.read_text(encoding='utf-8')
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f'{path}: expected one replacement, found {count}')
+    file.write_text(text.replace(old, new), encoding='utf-8')
+
+
+Path('src/editor/slashCommand.ts').write_text(
+    """import type { EditorState } from '@tiptap/pm/state'
+
+export interface SlashMenuAnchor {
+  left: number
+  top: number
+  bottom: number
+}
+
+export type SlashMenuKey = 'ArrowDown' | 'ArrowUp' | 'Home' | 'End' | 'Enter' | 'Escape'
+
+const slashMenuKeys = new Set<string>([
+  'ArrowDown',
+  'ArrowUp',
+  'Home',
+  'End',
+  'Enter',
+  'Escape',
+])
+
+export function isSlashMenuKey(key: string): key is SlashMenuKey {
+  return slashMenuKeys.has(key)
+}
+
+export function nextSlashMenuIndex(currentIndex: number, key: string, itemCount: number): number {
+  if (itemCount <= 0) return -1
+  if (key === 'ArrowDown') return (currentIndex + 1) % itemCount
+  if (key === 'ArrowUp') return (currentIndex - 1 + itemCount) % itemCount
+  if (key === 'Home') return 0
+  if (key === 'End') return itemCount - 1
+  return currentIndex
+}
+
+export function shouldOpenSlashMenu(state: EditorState): boolean {
+  const { selection } = state
+  if (!selection.empty) return false
+
+  const { $from } = selection
+  if (!$from.parent.isTextblock) return false
+  if ($from.parentOffset === 0) return true
+
+  const previousNode = $from.nodeBefore
+  if (previousNode?.type.name === 'hardBreak') return true
+  if (!previousNode?.isText) return false
+
+  return /\\s$/u.test(previousNode.text ?? '')
+}
+""",
+    encoding='utf-8',
+)
+
+replace_once(
+    'src/editor/PromptEditor.tsx',
+    "import { shouldOpenSlashMenu } from './slashCommand'",
+    """import {
+  isSlashMenuKey,
+  shouldOpenSlashMenu,
+  type SlashMenuAnchor,
+  type SlashMenuKey,
+} from './slashCommand'""",
+)
+
+replace_once(
+    'src/editor/PromptEditor.tsx',
+    """  onCompletionContext(context: EditorCompletionContext | null): void
+  onSlashRequest(): void
+}""",
+    """  onCompletionContext(context: EditorCompletionContext | null): void
+  onSlashRequest(anchor: SlashMenuAnchor): void
+  onSlashMenuKey(key: SlashMenuKey): boolean
+}""",
+)
+
+replace_once(
+    'src/editor/PromptEditor.tsx',
+    """  const appliedContentRef = useRef(props.content)
+  documentIdRef.current = props.documentId
+  completionContextCharsRef.current = props.completionContextChars
+""",
+    """  const appliedContentRef = useRef(props.content)
+  const onSlashRequestRef = useRef(props.onSlashRequest)
+  const onSlashMenuKeyRef = useRef(props.onSlashMenuKey)
+  documentIdRef.current = props.documentId
+  completionContextCharsRef.current = props.completionContextChars
+  onSlashRequestRef.current = props.onSlashRequest
+  onSlashMenuKeyRef.current = props.onSlashMenuKey
+""",
+)
+
+replace_once(
+    'src/editor/PromptEditor.tsx',
+    """      handleKeyDown: (view, event) => {
+        const slashCommandRequested =
+          event.key === '/' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.isComposing &&
+          !view.composing &&
+          shouldOpenSlashMenu(view.state)
+
+        if (slashCommandRequested) {
+          event.preventDefault()
+          props.onSlashRequest()
+          return true
+        }
+        return false
+      },
+""",
+    """      handleKeyDown: (view, event) => {
+        if (isSlashMenuKey(event.key) && onSlashMenuKeyRef.current(event.key)) {
+          event.preventDefault()
+          event.stopPropagation()
+          return true
+        }
+
+        const slashCommandRequested =
+          event.key === '/' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.isComposing &&
+          !view.composing &&
+          shouldOpenSlashMenu(view.state)
+
+        if (slashCommandRequested) {
+          const caret = view.coordsAtPos(view.state.selection.from)
+          event.preventDefault()
+          event.stopPropagation()
+          onSlashRequestRef.current({ left: caret.left, top: caret.top, bottom: caret.bottom })
+          return true
+        }
+        return false
+      },
+      handleTextInput: (view, _from, _to, text) => {
+        if (text !== '/' || view.composing || !shouldOpenSlashMenu(view.state)) return false
+        const caret = view.coordsAtPos(view.state.selection.from)
+        onSlashRequestRef.current({ left: caret.left, top: caret.top, bottom: caret.bottom })
+        return true
+      },
+""",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    """} from '../prompt/schema'
+import { ChromePromptRepository } from '../storage/promptRepository'
+""",
+    """} from '../prompt/schema'
+import { sectionKinds } from '../prompt/sectionKinds'
+import {
+  nextSlashMenuIndex,
+  type SlashMenuAnchor,
+  type SlashMenuKey,
+} from '../editor/slashCommand'
+import { ChromePromptRepository } from '../storage/promptRepository'
+""",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    """type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type AiPanel = 'menu' | 'settings' | null
+""",
+    """type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type AiPanel = 'menu' | 'settings' | null
+
+interface SlashMenuState {
+  anchor: SlashMenuAnchor
+  activeIndex: number
+}
+""",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    "  const [slashOpen, setSlashOpen] = useState(false)",
+    "  const [slashMenu, setSlashMenu] = useState<SlashMenuState | null>(null)",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    """      else if (previewOpen) setPreviewOpen(false)
+      else if (slashOpen) setSlashOpen(false)
+      else if (selection) setSelection(null)
+""",
+    """      else if (previewOpen) setPreviewOpen(false)
+      else if (slashMenu) {
+        editorRef.current?.insertText('/')
+        setSlashMenu(null)
+      } else if (selection) setSelection(null)
+""",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    "  }, [aiPanel, documentSheetOpen, previewOpen, selection, slashOpen])",
+    "  }, [aiPanel, documentSheetOpen, previewOpen, selection, slashMenu])",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    """  function resetTransientEditorState() {
+    setSuggestion(null)
+    setSelection(null)
+    setCompletionContext(null)
+  }
+""",
+    """  function openSlashMenu(anchor: SlashMenuAnchor) {
+    setSlashMenu({ anchor, activeIndex: 0 })
+    setSelection(null)
+  }
+
+  function insertSlashSection(index: number) {
+    const kind = sectionKinds[index]
+    if (!kind) return
+    editorRef.current?.insertSection(kind)
+    setSlashMenu(null)
+  }
+
+  function handleSlashMenuKey(key: SlashMenuKey): boolean {
+    if (!slashMenu) return false
+
+    if (key === 'Enter') {
+      insertSlashSection(slashMenu.activeIndex)
+      return true
+    }
+    if (key === 'Escape') {
+      editorRef.current?.insertText('/')
+      setSlashMenu(null)
+      return true
+    }
+
+    setSlashMenu((currentMenu) =>
+      currentMenu
+        ? {
+            ...currentMenu,
+            activeIndex: nextSlashMenuIndex(
+              currentMenu.activeIndex,
+              key,
+              sectionKinds.length,
+            ),
+          }
+        : currentMenu,
+    )
+    return true
+  }
+
+  function resetTransientEditorState() {
+    setSuggestion(null)
+    setSelection(null)
+    setCompletionContext(null)
+    setSlashMenu(null)
+  }
+""",
+)
+
+replace_once(
+    'src/app/PromptNoteApp.tsx',
+    """                onSelectionChange={setSelection}
+                onCompletionContext={setCompletionContext}
+                onSlashRequest={() => { setSlashOpen(true); setSelection(null) }}
+              />
+              {slashOpen && (
+                <SlashMenu
+                  onClose={() => setSlashOpen(false)}
+                  onEscape={() => {
+                    editorRef.current?.insertText('/')
+                    setSlashOpen(false)
+                  }}
+                  onInsert={(kind) => {
+                    editorRef.current?.insertSection(kind)
+                    setSlashOpen(false)
+                  }}
+                />
+              )}
+""",
+    """                onSelectionChange={setSelection}
+                onCompletionContext={setCompletionContext}
+                onSlashRequest={openSlashMenu}
+                onSlashMenuKey={handleSlashMenuKey}
+              />
+              {slashMenu && (
+                <SlashMenu
+                  anchor={slashMenu.anchor}
+                  activeIndex={slashMenu.activeIndex}
+                  onActiveIndex={(activeIndex) =>
+                    setSlashMenu((currentMenu) =>
+                      currentMenu ? { ...currentMenu, activeIndex } : currentMenu,
+                    )
+                  }
+                  onClose={() => setSlashMenu(null)}
+                  onInsert={(kind) => {
+                    editorRef.current?.insertSection(kind)
+                    setSlashMenu(null)
+                  }}
+                />
+              )}
+""",
+)
+
+Path('src/ui/SlashMenu.tsx').write_text(
+    """import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { sectionKindMeta, sectionKinds, type SectionKind } from '../prompt/sectionKinds'
+import type { SlashMenuAnchor } from '../editor/slashCommand'
+import './slashMenu.css'
+
+const MENU_GAP = 6
+const VIEWPORT_PADDING = 8
+
+export interface SlashMenuPosition {
+  left: number
+  top: number
+}
+
+export function placeSlashMenu(
+  anchor: SlashMenuAnchor,
+  menuWidth: number,
+  menuHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): SlashMenuPosition {
+  const minLeft = VIEWPORT_PADDING
+  const maxLeft = Math.max(minLeft, viewportWidth - VIEWPORT_PADDING - menuWidth)
+  const left = Math.min(Math.max(anchor.left, minLeft), maxLeft)
+
+  const below = anchor.bottom + MENU_GAP
+  const above = anchor.top - MENU_GAP - menuHeight
+  const maxTop = Math.max(VIEWPORT_PADDING, viewportHeight - VIEWPORT_PADDING - menuHeight)
+  const top =
+    below <= maxTop
+      ? below
+      : above >= VIEWPORT_PADDING
+        ? above
+        : Math.min(Math.max(below, VIEWPORT_PADDING), maxTop)
+
+  return { left, top }
+}
+
+interface SlashMenuProps {
+  anchor: SlashMenuAnchor
+  activeIndex: number
+  onActiveIndex(index: number): void
+  onClose(): void
+  onInsert(kind: SectionKind): void
+}
+
+export function SlashMenu(props: SlashMenuProps) {
+  const [position, setPosition] = useState<SlashMenuPosition | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    if (!menu) return
+    const menuRect = menu.getBoundingClientRect()
+    setPosition(
+      placeSlashMenu(
+        props.anchor,
+        menuRect.width,
+        menuRect.height,
+        window.innerWidth,
+        window.innerHeight,
+      ),
+    )
+  }, [props.anchor])
+
+  useLayoutEffect(() => {
+    itemRefs.current[props.activeIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [props.activeIndex])
+
+  const positionStyle: CSSProperties = {
+    position: 'fixed',
+    left: position?.left ?? 0,
+    top: position?.top ?? 0,
+    visibility: position ? 'visible' : 'hidden',
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      className="slash-menu"
+      role="menu"
+      aria-label="Prompt 结构"
+      style={positionStyle}
+    >
+      <div className="slash-menu__head">
+        <span>Prompt 结构</span>
+        <button
+          type="button"
+          aria-label="关闭 Prompt 结构菜单"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={props.onClose}
+        >
+          ×
+        </button>
+      </div>
+      {sectionKinds.map((kind, index) => {
+        const meta = sectionKindMeta[kind]
+        return (
+          <button
+            key={kind}
+            ref={(node) => { itemRefs.current[index] = node }}
+            type="button"
+            role="menuitem"
+            aria-selected={index === props.activeIndex}
+            tabIndex={-1}
+            className={index === props.activeIndex ? 'slash-item slash-item--active' : 'slash-item'}
+            data-kind={kind}
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => props.onActiveIndex(index)}
+            onClick={() => props.onInsert(kind)}
+          >
+            <span className="slash-item__icon">{meta.icon}</span>
+            <span>
+              <strong>{meta.label}</strong>
+              <small>{meta.description}</small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+""",
+    encoding='utf-8',
+)
+
+Path('tests/slash-menu-position.test.ts').write_text(
+    """import { describe, expect, it } from 'vitest'
+import { placeSlashMenu } from '../src/ui/SlashMenu'
+import type { SlashMenuAnchor } from '../src/editor/slashCommand'
+
+const baseAnchor: SlashMenuAnchor = {
+  left: 120,
+  top: 180,
+  bottom: 200,
+}
+
+describe('slash menu caret placement', () => {
+  it('opens below the ProseMirror caret when there is enough room', () => {
+    expect(placeSlashMenu(baseAnchor, 280, 260, 360, 640)).toEqual({ left: 72, top: 206 })
+  })
+
+  it('flips directly above the ProseMirror caret near the viewport bottom', () => {
+    expect(
+      placeSlashMenu({ left: 120, top: 570, bottom: 590 }, 280, 260, 360, 640),
+    ).toEqual({ left: 72, top: 304 })
+  })
+
+  it('keeps the menu inside horizontal viewport bounds', () => {
+    expect(placeSlashMenu({ ...baseAnchor, left: 340 }, 280, 260, 360, 640).left).toBe(72)
+    expect(placeSlashMenu({ ...baseAnchor, left: 2 }, 280, 260, 360, 640).left).toBe(8)
+  })
+})
+""",
+    encoding='utf-8',
+)
+
+Path('tests/slash-menu.test.tsx').write_text(
+    """import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+import { sectionKindMeta, sectionKinds } from '../src/prompt/sectionKinds'
+import { SlashMenu } from '../src/ui/components'
+import { nextSlashMenuIndex } from '../src/editor/slashCommand'
+
+const anchor = { left: 100, top: 120, bottom: 140 }
+
+function renderMenu(activeIndex = 0) {
+  return renderToStaticMarkup(
+    <SlashMenu
+      anchor={anchor}
+      activeIndex={activeIndex}
+      onActiveIndex={() => undefined}
+      onClose={() => undefined}
+      onInsert={() => undefined}
+    />,
+  )
+}
+
+describe('SlashMenu', () => {
+  it('renders every authoritative semantic section exactly once', () => {
+    const html = renderMenu()
+    for (const kind of sectionKinds) {
+      expect(html.match(new RegExp(`data-kind="${kind}"`, 'g'))).toHaveLength(1)
+      expect(html).toContain(sectionKindMeta[kind].label)
+      expect(html).toContain(sectionKindMeta[kind].description)
+    }
+  })
+
+  it('uses a controlled active index without moving DOM focus into the menu', () => {
+    const html = renderMenu(2)
+    expect(html).toContain('role="menu"')
+    expect(html).not.toContain('tabindex="0"')
+    expect(html).toContain('aria-selected="true"')
+    expect(html.match(/tabindex="-1"/g)?.length).toBeGreaterThanOrEqual(sectionKinds.length)
+  })
+
+  it('moves keyboard selection with wrapping and Home/End', () => {
+    expect(nextSlashMenuIndex(0, 'ArrowDown', 3)).toBe(1)
+    expect(nextSlashMenuIndex(2, 'ArrowDown', 3)).toBe(0)
+    expect(nextSlashMenuIndex(0, 'ArrowUp', 3)).toBe(2)
+    expect(nextSlashMenuIndex(1, 'Home', 3)).toBe(0)
+    expect(nextSlashMenuIndex(1, 'End', 3)).toBe(2)
+  })
+})
+""",
+    encoding='utf-8',
+)
+
+Path('tests/slash-menu-runtime-boundary.test.ts').write_text(
+    """import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+function source(path: string) {
+  return readFileSync(new URL(path, import.meta.url), 'utf-8')
+}
+
+describe('slash menu runtime boundary', () => {
+  it('anchors from ProseMirror coordinates at slash key time', () => {
+    const editorSource = source('../src/editor/PromptEditor.tsx')
+    expect(editorSource).toContain('view.coordsAtPos(view.state.selection.from)')
+    expect(editorSource).toContain('onSlashRequestRef.current')
+  })
+
+  it('keeps keyboard ownership in PromptEditor instead of the React menu', () => {
+    const editorSource = source('../src/editor/PromptEditor.tsx')
+    const menuSource = source('../src/ui/SlashMenu.tsx')
+    expect(editorSource).toContain('onSlashMenuKeyRef.current')
+    expect(menuSource).not.toContain('window.getSelection')
+    expect(menuSource).not.toContain("addEventListener('keydown'")
+  })
+})
+""",
+    encoding='utf-8',
+)
+
+slash_test = Path('tests/slash-command.test.ts')
+slash_test_text = slash_test.read_text(encoding='utf-8')
+slash_test_text = slash_test_text.replace(
+    "import { shouldOpenSlashMenu } from '../src/editor/slashCommand'",
+    """import {
+  isSlashMenuKey,
+  nextSlashMenuIndex,
+  shouldOpenSlashMenu,
+} from '../src/editor/slashCommand'""",
+)
+slash_test_text += """
+
+describe('Slash menu keyboard contract', () => {
+  it('recognizes only menu-owned navigation/commit keys', () => {
+    expect(isSlashMenuKey('ArrowDown')).toBe(true)
+    expect(isSlashMenuKey('Enter')).toBe(true)
+    expect(isSlashMenuKey('Escape')).toBe(true)
+    expect(isSlashMenuKey('/')).toBe(false)
+    expect(isSlashMenuKey('a')).toBe(false)
+  })
+
+  it('wraps the controlled active index', () => {
+    expect(nextSlashMenuIndex(0, 'ArrowUp', 7)).toBe(6)
+    expect(nextSlashMenuIndex(6, 'ArrowDown', 7)).toBe(0)
+  })
+})
+"""
+slash_test.write_text(slash_test_text, encoding='utf-8')
