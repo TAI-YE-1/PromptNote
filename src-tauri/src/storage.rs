@@ -57,6 +57,8 @@ pub fn get(path: &Path, id: &str) -> Result<Option<PromptDocument>, String> {
 
 pub fn save(path: &Path, document: &PromptDocument) -> Result<(), String> {
     validate_document(document)?;
+    let revision = i64::try_from(document.revision)
+        .map_err(|_| "PromptDocument.revision 超出 SQLite INTEGER 范围。".to_string())?;
     let content_json = serde_json::to_string(&document.content).map_err(error_message)?;
     let connection = open_initialized(path)?;
     connection
@@ -76,7 +78,7 @@ pub fn save(path: &Path, document: &PromptDocument) -> Result<(), String> {
                 document.id,
                 document.title,
                 document.schema_version,
-                document.revision,
+                revision,
                 content_json,
                 document.created_at,
                 document.updated_at,
@@ -204,6 +206,14 @@ fn migrate(connection: &mut Connection) -> Result<(), String> {
 }
 
 fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<PromptDocument> {
+    let raw_revision: i64 = row.get(3)?;
+    let revision = u64::try_from(raw_revision).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            3,
+            rusqlite::types::Type::Integer,
+            Box::new(error),
+        )
+    })?;
     let content_json: String = row.get(4)?;
     let content = serde_json::from_str(&content_json).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
@@ -216,7 +226,7 @@ fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<PromptDocument> 
         id: row.get(0)?,
         title: row.get(1)?,
         schema_version: row.get(2)?,
-        revision: row.get(3)?,
+        revision,
         content,
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
@@ -305,6 +315,16 @@ mod tests {
         let stored = get(&path, "doc-1").unwrap().unwrap();
         assert_eq!(stored.revision, 4);
         assert_eq!(stored.title, "新版本");
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_revision_outside_sqlite_integer_range() {
+        let path = temp_database();
+        initialize(&path).unwrap();
+        let result = save(&path, &document(i64::MAX as u64 + 1, "超范围"));
+        assert!(result.is_err());
+        assert!(get(&path, "doc-1").unwrap().is_none());
         fs::remove_file(path).unwrap();
     }
 
