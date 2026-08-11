@@ -1,0 +1,35 @@
+name: fix-offscreen-overlap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-offscreen-overlap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fix negative rectangle intersections
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('src-tauri/src/shell.rs')
+          s=p.read_text()
+          old='    let visible_width = right.saturating_sub(left) as u32;\n    let visible_height = bottom.saturating_sub(top) as u32;'
+          new='    if right <= left || bottom <= top {\n        return false;\n    }\n    let visible_width = (right - left) as u32;\n    let visible_height = (bottom - top) as u32;'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/fix-offscreen-overlap.yml
+          git add src-tauri/src/shell.rs
+          git commit -m "fix(desktop): reject negative monitor intersections"
+          git push
