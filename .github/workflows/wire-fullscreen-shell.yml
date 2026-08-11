@@ -28,7 +28,7 @@ jobs:
         shell: pwsh
         run: |
           $shellPath = 'src-tauri/src/shell.rs'
-          $shell = [System.IO.File]::ReadAllText($shellPath)
+          $shell = [System.IO.File]::ReadAllText($shellPath).Replace("`r`n", "`n")
           $oldShow = @(
             '    fn show_orb(&self, app: &AppHandle) -> Result<(), String> {',
             '        let orb = orb_window(app)?;',
@@ -60,7 +60,7 @@ jobs:
           [System.IO.File]::WriteAllText($shellPath, $shell, [System.Text.UTF8Encoding]::new($false))
 
           $libPath = 'src-tauri/src/lib.rs'
-          $lib = [System.IO.File]::ReadAllText($libPath)
+          $lib = [System.IO.File]::ReadAllText($libPath).Replace("`r`n", "`n")
           $moduleAnchor = "mod credentials;`nmod shell;`nmod storage;"
           $moduleReplacement = "mod credentials;`n#[cfg(target_os = `"windows`)]`nmod fullscreen;`nmod shell;`nmod storage;"
           if (-not $lib.Contains($moduleAnchor)) { throw 'lib module anchor changed' }
