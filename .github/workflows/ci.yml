@@ -32,17 +32,22 @@ jobs:
         run: npm run build
       - name: Read extension version
         if: github.event_name == 'push'
-        run: echo "EXTENSION_VERSION=$(node -p 'JSON.parse(require(\"node:fs\").readFileSync(\"public/manifest.json\", \"utf8\")).version')" >> "$GITHUB_ENV"
+        id: extension
+        shell: bash
+        run: |
+          version="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync("public/manifest.json", "utf8")).version)')"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Package release artifact
         if: github.event_name == 'push'
         run: |
           cd dist
-          zip -qr "../promptnote-${EXTENSION_VERSION}.zip" .
+          zip -qr "../promptnote-${{ steps.extension.outputs.version }}.zip" .
       - name: Upload release artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: promptnote-${{ env.EXTENSION_VERSION }}
-          path: promptnote-${{ env.EXTENSION_VERSION }}.zip
+          name: promptnote-${{ steps.extension.outputs.version }}
+          path: promptnote-${{ steps.extension.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 30
