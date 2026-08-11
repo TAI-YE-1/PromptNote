@@ -24,16 +24,11 @@ jobs:
 
           shell_path = Path('src-tauri/src/shell.rs')
           shell = shell_path.read_text(encoding='utf-8')
-          old_show = '''    fn show_orb(&self, app: &AppHandle) -> Result<(), String> {
-              let orb = orb_window(app)?;
-              let preferences = self.lock_preferences()?.clone();
-              let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
-              self.position_orb(&orb, &monitor, false)?;
-              orb.show().map_err(error_message)?;
-              self.set_mode_and_persist(ShellMode::Orb)?;
-              self.emit_snapshot(app)
-          }'''
-          new_show = '''    fn show_orb(&self, app: &AppHandle) -> Result<(), String> {
+          start_token = '    fn show_orb(&self, app: &AppHandle) -> Result<(), String> {'
+          end_token = '    fn position_orb(&self, orb: &WebviewWindow, monitor: &Monitor, idle: bool) -> Result<(), String> {'
+          start = shell.index(start_token)
+          end = shell.index(end_token, start)
+          replacement = '''    fn show_orb(&self, app: &AppHandle) -> Result<(), String> {
               let orb = orb_window(app)?;
               self.set_mode_and_persist(ShellMode::Orb)?;
               if crate::fullscreen::is_suppressed() {
@@ -45,29 +40,27 @@ jobs:
               self.position_orb(&orb, &monitor, false)?;
               orb.show().map_err(error_message)?;
               self.emit_snapshot(app)
-          }'''
-          assert shell.count(old_show) == 1, 'shell show_orb anchor changed'
-          shell_path.write_text(shell.replace(old_show, new_show, 1), encoding='utf-8')
+          }
+
+          '''
+          shell_path.write_text(shell[:start] + replacement + shell[end:], encoding='utf-8')
 
           lib_path = Path('src-tauri/src/lib.rs')
           lib = lib_path.read_text(encoding='utf-8')
-          module_anchor = 'mod credentials;\nmod shell;\nmod storage;'
-          module_replacement = 'mod credentials;\n#[cfg(target_os = "windows")]\nmod fullscreen;\nmod shell;\nmod storage;'
-          assert lib.count(module_anchor) == 1, 'lib module anchor changed'
-          lib = lib.replace(module_anchor, module_replacement, 1)
-
-          setup_anchor = '''            app.state::<ShellController>()
-                      .initialize(app.handle())
-                      .map_err(std::io::Error::other)?;
-                  Ok(())'''
-          setup_replacement = '''            app.state::<ShellController>()
-                      .initialize(app.handle())
-                      .map_err(std::io::Error::other)?;
-                  #[cfg(target_os = "windows")]
-                  fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;
-                  Ok(())'''
-          assert lib.count(setup_anchor) == 1, 'lib setup anchor changed'
-          lib_path.write_text(lib.replace(setup_anchor, setup_replacement, 1), encoding='utf-8')
+          assert 'mod fullscreen;' not in lib
+          lib = lib.replace(
+              'mod credentials;\nmod shell;\nmod storage;',
+              'mod credentials;\n#[cfg(target_os = "windows")]\nmod fullscreen;\nmod shell;\nmod storage;',
+              1,
+          )
+          init_line = '                .map_err(std::io::Error::other)?;\n            Ok(())'
+          assert lib.count(init_line) == 1
+          lib = lib.replace(
+              init_line,
+              '                .map_err(std::io::Error::other)?;\n            #[cfg(target_os = "windows")]\n            fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;\n            Ok(())',
+              1,
+          )
+          lib_path.write_text(lib, encoding='utf-8')
       - name: Commit source wiring and remove one-shot workflow
         shell: bash
         run: |
