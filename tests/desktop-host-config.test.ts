@@ -21,19 +21,30 @@ describe('Desktop host boundary', () => {
 
     expect(cargo).toContain('tauri = "=2.11.5"')
     expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
+    expect(cargo).toContain('tauri-plugin-http = "=2.5.9"')
     expect(config.identifier).toBe('com.promptnote.desktop')
     expect(config.app.windows.map((window) => window.label)).toEqual(['main'])
     expect(existsSync(iconPath)).toBe(true)
     expect([...readFileSync(iconPath).subarray(0, 6)]).toEqual([0, 0, 1, 0, 1, 0])
   })
 
-  it('keeps capabilities minimal and does not enable shell or filesystem plugins', () => {
+  it('keeps capabilities minimal while allowing only HTTPS and local AI HTTP traffic', () => {
     const cargo = read('src-tauri/Cargo.toml')
     const capability = JSON.parse(read('src-tauri/capabilities/main-window.json')) as {
-      permissions: string[]
+      permissions: Array<string | { identifier: string; allow: Array<{ url: string }> }>
     }
 
-    expect(capability.permissions).toEqual(['core:default'])
+    expect(capability.permissions).toEqual([
+      'core:default',
+      {
+        identifier: 'http:default',
+        allow: [
+          { url: 'https://*:*' },
+          { url: 'http://localhost:*' },
+          { url: 'http://127.0.0.1:*' },
+        ],
+      },
+    ])
     expect(cargo).not.toContain('tauri-plugin-shell')
     expect(cargo).not.toContain('tauri-plugin-fs')
   })
@@ -42,15 +53,21 @@ describe('Desktop host boundary', () => {
     const host = read('src-tauri/src/lib.rs')
 
     expect(host).toContain('tauri_plugin_single_instance::init')
+    expect(host).toContain('tauri_plugin_http::init()')
     expect(host).toContain('get_webview_window("main")')
     expect(host).toContain('window.show()')
     expect(host).toContain('window.unminimize()')
     expect(host).toContain('window.set_focus()')
   })
 
-  it('keeps the Desktop entry free of Browser host adapters', () => {
+  it('mounts the shared PromptNote app with Desktop adapters only', () => {
     const entry = read('src/desktop.tsx')
 
+    expect(entry).toContain("import { PromptNoteApp } from './app/PromptNoteApp'")
+    expect(entry).toContain("./platform/desktop/promptRepository")
+    expect(entry).toContain("./platform/desktop/preferencesRepository")
+    expect(entry).toContain("./platform/desktop/secretStore")
+    expect(entry).toContain("./platform/desktop/aiTransport")
     expect(entry).not.toContain('platform/browser')
     expect(entry).not.toMatch(/\bchrome\./)
   })
