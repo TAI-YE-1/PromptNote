@@ -1,4 +1,6 @@
 mod credentials;
+#[cfg(target_os = "windows")]
+mod fullscreen;
 mod shell;
 mod storage;
 
@@ -208,6 +210,8 @@ pub fn run() {
             app.state::<ShellController>()
                 .initialize(app.handle())
                 .map_err(std::io::Error::other)?;
+            #[cfg(target_os = "windows")]
+            fullscreen::start(app.handle().clone()).map_err(std::io::Error::other)?;
             Ok(())
         })
         .on_window_event(|window, event| {

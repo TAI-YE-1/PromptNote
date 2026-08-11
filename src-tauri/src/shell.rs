@@ -349,14 +349,18 @@ impl ShellController {
     }
 
     fn show_orb(&self, app: &AppHandle) -> Result<(), String> {
-        let orb = orb_window(app)?;
-        let preferences = self.lock_preferences()?.clone();
-        let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
-        self.position_orb(&orb, &monitor, false)?;
-        orb.show().map_err(error_message)?;
-        self.set_mode_and_persist(ShellMode::Orb)?;
-        self.emit_snapshot(app)
+    let orb = orb_window(app)?;
+    self.set_mode_and_persist(ShellMode::Orb)?;
+    if crate::fullscreen::is_suppressed() {
+        hide_window(app, ORB_LABEL)?;
+        return self.emit_snapshot(app);
     }
+    let preferences = self.lock_preferences()?.clone();
+    let monitor = select_monitor(&orb, preferences.monitor_name.as_deref())?;
+    self.position_orb(&orb, &monitor, false)?;
+    orb.show().map_err(error_message)?;
+    self.emit_snapshot(app)
+}
 
     fn position_orb(&self, orb: &WebviewWindow, monitor: &Monitor, idle: bool) -> Result<(), String> {
         let preferences = self.lock_preferences()?.clone();
