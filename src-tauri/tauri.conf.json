@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.promptnote.desktop",
   "build": {
-    "frontendDist": "frontend"
+    "frontendDist": "../dist-desktop"
   },
   "app": {
     "withGlobalTauri": false,
@@ -12,7 +12,7 @@
       {
         "label": "main",
         "title": "PromptNote",
-        "url": "index.html",
+        "url": "desktop.html",
         "width": 1080,
         "height": 720,
         "minWidth": 720,
