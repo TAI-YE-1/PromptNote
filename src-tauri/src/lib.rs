@@ -1,4 +1,5 @@
 mod credentials;
+mod shell;
 mod storage;
 
 #[cfg(test)]
@@ -8,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde_json::Value;
+use shell::{ShellController, ShellSnapshot};
 use storage::PromptDocument;
 use tauri::Manager;
 
@@ -99,11 +101,92 @@ fn secret_remove(state: tauri::State<'_, DesktopState>, name: String) -> Result<
     credentials::remove(&name)
 }
 
+#[tauri::command]
+fn shell_snapshot(shell: tauri::State<'_, ShellController>) -> Result<ShellSnapshot, String> {
+    shell.snapshot()
+}
+
+#[tauri::command]
+fn shell_show_full(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.show_full_window(&app)
+}
+
+#[tauri::command]
+fn shell_show_panel(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.show_panel(&app)
+}
+
+#[tauri::command]
+fn shell_collapse_panel(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.collapse_panel(&app)
+}
+
+#[tauri::command]
+fn shell_toggle_compact(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.toggle_compact(&app)
+}
+
+#[tauri::command]
+fn shell_toggle_orb(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.toggle_orb_enabled(&app)
+}
+
+#[tauri::command]
+fn shell_set_panel_always_on_top(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+    enabled: bool,
+) -> Result<(), String> {
+    shell.set_panel_always_on_top(&app, enabled)
+}
+
+#[tauri::command]
+fn shell_start_orb_drag(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.start_orb_drag(&app)
+}
+
+#[tauri::command]
+fn shell_snap_orb(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+) -> Result<(), String> {
+    shell.snap_orb(&app)
+}
+
+#[tauri::command]
+fn shell_set_orb_idle(
+    app: tauri::AppHandle,
+    shell: tauri::State<'_, ShellController>,
+    idle: bool,
+) -> Result<(), String> {
+    shell.set_orb_idle(&app, idle)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(shell) = app.try_state::<ShellController>() {
+                let _ = shell.show_full_window(app);
+            } else if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
@@ -116,11 +199,30 @@ pub fn run() {
             let database_path = data_dir.join("promptnote.sqlite3");
             storage::initialize(&database_path).map_err(std::io::Error::other)?;
             credentials::initialize().map_err(std::io::Error::other)?;
+            let shell = ShellController::load(database_path.clone()).map_err(std::io::Error::other)?;
             app.manage(DesktopState {
                 database_path,
                 credential_lock: Mutex::new(()),
             });
+            app.manage(shell);
+            app.state::<ShellController>()
+                .initialize(app.handle())
+                .map_err(std::io::Error::other)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+                if let Some(shell) = window.app_handle().try_state::<ShellController>() {
+                    if let Err(error) = shell.handle_main_close(window.app_handle()) {
+                        eprintln!("PromptNote close-to-background failed: {error}");
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             prompt_list,
@@ -134,6 +236,16 @@ pub fn run() {
             secret_get,
             secret_set,
             secret_remove,
+            shell_snapshot,
+            shell_show_full,
+            shell_show_panel,
+            shell_collapse_panel,
+            shell_toggle_compact,
+            shell_toggle_orb,
+            shell_set_panel_always_on_top,
+            shell_start_orb_drag,
+            shell_snap_orb,
+            shell_set_orb_idle,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PromptNote Desktop");
