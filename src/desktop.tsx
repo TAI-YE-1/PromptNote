@@ -1,6 +1,9 @@
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { PromptNoteApp } from './app/PromptNoteApp'
+import {
+  PromptNoteApp,
+  type PromptNoteHostCommandRequest,
+} from './app/PromptNoteApp'
 import { RuntimeErrorBoundary } from './app/RuntimeErrorBoundary'
 import { DesktopAiTransport } from './platform/desktop/aiTransport'
 import { DesktopPreferencesRepository } from './platform/desktop/preferencesRepository'
@@ -9,6 +12,7 @@ import { DesktopSecretStore } from './platform/desktop/secretStore'
 import {
   collapseDockedPanel,
   getShellSnapshot,
+  onHostCommand,
   onShellSnapshot,
   setPanelAlwaysOnTop,
   showFullWindow,
@@ -27,12 +31,15 @@ const secretStore = new DesktopSecretStore()
 const aiTransport = new DesktopAiTransport()
 
 function DesktopRoot() {
+  const hostCommandSequence = useRef(0)
   const [shell, setShell] = useState<ShellSnapshot | null>(null)
+  const [hostCommand, setHostCommand] = useState<PromptNoteHostCommandRequest | null>(null)
   const [shellError, setShellError] = useState<string | null>(null)
 
   useEffect(() => {
     let disposed = false
-    let unlisten: (() => void) | null = null
+    let unlistenShell: (() => void) | null = null
+    let unlistenHostCommand: (() => void) | null = null
 
     void getShellSnapshot()
       .then((snapshot) => {
@@ -49,12 +56,22 @@ function DesktopRoot() {
       }
     }).then((stop) => {
       if (disposed) stop()
-      else unlisten = stop
+      else unlistenShell = stop
+    })
+
+    void onHostCommand((command) => {
+      if (disposed) return
+      hostCommandSequence.current += 1
+      setHostCommand({ id: hostCommandSequence.current, command })
+    }).then((stop) => {
+      if (disposed) stop()
+      else unlistenHostCommand = stop
     })
 
     return () => {
       disposed = true
-      unlisten?.()
+      unlistenShell?.()
+      unlistenHostCommand?.()
     }
   }, [])
 
@@ -78,6 +95,7 @@ function DesktopRoot() {
         preferencesRepository={preferencesRepository}
         secretStore={secretStore}
         aiTransport={aiTransport}
+        hostCommand={hostCommand}
       />
 
       {shell?.mode === 'docked-panel' && (
