@@ -1,0 +1,59 @@
+name: build-desktop-smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-desktop-smoke.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: npm ci --ignore-scripts
+      - name: Build shared Desktop frontend
+        shell: pwsh
+        run: npm run build:desktop-shell
+      - name: Build Windows x64 smoke executable
+        shell: pwsh
+        run: cargo build --release --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - name: Prepare smoke artifact
+        shell: pwsh
+        run: |
+          Copy-Item 'src-tauri/target/x86_64-pc-windows-msvc/release/promptnote-desktop.exe' 'PromptNote-Windows-x64-smoke.exe'
+          $hash = (Get-FileHash 'PromptNote-Windows-x64-smoke.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "PromptNote Windows x64 smoke executable`nCommit: $env:GITHUB_SHA`nSHA256: $hash`nUnsigned development smoke build; Windows may show an Unknown Publisher warning." | Set-Content -Encoding UTF8 'SMOKE-README.txt'
+          "$hash  PromptNote-Windows-x64-smoke.exe" | Set-Content -Encoding ascii 'SHA256SUM.txt'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PromptNote-Windows-x64-smoke
+          path: |
+            PromptNote-Windows-x64-smoke.exe
+            SMOKE-README.txt
+            SHA256SUM.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/build-desktop-smoke.yml
+          git commit -m "chore(desktop): remove smoke build workflow"
+          git push
