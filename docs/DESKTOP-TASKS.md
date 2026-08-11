@@ -153,8 +153,8 @@
 
 - [ ] 默认 `Ctrl + Alt + P` 注册成功时可 toggle compact shell；
 - [ ] 快捷键冲突显示真实错误；
-- [ ] 不读取全局按键内容、当前选区或剪贴板；
-- [ ] 开机启动设置默认关闭；
+- [x] 不读取全局按键内容、当前选区或剪贴板；
+- [x] 开机启动设置默认关闭；
 - [ ] 用户开启后可开机进入 Orb / Tray 且不抢焦点；
 - [ ] 手动启动恢复上次 shell 偏好；
 - [ ] 显示器拔插 / 主屏切换后窗口位置安全回退；
@@ -162,6 +162,17 @@
 - [ ] 多显示器不同 DPI smoke；
 - [ ] Taskbar 不同位置 smoke；
 - [ ] 全屏视频 / 应用 smoke。
+
+### P6 实施证据 — 2026-08-11
+
+- `src-tauri/src/startup.rs` 固定 `Ctrl + Alt + P`，由 Rust `tauri-plugin-global-shortcut 2.3.2` 注册；只有 `Pressed` 事件进入同一个 `ShellController.toggle_compact()`。注册冲突不会让应用启动失败，而是保留真实错误到 `StartupState`，Windows 设置页直接显示 `shortcutRegistered / shortcutError`。
+- 快捷键实现不读取按键内容：P6 边界明确不存在 `GetAsyncKeyState`、`SetWindowsHookEx`、剪贴板读取、OCR、Accessibility / UI Automation；共享 Editor 也不接收宿主全局输入。
+- 开机启动使用 `tauri-plugin-autostart 2.5.1`，默认不调用 enable；只有 Windows 设置页显式开启时才调用 OS autostart，并在写入后重新读取 `is_enabled()` 校验实际状态，失败返回真实错误。Autostart 参数固定为 `--autostart`。
+- `--autostart` 启动走 `show_background_launch()`：先隐藏 main，Orb 窗口 `focusable(false) / focused(false)`，仅进入 Orb 或 Tray，不覆盖用户手动启动的 `last_mode`。普通手动启动仍按 SQLite 中 `last_mode` 恢复。
+- Full Window 恢复旧坐标前会检查与任一当前 monitor work area 至少存在 64x48 physical px 安全交集；完全离屏则居中。Windows 测试曾发现负交集转 `u32` 会形成超大正数的真实 bug，已改为 `right <= left || bottom <= top` 先拒绝，再计算无符号交集。
+- Tray 的 Settings 已与 AI Provider Settings 分离：Tray 打开 Windows Desktop 设置（快捷键 / 开机启动 / Orb / Panel 置顶）；AI chip 继续只负责 AI 配置。不存在第二套 Settings 数据模型。
+- 正式 CI `#505`（commit `fcc5b1773206384ac7212cebf20b252f3141acbc`）Browser verify 全绿，Windows `desktop-host` 的真实 `dist-desktop → cargo test --locked` 也通过；P6 插件 API、后台启动、离屏恢复与已有 P3/P4/P5 Rust tests 在同一 Windows x64 宿主链验证。
+- 其余 9 项保持未完成：快捷键真实注册/冲突、开机登录、手动恢复、拔屏、多 DPI、多屏不同 DPI、Taskbar 位置、全屏视频/应用均需要真实 Windows GUI / OS 生命周期 smoke，不能用静态测试或 CI 编译替代。
 
 ## P7 — Backup 兼容与 Browser 共存
 
