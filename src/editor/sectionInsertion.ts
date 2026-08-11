@@ -46,7 +46,6 @@ export function createSlashSectionTransaction(
   if (!didConvert || !conversionTransaction) return null
 
   for (const step of conversionTransaction.steps) splitTransaction.step(step)
-  splitTransaction.setSelection(conversionTransaction.selection)
   return splitTransaction
 }
 

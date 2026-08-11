@@ -18,8 +18,8 @@ describe('Desktop host boundary', () => {
       app: { windows: Array<{ label: string }> }
     }
 
-    expect(cargo).toContain('tauri = { version = "2"')
-    expect(cargo).toContain('tauri-plugin-single-instance = "2"')
+    expect(cargo).toContain('tauri = "=2.11.5"')
+    expect(cargo).toContain('tauri-plugin-single-instance = "=2.4.3"')
     expect(config.identifier).toBe('com.promptnote.desktop')
     expect(config.app.windows.map((window) => window.label)).toEqual(['main'])
   })
