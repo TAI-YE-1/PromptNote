@@ -49,11 +49,20 @@ describe('Desktop host boundary', () => {
     expect(cargo).not.toContain('tauri-plugin-fs')
   })
 
+  it('uses one Tauri runtime for the executable and all Desktop services', () => {
+    const main = read('src-tauri/src/main.rs')
+    const host = read('src-tauri/src/lib.rs')
+
+    expect(main.trim()).toBe('fn main() {\n    promptnote_desktop::run();\n}')
+    expect(main).not.toContain('tauri::Builder')
+    expect(host).toContain('tauri::Builder::default()')
+    expect(host).toContain('tauri_plugin_single_instance::init')
+    expect(host).toContain('tauri_plugin_http::init()')
+  })
+
   it('wakes and focuses the existing main window on a second launch', () => {
     const host = read('src-tauri/src/lib.rs')
 
-    expect(host).toContain('tauri_plugin_single_instance::init')
-    expect(host).toContain('tauri_plugin_http::init()')
     expect(host).toContain('get_webview_window("main")')
     expect(host).toContain('window.show()')
     expect(host).toContain('window.unminimize()')
