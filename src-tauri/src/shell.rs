@@ -628,8 +628,11 @@ fn rectangles_have_safe_overlap(position: PhysicalPosition<i32>, size: PhysicalS
     let top = position.y.max(work_position.y);
     let right = (position.x + size.width as i32).min(work_position.x + work_size.width as i32);
     let bottom = (position.y + size.height as i32).min(work_position.y + work_size.height as i32);
-    let visible_width = right.saturating_sub(left) as u32;
-    let visible_height = bottom.saturating_sub(top) as u32;
+    if right <= left || bottom <= top {
+        return false;
+    }
+    let visible_width = (right - left) as u32;
+    let visible_height = (bottom - top) as u32;
     visible_width >= 64.min(size.width) && visible_height >= 48.min(size.height)
 }
 
