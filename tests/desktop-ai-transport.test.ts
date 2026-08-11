@@ -1,9 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getAiProvider } from '../src/ai/provider'
+import type { AiSettings } from '../src/ai/types'
 
 const http = vi.hoisted(() => ({ fetch: vi.fn() }))
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: http.fetch }))
 
 import { DesktopAiTransport } from '../src/platform/desktop/aiTransport'
+
+const baseSettings: AiSettings = {
+  enabled: true,
+  configured: true,
+  completionEnabled: true,
+  completionContextChars: 320,
+  completionDelayMs: 300,
+  completionModel: '',
+  instructionOverrides: {},
+  provider: 'openai-compatible',
+  model: 'test-model',
+  baseUrl: 'https://provider.example.com/v1',
+  apiKey: 'test-key',
+  scope: 'selection',
+}
 
 describe('DesktopAiTransport', () => {
   beforeEach(() => {
@@ -52,6 +69,49 @@ describe('DesktopAiTransport', () => {
       body: '{}',
       signal: controller.signal,
     })
+  })
+
+  it('runs the shared OpenAI-compatible provider through the Desktop transport', async () => {
+    const transport = new DesktopAiTransport()
+    http.fetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'desktop-openai-ok' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await expect(
+      getAiProvider(baseSettings, transport).generate(baseSettings, {
+        action: 'clarify',
+        content: '测试',
+      }),
+    ).resolves.toBe('desktop-openai-ok')
+
+    expect(http.fetch.mock.calls[0]?.[0]).toBe('https://provider.example.com/v1/chat/completions')
+  })
+
+  it('runs the shared Anthropic provider through the Desktop transport', async () => {
+    const transport = new DesktopAiTransport()
+    const settings: AiSettings = {
+      ...baseSettings,
+      provider: 'anthropic',
+      baseUrl: 'https://api.anthropic.com',
+    }
+    http.fetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ content: [{ type: 'text', text: 'desktop-anthropic-ok' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await expect(
+      getAiProvider(settings, transport).generate(settings, {
+        action: 'clarify',
+        content: '测试',
+      }),
+    ).resolves.toBe('desktop-anthropic-ok')
+
+    expect(http.fetch.mock.calls[0]?.[0]).toBe('https://api.anthropic.com/v1/messages')
   })
 
   it('rejects insecure remote requests even if a caller skips ensureAccess', async () => {
