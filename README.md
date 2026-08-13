@@ -6,7 +6,9 @@
 
 PromptNote 是一款本地优先的 Chrome / Edge Side Panel Prompt 编辑器。你可以像写普通文档一样组织 Prompt，不需要先学习 Markdown、XML 或复杂的 Prompt Engineering 语法。
 
-当前正式版本：**1.0.0**
+当前仓库 Manifest 版本：**1.0.1**
+
+Microsoft Edge Add-ons：**已上架**（商店当前版本：**1.0.0**，扩展 ID：`anfinlneeljjcbaehlknppeidggbonhk`）
 
 ## 主要能力
 
@@ -22,18 +24,26 @@ PromptNote 不向 ChatGPT、Claude、Gemini 等第三方网页输入框自动注
 
 ## 安装
 
-### 当前发行包
+### Microsoft Edge Add-ons
 
-在浏览器商店上架前，可以使用仓库 CI 生成的正式构建：
+PromptNote 已发布至 Microsoft Edge Add-ons。Edge 用户建议优先通过扩展商店安装，以便获得浏览器托管的安装与自动更新。
+
+- 商店名称：`PromptNote / 提词笺`
+- 商店当前版本：`1.0.0`
+- 扩展 ID：`anfinlneeljjcbaehlknppeidggbonhk`
+
+仓库当前 Manifest 已推进到 `1.0.1`；商店版本升级完成前，以 Microsoft Edge Add-ons 实际展示的版本为准。
+
+### 当前仓库构建
+
+如果需要测试仓库当前版本，可以使用 CI 生成的正式构建：
 
 1. 打开本仓库 **Actions**；
 2. 进入最新成功的 `ci`；
-3. 下载 `promptnote-1.0.0` artifact；
+3. 下载 `promptnote-1.0.1` artifact；
 4. 解压；
 5. Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`；
 6. 开启开发者模式并选择“加载已解压的扩展程序”。
-
-浏览器商店版本上线后，普通用户应优先通过商店安装和自动更新。
 
 ### 从源码构建
 
@@ -107,7 +117,7 @@ AI 自定义地址使用 optional host permission。PromptNote 不需要 `active
 
 ## 版本说明
 
-见 [`docs/RELEASE-NOTES-1.0.0.md`](docs/RELEASE-NOTES-1.0.0.md)。
+最新版本说明见 [`docs/RELEASE-NOTES-1.0.1.md`](docs/RELEASE-NOTES-1.0.1.md)。首发版本说明见 [`docs/RELEASE-NOTES-1.0.0.md`](docs/RELEASE-NOTES-1.0.0.md)。
 
 ## 开发与维护
 
