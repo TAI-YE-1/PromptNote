@@ -8,7 +8,7 @@ PromptNote 是一款本地优先的 Chrome / Edge Side Panel Prompt 编辑器。
 
 当前仓库 Manifest 版本：**1.0.1**
 
-Microsoft Edge Add-ons：**已上架**（商店当前版本：**1.0.0**，扩展 ID：`anfinlneeljjcbaehlknppeidggbonhk`）
+Microsoft Edge Add-ons：**[已上架，点击安装](https://microsoftedge.microsoft.com/addons/detail/promptnote-%E6%8F%90%E8%AF%8D%E7%AC%BA/anfinlneeljjcbaehlknppeidggbonhk)**（商店当前版本：**1.0.0**，扩展 ID：`anfinlneeljjcbaehlknppeidggbonhk`）
 
 ## 主要能力
 
@@ -27,6 +27,8 @@ PromptNote 不向 ChatGPT、Claude、Gemini 等第三方网页输入框自动注
 ### Microsoft Edge Add-ons
 
 PromptNote 已发布至 Microsoft Edge Add-ons。Edge 用户建议优先通过扩展商店安装，以便获得浏览器托管的安装与自动更新。
+
+**[在 Microsoft Edge Add-ons 安装 PromptNote](https://microsoftedge.microsoft.com/addons/detail/promptnote-%E6%8F%90%E8%AF%8D%E7%AC%BA/anfinlneeljjcbaehlknppeidggbonhk)**
 
 - 商店名称：`PromptNote / 提词笺`
 - 商店当前版本：`1.0.0`
