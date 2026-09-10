@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  一个本地优先的 Chrome / Edge Side Panel Prompt 编辑器：自由写作、结构化、检查、预览并复制，不要求先学 Markdown、XML 或复杂的 Prompt Engineering 语法。
+  一个本地优先的 Chrome / Edge Side Panel Prompt 编辑器：自由写作、结构化、检查、预览并复制，并提供可主动开启的 IDE 风格 AI 内联补全；不要求先学 Markdown、XML 或复杂的 Prompt Engineering 语法。
 </p>
 
 <p align="center">
@@ -23,6 +23,7 @@
 
 <p align="center">
   <img alt="Manifest V3" src="https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white">
+  <img alt="AI inline completion" src="https://img.shields.io/badge/AI-inline_completion-7C3AED">
   <img alt="Chrome 116+" src="https://img.shields.io/badge/Chrome-116%2B-4285F4?logo=googlechrome&logoColor=white">
   <img alt="Local first" src="https://img.shields.io/badge/Data-local--first-success">
   <img alt="License MPL-2.0" src="https://img.shields.io/badge/license-MPL--2.0-blue">
@@ -33,6 +34,22 @@
 </p>
 
 > 如果 PromptNote 对你有帮助，欢迎点一个 ⭐ **Star**。它能让更多需要结构化写 Prompt 的人发现这个项目。
+
+## 一个比较特别的能力：IDE 风格 AI 内联补全
+
+PromptNote 不只是在你写完以后让 AI “改一下”。它还可以在你正在写 Prompt 时，像代码编辑器里的补全一样，在**当前块**给出 ghost text 建议：
+
+- 由用户单独开启，默认关闭；
+- 补全出现后按 `Tab` 接受；
+- 按 `Esc` 忽略；
+- 未接受的 ghost text 不会进入正文；
+- 关闭 AI、Provider 不可用或请求失败时，不影响正常编辑、保存、检查、预览和复制。
+
+这也是 PromptNote 当前唯一允许自动请求 AI 的能力；用户仍然是作者，AI 只是助手。
+
+<p align="center">
+  <img src="docs/store-assets/screenshots/screenshot-03-ai-assist.png" alt="PromptNote AI assistance" width="760">
+</p>
 
 ## 为什么做 PromptNote
 
@@ -45,6 +62,7 @@ PromptNote 的思路很简单：**Prompt 本质上也是文档。**
 | 普通大文本框 | PromptNote |
 | --- | --- |
 | 内容越长越难定位 | 用目标、背景、任务、约束等结构块组织 |
+| 写到一半只能自己继续补 | 可主动开启 block-local AI 内联补全，`Tab` 接受、`Esc` 忽略 |
 | 需要自己维护 Markdown / XML | 正常写作即可，最后再预览 / 编译 |
 | Prompt 与工具强绑定 | 统一 Copy，交给 ChatGPT、Claude、Gemini 或其他工具 |
 | AI 不可用时工作流容易中断 | AI 完全可选，编辑、保存、检查、预览、复制始终可用 |
@@ -54,23 +72,21 @@ PromptNote 的思路很简单：**Prompt 本质上也是文档。**
 
 **写 → 结构化 → 检查 → 预览 / 编译 → Copy**
 
+AI 内联补全是这条主链上的可选增强，不是使用 PromptNote 的前置条件。
+
 <p>
   <img src="docs/store-assets/screenshots/screenshot-02-slash-menu.png" alt="Slash menu" width="49%">
   <img src="docs/store-assets/screenshots/screenshot-04-preview-copy.png" alt="Preview and copy" width="49%">
 </p>
 
-<p>
-  <img src="docs/store-assets/screenshots/screenshot-03-ai-assist.png" alt="Optional AI assist" width="49%">
-</p>
-
 ## 主要能力
 
 - **自由富文本编辑**：先写内容，不需要先学习一套 Prompt 语法。
+- **IDE 风格 AI 内联补全**：用户主动开启后，在当前块显示 ghost text，`Tab` 接受、`Esc` 忽略；未接受内容不会写入正文。
 - **`/` 结构菜单**：快速插入目标、背景、任务、约束、示例、输出格式、验收标准等结构块。
 - **Prompt Check**：在本地检查结构和常见问题。
 - **多格式预览与复制**：Plain Text / Markdown / XML。
 - **可选 AI 辅助**：选中文字后执行“改清楚 / 缩短 / 拆约束”等操作。
-- **可选内联补全**：主动开启后使用，`Tab` 接受、`Esc` 忽略；默认关闭。
 - **多 Prompt 本地保存**：自动保存，并支持 JSON 备份与恢复。
 - **低权限设计**：固定 Manifest 权限只有 `storage` 与 `sidePanel`。
 
@@ -112,6 +128,12 @@ npm run build
 ### 直接写
 
 打开 Side Panel 后即可输入。标题可以直接修改，正文自动保存到浏览器扩展本地存储。
+
+### 使用内联补全
+
+配置 AI Provider 后，可以单独开启编辑器内联补全。开启后，PromptNote 会在当前块生成 ghost text 建议：按 `Tab` 接受，按 `Esc` 忽略。只有你明确接受后，补全内容才会进入正文。
+
+内联补全默认关闭；不使用它也不会影响 PromptNote 的其他核心能力。
 
 ### 用 `/` 加结构
 
